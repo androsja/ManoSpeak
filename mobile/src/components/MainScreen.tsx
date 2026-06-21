@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { FrameBuffer } from '../services/FrameBuffer';
+import { Camera, useCameraDevice } from 'react-native-vision-camera';
+import Svg, { Circle, Line, Polyline } from 'react-native-svg';
+import { useMediaPipeHolistic } from '../hooks/useMediaPipeHolistic';
 import { TranslationService } from '../services/TranslationService';
 import { TtsService } from '../services/TtsService';
 
@@ -9,9 +11,15 @@ export const MainScreen: React.FC = () => {
   const [bufferSize, setBufferSize] = useState(0);
   const [translatedText, setTranslatedText] = useState('');
   const [speaking, setSpeaking] = useState(false);
+  const [currentLandmarks, setCurrentLandmarks] = useState<number[][] | null>(null);
+
+  // Hook for camera integration and MediaPipe Holistic coordinates streaming
+  const { hasPermission, requestPermission, frameOutput, frameBuffer } = useMediaPipeHolistic(30);
+
+  // Get front camera device
+  const cameraDevice = useCameraDevice('front');
 
   // References to Services (preserved across renders)
-  const frameBufferRef = useRef<FrameBuffer>(new FrameBuffer(30));
   const translationServiceRef = useRef<TranslationService>(new TranslationService());
   const ttsServiceRef = useRef<TtsService>(new TtsService());
 
@@ -22,18 +30,38 @@ export const MainScreen: React.FC = () => {
         await translationServiceRef.current.loadModel();
         setModelLoading(false);
       } catch (err) {
-        console.error('Failed to load PhonSSM model', err);
+        console.error('Failed to load LSC dictionary models', err);
       }
     };
     initModel();
   }, []);
 
+  // Frame update loop pulling from frame buffer to render skeleton overlay
+  useEffect(() => {
+    let active = true;
+    const updateLoop = () => {
+      if (!active) return;
+      const size = frameBuffer.size();
+      setBufferSize(size);
+      
+      const frames = frameBuffer.getFrames();
+      if (frames.length > 0) {
+        setCurrentLandmarks(frames[frames.length - 1]);
+      }
+      
+      requestAnimationFrame(updateLoop);
+    };
+    updateLoop();
+    
+    return () => {
+      active = false;
+    };
+  }, [frameBuffer]);
+
   // Update translation text when buffer changes
   const runTranslation = async () => {
     try {
-      const gloss = await translationServiceRef.current.translateFrameBuffer(
-        frameBufferRef.current
-      );
+      const gloss = await translationServiceRef.current.translateFrameBuffer(frameBuffer);
       setTranslatedText(gloss);
     } catch (err) {
       console.error('Translation error', err);
@@ -44,11 +72,15 @@ export const MainScreen: React.FC = () => {
   const addMockFrameForSign = (value: number) => {
     const frame: number[][] = [];
     for (let i = 0; i < 543; i++) {
-      frame.push([value, value, value]);
+      // Mock coordinates with slight positional offsets to look realistic
+      frame.push([
+        0.5 + Math.sin(i * 0.1) * 0.25,
+        0.5 + Math.cos(i * 0.1) * 0.25,
+        value
+      ]);
     }
     try {
-      frameBufferRef.current.addFrame(frame);
-      setBufferSize(frameBufferRef.current.size());
+      frameBuffer.addFrame(frame);
       runTranslation();
     } catch (err) {
       console.error(err);
@@ -65,9 +97,100 @@ export const MainScreen: React.FC = () => {
   };
 
   const handleClear = () => {
-    frameBufferRef.current.clear();
+    frameBuffer.clear();
     setBufferSize(0);
     setTranslatedText('');
+    setCurrentLandmarks(null);
+  };
+
+  // Maps coordinates [0, 1] range to screen canvas percentages
+  const mapX = (x: number) => `${Math.max(0, Math.min(100, x * 100))}%`;
+  const mapY = (y: number) => `${Math.max(0, Math.min(100, y * 100))}%`;
+
+  const renderSkeletonOverlay = () => {
+    if (!currentLandmarks || currentLandmarks.length !== 543) {
+      return null;
+    }
+
+    const landmarks = currentLandmarks;
+
+    // Define structural points
+    const leftShoulder = landmarks[11];
+    const rightShoulder = landmarks[12];
+    const leftElbow = landmarks[13];
+    const rightElbow = landmarks[14];
+    const leftWrist = landmarks[15];
+    const rightWrist = landmarks[16];
+
+    // Left hand landmarks (33 to 53)
+    const leftHandPoints = landmarks.slice(33, 54);
+    // Right hand landmarks (54 to 74)
+    const rightHandPoints = landmarks.slice(54, 75);
+
+    return (
+      <Svg style={StyleSheet.absoluteFill}>
+        {/* Render Torso / Arm Connections */}
+        <Line
+          x1={mapX(leftShoulder[0])} y1={mapY(leftShoulder[1])}
+          x2={mapX(rightShoulder[0])} y2={mapY(rightShoulder[1])}
+          stroke="#0EA5E9" strokeWidth="3"
+        />
+        <Line
+          x1={mapX(leftShoulder[0])} y1={mapY(leftShoulder[1])}
+          x2={mapX(leftElbow[0])} y2={mapY(leftElbow[1])}
+          stroke="#0EA5E9" strokeWidth="2.5"
+        />
+        <Line
+          x1={mapX(leftElbow[0])} y1={mapY(leftElbow[1])}
+          x2={mapX(leftWrist[0])} y2={mapY(leftWrist[1])}
+          stroke="#0EA5E9" strokeWidth="2.5"
+        />
+        <Line
+          x1={mapX(rightShoulder[0])} y1={mapY(rightShoulder[1])}
+          x2={mapX(rightElbow[0])} y2={mapY(rightElbow[1])}
+          stroke="#0EA5E9" strokeWidth="2.5"
+        />
+        <Line
+          x1={mapX(rightElbow[0])} y1={mapY(rightElbow[1])}
+          x2={mapX(rightWrist[0])} y2={mapY(rightWrist[1])}
+          stroke="#0EA5E9" strokeWidth="2.5"
+        />
+
+        {/* Render Left Hand Points */}
+        {leftHandPoints.map((pt, idx) => (
+          <Circle
+            key={`lh-${idx}`}
+            cx={mapX(pt[0])}
+            cy={mapY(pt[1])}
+            r="4"
+            fill="#10B981"
+          />
+        ))}
+
+        {/* Render Right Hand Points */}
+        {rightHandPoints.map((pt, idx) => (
+          <Circle
+            key={`rh-${idx}`}
+            cx={mapX(pt[0])}
+            cy={mapY(pt[1])}
+            r="4"
+            fill="#10B981"
+          />
+        ))}
+
+        {/* Render Face Outline points (sampled subset for smooth rendering) */}
+        {landmarks.slice(75, 120).map((pt, idx) => (
+          <Circle
+            key={`face-${idx}`}
+            cx={mapX(pt[0])}
+            cy={mapY(pt[1])}
+            r="2"
+            fill="#F43F5E"
+            opacity={0.7}
+          />
+        ))}
+      </Svg>
+    );
   };
 
   return (
@@ -78,20 +201,36 @@ export const MainScreen: React.FC = () => {
         <Text style={styles.subtitle}>Traductor LSC Offline</Text>
       </View>
 
-      {/* 2. Live Camera Stream Frame (Placeholder) */}
-      <View style={styles.cameraFrame}>
-        <View style={styles.cameraOverlay}>
-          <Text style={styles.cameraText}>[ Vista de Cámara MediaPipe Activa ]</Text>
-          <Text style={styles.statsText}>
-            Buffer Temporal: {bufferSize} / 30 frames
-          </Text>
+      {/* 2. Camera View & Overlay */}
+      <View style={styles.cameraContainer}>
+        {hasPermission && cameraDevice ? (
+          <View style={StyleSheet.absoluteFill}>
+            <Camera
+              style={StyleSheet.absoluteFill}
+              device={cameraDevice}
+              isActive={true}
+              outputs={[frameOutput]}
+            />
+            {renderSkeletonOverlay()}
+          </View>
+        ) : (
+          <View style={styles.cameraPlaceholder}>
+            <Text style={styles.cameraText}>Acceso a Cámara Desactivado</Text>
+            <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+              <Text style={styles.permissionBtnText}>Solicitar Permiso</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={styles.statsOverlay}>
+          <Text style={styles.statsText}>Buffer: {bufferSize} / 30 frames</Text>
           {modelLoading ? (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator size="small" color="#ffffff" />
-              <Text style={styles.loaderText}>Cargando phonssm_quant.tflite...</Text>
+            <View style={styles.loaderRow}>
+              <ActivityIndicator size="small" color="#38BDF8" />
+              <Text style={styles.loaderText}>Cargando Diccionario LSC...</Text>
             </View>
           ) : (
-            <Text style={styles.statusText}>● Modelo PhonSSM Cargado</Text>
+            <Text style={styles.statusText}>● Diccionario LSC Activo</Text>
           )}
         </View>
       </View>
@@ -112,23 +251,23 @@ export const MainScreen: React.FC = () => {
 
       {/* 4. Controls Console */}
       <View style={styles.console}>
-        <Text style={styles.consoleLabel}>Simulador de Gestos MediaPipe:</Text>
+        <Text style={styles.consoleLabel}>Simulador de Gestos LSC:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => addMockFrameForSign(0.0)} // hola recipe (sum = 0)
+            onPress={() => addMockFrameForSign(0.0)} // HOLA recipe
           >
             <Text style={styles.btnText}>+ Seña: HOLA</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => addMockFrameForSign(1.0 / (543 * 3))} // gracias recipe (sum = 1)
+            onPress={() => addMockFrameForSign(1.0 / (543 * 3))} // GRACIAS recipe
           >
             <Text style={styles.btnText}>+ Seña: GRACIAS</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => addMockFrameForSign(5.0 / (543 * 3))} // colombia recipe (sum = 5)
+            onPress={() => addMockFrameForSign(5.0 / (543 * 3))} // COLOMBIA recipe
           >
             <Text style={styles.btnText}>+ Seña: COLOMBIA</Text>
           </TouchableOpacity>
@@ -156,18 +295,18 @@ export const MainScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A', // Deep slate dark mode
+    backgroundColor: '#0F172A',
     padding: 16,
   },
   header: {
     marginTop: 24,
-    marginBottom: 16,
+    marginBottom: 12,
     alignItems: 'center',
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#38BDF8', // Sky blue primary
+    color: '#38BDF8',
     letterSpacing: 1,
   },
   subtitle: {
@@ -175,45 +314,68 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginTop: 4,
   },
-  cameraFrame: {
+  cameraContainer: {
     flex: 3,
     backgroundColor: '#1E293B',
     borderRadius: 16,
     borderWidth: 2,
     borderColor: '#334155',
     overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 12,
+  },
+  cameraPlaceholder: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  cameraOverlay: {
-    alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   cameraText: {
     color: '#64748B',
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 16,
+  },
+  permissionBtn: {
+    backgroundColor: '#38BDF8',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  permissionBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  statsOverlay: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   statsText: {
     color: '#38BDF8',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 16,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
   },
-  loaderContainer: {
+  loaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   loaderText: {
     color: '#94A3B8',
-    fontSize: 12,
-    marginLeft: 8,
+    fontSize: 11,
+    marginLeft: 6,
   },
   statusText: {
-    color: '#10B981', // Emerald green online indicator
-    fontSize: 12,
+    color: '#10B981',
+    fontSize: 11,
     fontWeight: '700',
   },
   translationOverlay: {
@@ -223,11 +385,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#334155',
-    marginBottom: 16,
+    marginBottom: 12,
     justifyContent: 'center',
   },
   overlayLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#94A3B8',
     textTransform: 'uppercase',
@@ -244,7 +406,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   placeholderText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748B',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -257,7 +419,7 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
   },
   consoleLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#94A3B8',
     marginBottom: 10,
@@ -265,7 +427,7 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   actionButton: {
     backgroundColor: '#0EA5E9',
