@@ -1,3 +1,22 @@
+jest.mock('react-native', () => ({
+  NativeModules: {},
+}));
+
+jest.mock('onnxruntime-react-native', () => ({
+  InferenceSession: {
+    create: jest.fn().mockResolvedValue({
+      run: jest.fn().mockResolvedValue({}),
+    }),
+  },
+  Tensor: jest.fn().mockImplementation((type, data, dims) => ({
+    type,
+    data,
+    dims,
+  })),
+}));
+
+jest.mock('../../../assets/models/tts_voice.onnx', () => 'mock-onnx-file', { virtual: true });
+
 import { FrameBuffer } from '../FrameBuffer';
 import { TranslationService } from '../TranslationService';
 import { TtsService } from '../TtsService';
