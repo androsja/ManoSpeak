@@ -21,3 +21,8 @@ ENV/
 # Ephemeral scratch directory contents
 tmp/*
 !tmp/.gitkeep
+
+# Local datasets and model parameters
+LSC70/
+ml/data/
+
