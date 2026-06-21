@@ -4,18 +4,20 @@ export class TranslationService {
   private isModelLoaded: boolean = false;
   
   // Zero-shot dictionary recipes mapping physical parameter indices to LSC words (glosas)
-  private dictionary: Map<string, string> = new Map([
-    ['0,0,0', 'HOLA'],
-    ['1,1,2', 'GRACIAS'],
-    ['2,5,3', 'YO'],
-    ['5,8,11', 'COLOMBIA'],
-    ['12,3,15', 'LSC'],
-    ['8,4,2', 'BUENOS_DIAS'],
-  ]);
+  private dictionary: Map<string, string> = new Map();
 
   public async loadModel(): Promise<void> {
-    // Simulates native TFLite compilation and model file load
-    this.isModelLoaded = true;
+    try {
+      // Load LSC dictionary recipes asynchronously from assets JSON
+      const dictData = require('../../assets/data/lsc_dictionary.json');
+      for (const [key, value] of Object.entries(dictData)) {
+        this.dictionary.set(key, value as string);
+      }
+      this.isModelLoaded = true;
+    } catch (err) {
+      console.error('Failed to load LSC dictionary', err);
+      throw err;
+    }
   }
 
   public async translateFrameBuffer(frameBuffer: FrameBuffer): Promise<string> {
