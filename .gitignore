@@ -1,0 +1,23 @@
+# Dependency folders
+node_modules/
+dist/
+build/
+.expo/
+
+# Environments
+.env
+.env.*
+venv/
+.venv/
+ENV/
+
+# OS/IDE files
+.DS_Store
+.vscode/
+
+# Deep Work Plan databases and logs
+.dwp/
+
+# Ephemeral scratch directory contents
+tmp/*
+!tmp/.gitkeep
