@@ -1,0 +1,15 @@
+{
+  "project": "ManoSpeak",
+  "version": "1.0.0",
+  "harness": {
+    "allow_git_commits": true,
+    "require_user_consent_on_destructive_actions": true,
+    "default_agent": "architect",
+    "supported_personas": [
+      "architect",
+      "ml-researcher",
+      "mobile-developer",
+      "qa-engineer"
+    ]
+  }
+}
