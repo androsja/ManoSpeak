@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "manospeak-ml"
+version = "0.1.0"
+description = "Machine Learning pipeline for ManoSpeak LSC translator"
+authors = ["Julian Florez <jflorezgaleano@gmail.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+numpy = "^1.24.0"
+mediapipe = "0.10.14"
+torch = "^2.0.0"
+pyyaml = "^6.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+ruff = "^0.1.0"
+mypy = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
