@@ -7,10 +7,19 @@ jest.mock('react-native', () => ({
   },
 }));
 
+// Mock LandmarkNormalizer as identity so hook tests remain decoupled from
+// normalizer math (LandmarkNormalizer has its own unit test suite).
+const mockNormalizeFrame = jest.fn();
+jest.mock('../../services/LandmarkNormalizer', () => ({
+  LandmarkNormalizer: {
+    normalizeFrame: mockNormalizeFrame,
+  },
+}));
+
 import { useMediaPipeHolistic } from '../useMediaPipeHolistic';
 import { useCameraPermission, useFrameOutput } from 'react-native-vision-camera';
 import { useRef } from 'react';
-import { NativeModules } from 'react-native';
+import { LandmarkNormalizer } from '../../services/LandmarkNormalizer';
 
 // Mock react-native-vision-camera hooks
 jest.mock('react-native-vision-camera', () => ({
@@ -36,10 +45,20 @@ jest.mock('react', () => {
 describe('useMediaPipeHolistic Hook Tests', () => {
   let mockFrameBuffer: any;
   let mockFrames: number[][][];
+  let rawCoords: number[][];
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
+    // Raw coordinates returned by native MediaPipe detector
+    rawCoords = [];
+    for (let i = 0; i < 543; i++) {
+      rawCoords.push([0.1, 0.2, 0.3]);
+    }
+
+    // LandmarkNormalizer mock: identity (returns input unchanged)
+    mockNormalizeFrame.mockImplementation((frame: number[][]) => frame);
+
     // Create a manual mock frame buffer
     mockFrames = [];
     mockFrameBuffer = {
@@ -52,13 +71,7 @@ describe('useMediaPipeHolistic Hook Tests', () => {
 
     (useRef as jest.Mock).mockReturnValue({ current: mockFrameBuffer });
 
-    mockProcessFrame.mockImplementation(() => {
-      const coords: number[][] = [];
-      for (let i = 0; i < 543; i++) {
-        coords.push([0.1, 0.2, 0.3]);
-      }
-      return coords;
-    });
+    mockProcessFrame.mockReturnValue(rawCoords);
   });
 
   test('should return permission states and buffer capacity', () => {
@@ -78,22 +91,50 @@ describe('useMediaPipeHolistic Hook Tests', () => {
     expect(allowed).toBe(true);
   });
 
-  test('should process camera frame and update FrameBuffer', () => {
+  test('should process camera frame through normalizer then into FrameBuffer', () => {
     const result = useMediaPipeHolistic(10);
-
-    const mockFrame = {
-      dispose: jest.fn(),
-    };
-
+    const mockFrame = { dispose: jest.fn() };
     const frameOutput = result.frameOutput as any;
-    
-    // Trigger onFrame callback
+
     frameOutput.options.onFrame(mockFrame);
 
-    expect(mockFrame.dispose).toHaveBeenCalled();
+    // 1. Frame must be forwarded to native detector
     expect(mockProcessFrame).toHaveBeenCalledWith(mockFrame);
-    expect(mockFrameBuffer.addFrame).toHaveBeenCalled();
+
+    // 2. Raw coordinates must pass through the normalizer
+    expect(mockNormalizeFrame).toHaveBeenCalledWith(rawCoords);
+
+    // 3. Normalized result (identity mock = rawCoords) must be buffered
+    expect(mockFrameBuffer.addFrame).toHaveBeenCalledWith(rawCoords);
     expect(mockFrames.length).toBe(1);
-    expect(mockFrames[0][0]).toEqual([0.1, 0.2, 0.3]);
+
+    // 4. Frame must always be disposed
+    expect(mockFrame.dispose).toHaveBeenCalled();
+  });
+
+  test('should dispose frame even when normalizer is not called (frame length mismatch)', () => {
+    mockProcessFrame.mockReturnValue([[0.1, 0.2, 0.3]]); // only 1 landmark — invalid
+    const result = useMediaPipeHolistic(10);
+    const mockFrame = { dispose: jest.fn() };
+    const frameOutput = result.frameOutput as any;
+
+    frameOutput.options.onFrame(mockFrame);
+
+    expect(mockNormalizeFrame).not.toHaveBeenCalled();
+    expect(mockFrameBuffer.addFrame).not.toHaveBeenCalled();
+    expect(mockFrame.dispose).toHaveBeenCalled();
+  });
+
+  test('should not add frame when native detector returns null', () => {
+    mockProcessFrame.mockReturnValue(null);
+    const result = useMediaPipeHolistic(10);
+    const mockFrame = { dispose: jest.fn() };
+    const frameOutput = result.frameOutput as any;
+
+    frameOutput.options.onFrame(mockFrame);
+
+    expect(mockNormalizeFrame).not.toHaveBeenCalled();
+    expect(mockFrameBuffer.addFrame).not.toHaveBeenCalled();
+    expect(mockFrame.dispose).toHaveBeenCalled();
   });
 });
