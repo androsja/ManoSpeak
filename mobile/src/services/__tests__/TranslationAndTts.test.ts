@@ -3,13 +3,7 @@ jest.mock('react-native', () => ({
 }));
 
 jest.mock('react-native-fast-tflite', () => ({
-  loadTensorflowModel: jest.fn().mockResolvedValue({
-    inputs: [],
-    outputs: [],
-    delegates: [],
-    run: jest.fn().mockResolvedValue([]),
-    runSync: jest.fn().mockReturnValue([]),
-  }),
+  loadTensorflowModel: jest.fn(),
 }));
 
 jest.mock('onnxruntime-react-native', () => ({
@@ -24,6 +18,28 @@ jest.mock('../../../assets/models/tts_voice.onnx', () => 'mock-onnx-file', { vir
 import { FrameBuffer } from '../FrameBuffer';
 import { TranslationService } from '../TranslationService';
 import { TtsService } from '../TtsService';
+import { loadTensorflowModel } from 'react-native-fast-tflite';
+
+// Build an ArrayBuffer with the given value set to 1.0 at `argmaxIdx` (all others 0).
+function makeOutputBuffer(argmaxIdx: number, size: number): ArrayBuffer {
+  const arr = new Float32Array(size).fill(0);
+  arr[argmaxIdx] = 1.0;
+  return arr.buffer;
+}
+
+function makeMockTfliteModel(hArgmax: number, lArgmax: number, mArgmax: number) {
+  return {
+    inputs: [],
+    outputs: [],
+    delegates: [],
+    run: jest.fn().mockResolvedValue([
+      makeOutputBuffer(hArgmax, 64),
+      makeOutputBuffer(lArgmax, 32),
+      makeOutputBuffer(mArgmax, 32),
+    ]),
+    runSync: jest.fn().mockReturnValue([]),
+  };
+}
 
 describe('Translation and TTS Integration Services', () => {
   let frameBuffer: FrameBuffer;
@@ -34,6 +50,7 @@ describe('Translation and TTS Integration Services', () => {
     frameBuffer = new FrameBuffer(5);
     translationService = new TranslationService();
     ttsService = new TtsService();
+    jest.clearAllMocks();
   });
 
   const createMockFrame = (value: number = 1.0): number[][] => {
@@ -53,36 +70,31 @@ describe('Translation and TTS Integration Services', () => {
     });
 
     test('should return empty string on empty buffer', async () => {
+      (loadTensorflowModel as jest.Mock).mockResolvedValue(makeMockTfliteModel(0, 0, 0));
       await translationService.loadModel();
       const gloss = await translationService.translateFrameBuffer(frameBuffer);
       expect(gloss).toBe('');
     });
 
     test('should translate matching LSC recipes from dictionary', async () => {
+      // lsc_dictionary.json maps "1,1,2" -> "GRACIAS".
+      // TFLite outputs: handshape argmax=1 (64-class), location argmax=1 (32-class), movement argmax=2 (32-class).
+      (loadTensorflowModel as jest.Mock).mockResolvedValue(makeMockTfliteModel(1, 1, 2));
       await translationService.loadModel();
-
-      // GRACIAS is at vocab index 47.
-      // Decoder: h = round(sum) % 64 = 47, l = floor(47 * 1.6) % 32 = 11, m = floor(47 * 2.2) % 32 = 7.
-      // Force sum = 47.0 by setting each of the 543 * 3 coordinates to 47.0 / 1629.
-      const val = 47.0 / (543 * 3);
-      frameBuffer.addFrame(createMockFrame(val));
+      frameBuffer.addFrame(createMockFrame(1.0));
 
       const gloss = await translationService.translateFrameBuffer(frameBuffer);
       expect(gloss).toBe('GRACIAS');
     });
 
     test('should register and decode custom zero-shot recipe fallbacks', async () => {
+      // Register COLOMBIA at (5, 8, 11). lsc_dictionary.json also has this key; the
+      // in-memory overlay takes priority and still returns "COLOMBIA".
+      (loadTensorflowModel as jest.Mock).mockResolvedValue(makeMockTfliteModel(5, 8, 11));
       await translationService.loadModel();
-
-      // Register COLOMBIA at (h=5, l=8, m=11).
-      // These coincide with the checksum output for sum=5 (vocab index 5 is 'F'),
-      // so registerRecipe overrides that slot with 'COLOMBIA'.
       translationService.registerRecipe(5, 8, 11, 'COLOMBIA');
 
-      // Force sum = 5.0: h = round(5) % 64 = 5, l = floor(5*1.6) % 32 = 8, m = floor(5*2.2) % 32 = 11.
-      const val = 5.0 / (543 * 3);
-      frameBuffer.addFrame(createMockFrame(val));
-
+      frameBuffer.addFrame(createMockFrame(1.0));
       const gloss = await translationService.translateFrameBuffer(frameBuffer);
       expect(gloss).toBe('COLOMBIA');
     });
@@ -91,10 +103,10 @@ describe('Translation and TTS Integration Services', () => {
   describe('TtsService Tests', () => {
     test('should speak valid text and update status', async () => {
       expect(ttsService.getIsSpeaking()).toBe(false);
-      
+
       const speakPromise = ttsService.speak('HOLA COLOMBIA');
       expect(ttsService.getIsSpeaking()).toBe(true);
-      
+
       await speakPromise;
       expect(ttsService.getIsSpeaking()).toBe(false);
     });
@@ -102,7 +114,7 @@ describe('Translation and TTS Integration Services', () => {
     test('should stop speaking immediately when stop is called', async () => {
       const speakPromise = ttsService.speak('HOLA');
       expect(ttsService.getIsSpeaking()).toBe(true);
-      
+
       await ttsService.stop();
       expect(ttsService.getIsSpeaking()).toBe(false);
       await speakPromise;
