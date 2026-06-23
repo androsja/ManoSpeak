@@ -2,102 +2,180 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# MediaPipe Holistic landmark indices for both hands (right + left).
+# Right hand: 501–521 (21 pts), Left hand: 522–542 (21 pts).
+# Combined: indices [501, 542] in the 543-point full array.
+_HAND_START = 501
+_HAND_END   = 543   # exclusive  → 42 landmarks × 3 = 126 features
+
+
 class AnatomicalGraphAttention(nn.Module):
     """
     Anatomical Graph Attention Network (AGAN) layer.
     Computes self-attention over coordinates to focus on joint relations.
     """
-    def __init__(self, in_features, out_features, num_heads=4):
-        super(AnatomicalGraphAttention, self).__init__()
+    def __init__(self, in_features: int, out_features: int, num_heads: int = 4) -> None:
+        super().__init__()
         self.num_heads = num_heads
-        self.head_dim = out_features // num_heads
-        
-        self.q_proj = nn.Linear(in_features, out_features)
-        self.k_proj = nn.Linear(in_features, out_features)
-        self.v_proj = nn.Linear(in_features, out_features)
+        self.head_dim  = out_features // num_heads
+
+        self.q_proj  = nn.Linear(in_features,  out_features)
+        self.k_proj  = nn.Linear(in_features,  out_features)
+        self.v_proj  = nn.Linear(in_features,  out_features)
         self.out_proj = nn.Linear(out_features, out_features)
-        
-    def forward(self, x):
-        # x shape: (batch, seq_len, in_features)
-        batch_size, seq_len, in_features = x.size()
-        
-        # Project queries, keys, values
-        q = self.q_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        k = self.k_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        v = self.v_proj(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        
-        # Scaled dot-product attention
-        scores = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim ** 0.5)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (batch, seq_len, in_features)
+        B, T, _ = x.size()
+
+        q = self.q_proj(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+        k = self.k_proj(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+        v = self.v_proj(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+
+        scores      = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim ** 0.5)
         attn_weights = F.softmax(scores, dim=-1)
-        
+
         context = torch.matmul(attn_weights, v)
-        context = context.transpose(1, 2).contiguous().view(batch_size, seq_len, -1)
-        
+        context = context.transpose(1, 2).contiguous().view(B, T, -1)
         return self.out_proj(context)
+
+
+class HandshapeBranch(nn.Module):
+    """
+    Dedicated hand-landmark branch for handshape classification.
+
+    Operates on the 42 hand keypoints only (right + left, indices 501-542),
+    giving the model a fine-grained, uncluttered view of finger configuration
+    that the global trunk cannot provide.
+
+    Architecture:
+        Linear(126 → 128) → AGAN(128) → GRU(128, 1-layer) → mean+max pool → Linear(256 → 128)
+    """
+    HAND_DIM = (_HAND_END - _HAND_START) * 3   # 42 × 3 = 126
+
+    def __init__(self, out_dim: int = 128, dropout: float = 0.3) -> None:
+        super().__init__()
+        self.proj  = nn.Linear(self.HAND_DIM, out_dim)
+        self.agan  = AnatomicalGraphAttention(out_dim, out_dim, num_heads=4)
+        self.gru   = nn.GRU(out_dim, out_dim, num_layers=1, batch_first=True, bidirectional=False)
+        self.fc    = nn.Linear(out_dim * 2, out_dim)   # mean + max → cat
+        self.drop  = nn.Dropout(dropout)
+
+    def forward(self, x_full: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x_full: (B, T, 543, 3) or (B, T, 1629) — full holistic landmarks.
+        Returns:
+            hand_feat: (B, out_dim)
+        """
+        B, T = x_full.shape[:2]
+        if x_full.dim() == 4:
+            # Slice hand landmarks and flatten: (B, T, 42, 3) → (B, T, 126)
+            hand = x_full[:, :, _HAND_START:_HAND_END, :].reshape(B, T, self.HAND_DIM)
+        else:
+            # Already flattened: (B, T, 1629), hand slice = [1503:1629]
+            hand = x_full[:, :, _HAND_START * 3 : _HAND_END * 3]
+
+        h = F.relu(self.proj(hand))             # (B, T, 128)
+        h = self.agan(h) + h                    # residual
+        gru_out, _ = self.gru(h)                # (B, T, 128)
+
+        # Mean + max pooling captures both the average and peak hand configuration
+        h_mean = gru_out.mean(dim=1)            # (B, 128)
+        h_max  = gru_out.max(dim=1).values      # (B, 128)
+        pooled = torch.cat([h_mean, h_max], dim=1)  # (B, 256)
+
+        return self.drop(F.relu(self.fc(pooled)))   # (B, 128)
+
 
 class PhonSSM(nn.Module):
     """
-    Phonological State Space Model (PhonSSM).
-    Processes MediaPipe landmarks sequence and projects them to orthogonal sign parameters.
+    Phonological State Space Model (PhonSSM) — v2.
+
+    Changes vs v1:
+    * HandshapeBranch — dedicated hand-landmark pathway for fine-grained
+      finger configuration encoding.
+    * mean + max temporal pooling on the global GRU trunk.
+    * Dropout(0.3) on every classification head.
+    * Backward-compatible ONNX signature: input `landmarks` (B, T, 543, 3),
+      outputs `handshape`, `location`, `movement` unchanged.
     """
-    def __init__(self, num_handshapes=64, num_locations=32, num_movements=32):
-        super(PhonSSM, self).__init__()
+
+    def __init__(
+        self,
+        num_handshapes: int = 64,
+        num_locations:  int = 32,
+        num_movements:  int = 32,
+        dropout:        float = 0.3,
+    ) -> None:
+        super().__init__()
         self.num_handshapes = num_handshapes
-        self.num_locations = num_locations
-        self.num_movements = num_movements
-        
-        # Landmark feature input dimension: 543 points * 3 coordinates = 1629
-        self.input_dim = 543 * 3
+        self.num_locations  = num_locations
+        self.num_movements  = num_movements
+
+        # ── Global trunk ─────────────────────────────────────────────────
+        self.input_dim  = 543 * 3   # 1629
         self.hidden_dim = 256
-        
-        # Input layer mapping landmarks to hidden space
+
         self.input_layer = nn.Linear(self.input_dim, self.hidden_dim)
-        
-        # Spatial Graph Attention (AGAN) Layer
-        self.agan = AnatomicalGraphAttention(self.hidden_dim, self.hidden_dim)
-        
-        # Temporal processing layer (GRU)
-        self.gru = nn.GRU(self.hidden_dim, self.hidden_dim, num_layers=2, 
-                          batch_first=True, bidirectional=True)
-        
-        # Post-GRU dimensional reduction
-        self.fc = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
-        
-        # Orthogonal Parameter Classification Heads
-        self.handshape_head = nn.Linear(self.hidden_dim, num_handshapes)
-        self.location_head = nn.Linear(self.hidden_dim, num_locations)
-        self.movement_head = nn.Linear(self.hidden_dim, num_movements)
-        
-    def forward(self, x):
-        # Input x shape: (batch, seq_len, 543, 3) or (batch, seq_len, 1629)
-        batch_size = x.size(0)
-        
-        # Flatten landmarks if needed
-        if x.dim() == 4:
-            x = x.view(batch_size, x.size(1), -1)
-            
-        # Map to features
-        features = F.relu(self.input_layer(x))
-        
-        # Apply Anatomical Graph Attention
-        features = self.agan(features) + features  # Residual connection
-        
-        # Temporal processing
-        gru_out, _ = self.gru(features)
-        
-        # Sequence-level pooling (average over time dimension)
-        pooled = torch.mean(gru_out, dim=1)
-        
-        # Dimensional reduction
-        features_reduced = F.relu(self.fc(pooled))
-        
-        # Orthogonal projections
-        handshape_logits = self.handshape_head(features_reduced)
-        location_logits = self.location_head(features_reduced)
-        movement_logits = self.movement_head(features_reduced)
-        
+        self.agan        = AnatomicalGraphAttention(self.hidden_dim, self.hidden_dim)
+        self.gru         = nn.GRU(
+            self.hidden_dim, self.hidden_dim,
+            num_layers=2, batch_first=True, bidirectional=True,
+        )
+        # mean + max → cat → 512, then reduce to 256
+        self.fc = nn.Linear(self.hidden_dim * 4, self.hidden_dim)
+
+        # ── Dedicated handshape branch ────────────────────────────────────
+        self.handshape_branch = HandshapeBranch(out_dim=128, dropout=dropout)
+
+        # ── Classification heads ──────────────────────────────────────────
+        # Handshape fuses trunk (256) + branch (128) = 384
+        self.handshape_head = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(self.hidden_dim + 128, num_handshapes),
+        )
+        self.location_head = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(self.hidden_dim, num_locations),
+        )
+        self.movement_head = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(self.hidden_dim, num_movements),
+        )
+
+    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+        """
+        Args:
+            x: (B, T, 543, 3) or (B, T, 1629)
+        Returns:
+            dict with keys 'handshape', 'location', 'movement' — logits.
+        """
+        B = x.size(0)
+
+        # ── Global trunk ──────────────────────────────────────────────────
+        x_flat = x.view(B, x.size(1), -1) if x.dim() == 4 else x
+
+        features = F.relu(self.input_layer(x_flat))     # (B, T, 256)
+        features = self.agan(features) + features        # residual
+
+        gru_out, _ = self.gru(features)                  # (B, T, 512) — bidirectional
+
+        # Mean + max pooling for richer temporal summary
+        trunk_mean = gru_out.mean(dim=1)                 # (B, 512)
+        trunk_max  = gru_out.max(dim=1).values           # (B, 512)
+        trunk_pool = torch.cat([trunk_mean, trunk_max], dim=1)  # (B, 1024)  ← note: hidden*4=1024
+
+        trunk = F.relu(self.fc(trunk_pool))              # (B, 256)
+
+        # ── Hand-specific branch ──────────────────────────────────────────
+        hand_feat = self.handshape_branch(x)             # (B, 128)
+
+        # ── Heads ─────────────────────────────────────────────────────────
+        hs_input = torch.cat([trunk, hand_feat], dim=1)  # (B, 384)
+
         return {
-            'handshape': handshape_logits,
-            'location': location_logits,
-            'movement': movement_logits
+            "handshape": self.handshape_head(hs_input),
+            "location":  self.location_head(trunk),
+            "movement":  self.movement_head(trunk),
         }

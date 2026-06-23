@@ -69,6 +69,9 @@ class LSCDataset(Dataset):
                 landmarks = apply_time_warping(landmarks, warp_factor=warp_factor)
             if np.random.rand() < 0.5:
                 landmarks = apply_micro_scaling(landmarks)
+            # Horizontal flip: mirrors X coordinate → simulates left-handed signer
+            if np.random.rand() < 0.4:
+                landmarks = _flip_horizontal(landmarks)
 
         return {
             "landmarks": torch.tensor(landmarks, dtype=torch.float32),
@@ -76,6 +79,18 @@ class LSCDataset(Dataset):
             "location":  torch.tensor(l, dtype=torch.long),
             "movement":  torch.tensor(m, dtype=torch.long),
         }
+
+
+def _flip_horizontal(landmarks: np.ndarray) -> np.ndarray:
+    """
+    Mirror the X coordinate of every landmark.
+    Shape: (T, 543, 3) — X channel is index 0.
+    This simulates a left-handed signer seen in mirror, doubling coverage
+    for static handshapes without requiring extra recordings.
+    """
+    flipped = landmarks.copy()
+    flipped[:, :, 0] = 1.0 - flipped[:, :, 0]   # X ∈ [0,1] after normalization
+    return flipped
 
 
 def collate_fn(batch: list[dict]) -> dict:
@@ -100,6 +115,22 @@ def collate_fn(batch: list[dict]) -> dict:
     }
 
 
+def compute_class_weights(dataset: Dataset, num_classes: int, label_key: str) -> torch.Tensor:
+    """
+    Compute inverse-frequency class weights from the full dataset.
+    Returns a tensor of shape (num_classes,) suitable for CrossEntropyLoss(weight=...).
+    """
+    counts = torch.zeros(num_classes, dtype=torch.float32)
+    for i in range(len(dataset)):  # type: ignore[arg-type]
+        label = dataset[i][label_key].item()
+        counts[label] += 1.0
+
+    # Replace zero counts with 1 to avoid division by zero
+    counts = counts.clamp(min=1.0)
+    weights = counts.sum() / (num_classes * counts)
+    return weights
+
+
 def select_device() -> torch.device:
     if torch.cuda.is_available():
         return torch.device("cuda")
@@ -111,11 +142,17 @@ def select_device() -> torch.device:
 def run_epoch(
     model: nn.Module,
     loader: DataLoader,
-    criterion: nn.Module,
+    h_criterion: nn.Module,
+    lm_criterion: nn.Module,
     device: torch.device,
     optimizer: optim.Optimizer | None = None,
 ) -> tuple[float, float, float, float]:
-    """Run one epoch. Returns (total_loss, h_acc, l_acc, m_acc)."""
+    """
+    Run one epoch.
+    h_criterion  — weighted CE for handshape (harder task).
+    lm_criterion — standard CE for location and movement.
+    Returns (total_loss, h_acc, l_acc, m_acc).
+    """
     training = optimizer is not None
     model.train(training)
 
@@ -133,10 +170,16 @@ def run_epoch(
                 optimizer.zero_grad()
 
             out = model(lm)
-            loss = criterion(out["handshape"], t_h) + criterion(out["location"], t_l) + criterion(out["movement"], t_m)
+            # Handshape uses class-weighted loss; location/movement use plain CE
+            loss = (
+                h_criterion(out["handshape"], t_h)
+                + lm_criterion(out["location"],  t_l)
+                + lm_criterion(out["movement"],  t_m)
+            )
 
             if training:
                 loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
 
             total_loss += loss.item()
@@ -156,13 +199,13 @@ def run_epoch(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train PhonSSM on LSC landmarks.")
-    parser.add_argument("--data_dir",      default="../datasets/landmarks_unified")
-    parser.add_argument("--epochs",        type=int,   default=50)
-    parser.add_argument("--batch_size",    type=int,   default=16)
-    parser.add_argument("--lr",            type=float, default=1e-3)
-    parser.add_argument("--val_split",     type=float, default=0.2)
+    parser.add_argument("--data_dir",       default="../datasets/landmarks_unified")
+    parser.add_argument("--epochs",         type=int,   default=100)
+    parser.add_argument("--batch_size",     type=int,   default=16)
+    parser.add_argument("--lr",             type=float, default=1e-3)
+    parser.add_argument("--val_split",      type=float, default=0.2)
     parser.add_argument("--checkpoint_dir", default="checkpoints")
-    parser.add_argument("--seed",          type=int,   default=42)
+    parser.add_argument("--seed",           type=int,   default=42)
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -177,9 +220,12 @@ def main() -> None:
     print(f"Loading dataset from: {args.data_dir}")
     full_dataset = LSCDataset(args.data_dir, augment=False)
 
-    val_size = int(len(full_dataset) * args.val_split)
+    val_size   = int(len(full_dataset) * args.val_split)
     train_size = len(full_dataset) - val_size
-    train_ds, val_ds = random_split(full_dataset, [train_size, val_size], generator=torch.Generator().manual_seed(args.seed))
+    train_ds, val_ds = random_split(
+        full_dataset, [train_size, val_size],
+        generator=torch.Generator().manual_seed(args.seed),
+    )
 
     # Enable augmentations on training subset only
     train_ds.dataset.augment = True  # type: ignore[attr-defined]
@@ -191,25 +237,41 @@ def main() -> None:
     print(f"Device: {device} | Train: {train_size} | Val: {val_size}")
 
     model = PhonSSM().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
-    criterion = nn.CrossEntropyLoss()
+
+    # Handshape class weights — computed from full dataset before splitting
+    print("Computing handshape class weights...")
+    h_weights = compute_class_weights(full_dataset, model.num_handshapes, "handshape").to(device)
+
+    # Handshape: weighted loss + label smoothing → helps rare classes
+    h_criterion  = nn.CrossEntropyLoss(weight=h_weights, label_smoothing=0.1)
+    # Location / movement: plain CE + label smoothing
+    lm_criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
+    # CosineAnnealing gives a warm-then-cool LR schedule; better than ReduceOnPlateau
+    # for datasets this size
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-5)
 
     best_val_loss = float("inf")
-    best_path = os.path.join(args.checkpoint_dir, "best_model.pt")
+    best_h_acc    = 0.0
+    best_path     = os.path.join(args.checkpoint_dir, "best_model.pt")
 
-    print(f"\nStarting training — {args.epochs} epochs\n{'-'*60}")
+    print(f"\nStarting training — {args.epochs} epochs\n{'-'*70}")
     for epoch in range(1, args.epochs + 1):
-        tr_loss, tr_h, tr_l, tr_m = run_epoch(model, train_loader, criterion, device, optimizer)
-        vl_loss, vl_h, vl_l, vl_m = run_epoch(model, val_loader,   criterion, device)
+        tr_loss, tr_h, tr_l, tr_m = run_epoch(model, train_loader, h_criterion, lm_criterion, device, optimizer)
+        vl_loss, vl_h, vl_l, vl_m = run_epoch(model, val_loader,   h_criterion, lm_criterion, device)
 
-        scheduler.step(vl_loss)
+        scheduler.step()
 
         flag = ""
+        # Save best by val_loss; also track best handshape acc separately
         if vl_loss < best_val_loss:
             best_val_loss = vl_loss
+            best_h_acc    = vl_h
             torch.save(model.state_dict(), best_path)
             flag = " ← best"
+        elif vl_h > best_h_acc:
+            best_h_acc = vl_h
 
         print(
             f"Epoch {epoch:3d}/{args.epochs}  "
@@ -217,7 +279,7 @@ def main() -> None:
             f"acc(h/l/m): {vl_h:.2%}/{vl_l:.2%}/{vl_m:.2%}{flag}"
         )
 
-    print(f"\nBest checkpoint saved → {best_path}  (val_loss={best_val_loss:.4f})")
+    print(f"\nBest checkpoint saved → {best_path}  (val_loss={best_val_loss:.4f}, best_h_acc={best_h_acc:.2%})")
 
 
 if __name__ == "__main__":
