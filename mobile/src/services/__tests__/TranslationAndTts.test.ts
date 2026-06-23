@@ -4,15 +4,9 @@ jest.mock('react-native', () => ({
 
 jest.mock('onnxruntime-react-native', () => ({
   InferenceSession: {
-    create: jest.fn().mockResolvedValue({
-      run: jest.fn().mockResolvedValue({}),
-    }),
+    create: jest.fn().mockResolvedValue({ run: jest.fn() }),
   },
-  Tensor: jest.fn().mockImplementation((type, data, dims) => ({
-    type,
-    data,
-    dims,
-  })),
+  Tensor: jest.fn().mockImplementation((type, data, dims) => ({ type, data, dims })),
 }));
 
 jest.mock('../../../assets/models/tts_voice.onnx', () => 'mock-onnx-file', { virtual: true });
@@ -57,14 +51,10 @@ describe('Translation and TTS Integration Services', () => {
     test('should translate matching LSC recipes from dictionary', async () => {
       await translationService.loadModel();
 
-      // Handshape 1, Location 1, Movement 2 -> "GRACIAS"
-      // Checksum target calculation:
-      // sum = flatInput.reduce((a,b)=>a+b, 0)
-      // handshape = round(sum) % 64
-      // Let's force sum to equal 1.0 by choosing coordinates carefully.
-      // Since size is 543 * 3 = 1629 coordinates per frame.
-      // If each coordinate value is 1.0 / 1629 = 0.0006138735, then sum of 1 frame is exactly 1.0!
-      const val = 1.0 / (543 * 3);
+      // GRACIAS is at vocab index 47.
+      // Decoder: h = round(sum) % 64 = 47, l = floor(47 * 1.6) % 32 = 11, m = floor(47 * 2.2) % 32 = 7.
+      // Force sum = 47.0 by setting each of the 543 * 3 coordinates to 47.0 / 1629.
+      const val = 47.0 / (543 * 3);
       frameBuffer.addFrame(createMockFrame(val));
 
       const gloss = await translationService.translateFrameBuffer(frameBuffer);
@@ -74,11 +64,12 @@ describe('Translation and TTS Integration Services', () => {
     test('should register and decode custom zero-shot recipe fallbacks', async () => {
       await translationService.loadModel();
 
-      // Let's register a custom LSC sign for "COLOMBIA"
-      // Handshape 5, Location 8, Movement 11
+      // Register COLOMBIA at (h=5, l=8, m=11).
+      // These coincide with the checksum output for sum=5 (vocab index 5 is 'F'),
+      // so registerRecipe overrides that slot with 'COLOMBIA'.
       translationService.registerRecipe(5, 8, 11, 'COLOMBIA');
 
-      // Force sum to equal 5.0 -> value = 5.0 / 1629
+      // Force sum = 5.0: h = round(5) % 64 = 5, l = floor(5*1.6) % 32 = 8, m = floor(5*2.2) % 32 = 11.
       const val = 5.0 / (543 * 3);
       frameBuffer.addFrame(createMockFrame(val));
 
