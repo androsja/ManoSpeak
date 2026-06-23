@@ -1,5 +1,11 @@
+import { loadTensorflowModel } from 'react-native-fast-tflite';
+import type { TfliteModel } from 'react-native-fast-tflite';
 import { InferenceSession } from 'onnxruntime-react-native';
 import { FrameBuffer } from './FrameBuffer';
+
+// Resolved to a numeric asset handle by Metro at bundle time.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const TFLITE_MODEL_ASSET = require('../assets/models/phonssm_quant.tflite') as number;
 
 // Maps PhonSSM orthogonal parameter indices to LSC gloss strings.
 // Built from training vocabulary (94 unique signs across LSC70W, LSC70AN, LSC50).
@@ -27,17 +33,21 @@ const GLOSS_VOCAB: string[] = [
 
 export class TranslationService {
   private session: InferenceSession | null = null;
+  private tfliteModel: TfliteModel | null = null;
   private isModelLoaded = false;
 
   public async loadModel(): Promise<void> {
     try {
+      // Load the quantized TFLite model for on-device hardware inference.
+      this.tfliteModel = await loadTensorflowModel(TFLITE_MODEL_ASSET, []);
+      // Keep the ONNX session as a secondary handle for vocabulary alignment.
       this.session = await InferenceSession.create(
         'phonssm.onnx',
         { executionProviders: ['cpu'] },
       );
       this.isModelLoaded = true;
     } catch (err) {
-      console.error('Failed to load PhonSSM ONNX model', err);
+      console.error('Failed to load PhonSSM models', err);
       throw err;
     }
   }

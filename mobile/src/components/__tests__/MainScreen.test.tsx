@@ -11,17 +11,21 @@ jest.mock('react-native', () => ({
   NativeModules: {},
 }));
 
+jest.mock('react-native-fast-tflite', () => ({
+  loadTensorflowModel: jest.fn().mockResolvedValue({
+    inputs: [],
+    outputs: [],
+    delegates: [],
+    run: jest.fn().mockResolvedValue([]),
+    runSync: jest.fn().mockReturnValue([]),
+  }),
+}));
+
 jest.mock('onnxruntime-react-native', () => ({
   InferenceSession: {
-    create: jest.fn().mockResolvedValue({
-      run: jest.fn().mockResolvedValue({}),
-    }),
+    create: jest.fn().mockResolvedValue({ run: jest.fn() }),
   },
-  Tensor: jest.fn().mockImplementation((type, data, dims) => ({
-    type,
-    data,
-    dims,
-  })),
+  Tensor: jest.fn().mockImplementation((type, data, dims) => ({ type, data, dims })),
 }));
 
 jest.mock('../../../assets/models/tts_voice.onnx', () => 'mock-onnx-file', { virtual: true });

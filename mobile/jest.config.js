@@ -10,4 +10,10 @@ module.exports = {
       },
     }],
   },
+  // Binary asset extensions are resolved to a numeric handle by Metro.
+  // In Jest (non-Metro), return a stub number so require('./model.tflite') works.
+  moduleNameMapper: {
+    '\\.tflite$': '<rootDir>/src/__mocks__/fileMock.js',
+    '\\.onnx$': '<rootDir>/src/__mocks__/fileMock.js',
+  },
 };
