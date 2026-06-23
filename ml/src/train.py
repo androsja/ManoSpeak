@@ -192,7 +192,7 @@ def main() -> None:
 
     model = PhonSSM().to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5, verbose=True)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
     criterion = nn.CrossEntropyLoss()
 
     best_val_loss = float("inf")
