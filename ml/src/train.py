@@ -4,154 +4,221 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 from model import PhonSSM
 from normalizers import normalize_landmarks, apply_gaussian_jitter, apply_time_warping, apply_micro_scaling
+from phonological_labels import PHONOLOGICAL_LABELS
+
 
 class LSCDataset(Dataset):
     """
-    Dataset to load LSC coordinate array datasets from data/landmarks/.
+    Dataset loading LSC landmark .npy files from a directory.
+
+    Label resolution uses PHONOLOGICAL_LABELS:
+      file stem → gloss → (handshape, location, movement)
+    Files whose gloss is not in PHONOLOGICAL_LABELS are silently skipped.
     """
-    def __init__(self, landmarks_dir, augment=False):
+
+    def __init__(self, landmarks_dir: str, augment: bool = False) -> None:
         self.landmarks_dir = landmarks_dir
         self.augment = augment
-        
-        # List all .npy files
-        self.file_paths = [os.path.join(landmarks_dir, f) for f in os.listdir(landmarks_dir) if f.endswith('.npy')]
-        
-        # Categorical maps (mock mapping for LSC70 letters to orthogonal classes)
-        # In real-world INSOR, we map each sign word to its unique handshape/location/movement
-        self.vocab = sorted(list(set([os.path.splitext(os.path.basename(f))[0].split('_')[-1] for f in self.file_paths])))
-        self.vocab_map = {word: idx for idx, word in enumerate(self.vocab)}
-        
-    def __len__(self):
+
+        all_files = [
+            os.path.join(landmarks_dir, f)
+            for f in os.listdir(landmarks_dir)
+            if f.endswith(".npy")
+        ]
+
+        # Keep only files whose gloss maps to a phonological label
+        self.file_paths: list[str] = []
+        for fp in all_files:
+            gloss = self._extract_gloss(fp)
+            if gloss in PHONOLOGICAL_LABELS:
+                self.file_paths.append(fp)
+
+        self.file_paths.sort()
+        skipped = len(all_files) - len(self.file_paths)
+        if skipped:
+            print(f"  [Dataset] Skipped {skipped} files with unknown glosses.")
+        print(f"  [Dataset] Loaded {len(self.file_paths)} files, {len(PHONOLOGICAL_LABELS)} sign classes.")
+
+    @staticmethod
+    def _extract_gloss(file_path: str) -> str:
+        stem = os.path.splitext(os.path.basename(file_path))[0]
+        return stem.split("_")[-1]
+
+    def __len__(self) -> int:
         return len(self.file_paths)
-        
-    def __getitem__(self, idx):
+
+    def __getitem__(self, idx: int) -> dict:
         file_path = self.file_paths[idx]
-        landmarks = np.load(file_path)
-        
-        # Resolve target labels from filename
-        file_name = os.path.splitext(os.path.basename(file_path))[0]
-        word = file_name.split('_')[-1]
-        
-        # Assign targets
-        word_idx = self.vocab_map.get(word, 0)
-        handshape_target = word_idx % 64
-        location_target = word_idx % 32
-        movement_target = word_idx % 32
-        
-        # Step 1: Normalize coordinates
+        landmarks: np.ndarray = np.load(file_path)
+
+        gloss = self._extract_gloss(file_path)
+        h, l, m = PHONOLOGICAL_LABELS[gloss]
+
+        # Step 1: normalize (mirrors mobile LandmarkNormalizer)
         landmarks = normalize_landmarks(landmarks)
-        
-        # Step 2: Apply Augmentations (Sim2Real) on the fly if training
+
+        # Step 2: Sim2Real augmentations (training only)
         if self.augment:
             if np.random.rand() < 0.5:
                 landmarks = apply_gaussian_jitter(landmarks, sigma=0.02)
             if np.random.rand() < 0.5:
-                warp_factor = np.random.uniform(0.85, 1.15)
+                warp_factor = float(np.random.uniform(0.85, 1.15))
                 landmarks = apply_time_warping(landmarks, warp_factor=warp_factor)
             if np.random.rand() < 0.5:
                 landmarks = apply_micro_scaling(landmarks)
-                
+
         return {
-            'landmarks': torch.tensor(landmarks, dtype=torch.float32),
-            'handshape': torch.tensor(handshape_target, dtype=torch.long),
-            'location': torch.tensor(location_target, dtype=torch.long),
-            'movement': torch.tensor(movement_target, dtype=torch.long)
+            "landmarks": torch.tensor(landmarks, dtype=torch.float32),
+            "handshape": torch.tensor(h, dtype=torch.long),
+            "location":  torch.tensor(l, dtype=torch.long),
+            "movement":  torch.tensor(m, dtype=torch.long),
         }
 
-def collate_fn(batch):
-    """
-    Custom collate function to handle variable-length temporal sequences (padding them to max length).
-    """
-    landmarks_list = [item['landmarks'] for item in batch]
-    handshape_list = [item['handshape'] for item in batch]
-    location_list = [item['location'] for item in batch]
-    movement_list = [item['movement'] for item in batch]
-    
-    # Pad sequences along temporal dimension
-    max_len = max([lms.shape[0] for lms in landmarks_list])
-    padded_lms = []
-    for lms in landmarks_list:
-        pad_size = max_len - lms.shape[0]
+
+def collate_fn(batch: list[dict]) -> dict:
+    """Pad variable-length temporal sequences to the longest in the batch."""
+    landmarks_list = [item["landmarks"] for item in batch]
+    max_len = max(lm.shape[0] for lm in landmarks_list)
+
+    padded = []
+    for lm in landmarks_list:
+        pad_size = max_len - lm.shape[0]
         if pad_size > 0:
-            # Pad with zeros at the end
-            pad = torch.zeros((pad_size, 543, 3))
-            padded = torch.cat([lms, pad], dim=0)
+            pad = torch.zeros((pad_size, 543, 3), dtype=torch.float32)
+            padded.append(torch.cat([lm, pad], dim=0))
         else:
-            padded = lms
-        padded_lms.append(padded)
-        
+            padded.append(lm)
+
     return {
-        'landmarks': torch.stack(padded_lms, dim=0),
-        'handshape': torch.stack(handshape_list, dim=0),
-        'location': torch.stack(location_list, dim=0),
-        'movement': torch.stack(movement_list, dim=0)
+        "landmarks": torch.stack(padded, dim=0),
+        "handshape": torch.stack([item["handshape"] for item in batch]),
+        "location":  torch.stack([item["location"]  for item in batch]),
+        "movement":  torch.stack([item["movement"]  for item in batch]),
     }
 
-def main():
-    parser = argparse.ArgumentParser(description="Train PhonSSM on LSC Landmarks.")
-    parser.add_argument("--data_dir", type=str, default="data/landmarks", help="Path to preprocessed landmarks")
-    parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs")
-    parser.add_argument("--batch_size", type=int, default=4, help="Batch size")
-    parser.add_argument("--checkpoint_dir", type=str, default="checkpoints", help="Directory to save weights")
+
+def select_device() -> torch.device:
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+def run_epoch(
+    model: nn.Module,
+    loader: DataLoader,
+    criterion: nn.Module,
+    device: torch.device,
+    optimizer: optim.Optimizer | None = None,
+) -> tuple[float, float, float, float]:
+    """Run one epoch. Returns (total_loss, h_acc, l_acc, m_acc)."""
+    training = optimizer is not None
+    model.train(training)
+
+    total_loss = 0.0
+    correct_h = correct_l = correct_m = total = 0
+
+    with torch.set_grad_enabled(training):
+        for batch in loader:
+            lm = batch["landmarks"].to(device)
+            t_h = batch["handshape"].to(device)
+            t_l = batch["location"].to(device)
+            t_m = batch["movement"].to(device)
+
+            if training:
+                optimizer.zero_grad()
+
+            out = model(lm)
+            loss = criterion(out["handshape"], t_h) + criterion(out["location"], t_l) + criterion(out["movement"], t_m)
+
+            if training:
+                loss.backward()
+                optimizer.step()
+
+            total_loss += loss.item()
+            correct_h += (out["handshape"].argmax(dim=1) == t_h).sum().item()
+            correct_l += (out["location"].argmax(dim=1)  == t_l).sum().item()
+            correct_m += (out["movement"].argmax(dim=1)  == t_m).sum().item()
+            total += t_h.size(0)
+
+    n = len(loader)
+    return (
+        total_loss / n,
+        correct_h / total,
+        correct_l / total,
+        correct_m / total,
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Train PhonSSM on LSC landmarks.")
+    parser.add_argument("--data_dir",      default="../datasets/landmarks_unified")
+    parser.add_argument("--epochs",        type=int,   default=50)
+    parser.add_argument("--batch_size",    type=int,   default=16)
+    parser.add_argument("--lr",            type=float, default=1e-3)
+    parser.add_argument("--val_split",     type=float, default=0.2)
+    parser.add_argument("--checkpoint_dir", default="checkpoints")
+    parser.add_argument("--seed",          type=int,   default=42)
     args = parser.parse_args()
-    
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
     os.makedirs(args.checkpoint_dir, exist_ok=True)
-    
-    # Check if we have extracted data
-    if not os.path.exists(args.data_dir) or len(os.listdir(args.data_dir)) == 0:
-        print(f"Error: No preprocessed landmarks found in {args.data_dir}. Run preprocess.py first.")
+
+    if not os.path.exists(args.data_dir) or not os.listdir(args.data_dir):
+        print(f"Error: No landmarks found in {args.data_dir}")
         return
-        
-    print(f"Loading data from: {args.data_dir}")
-    dataset = LSCDataset(args.data_dir, augment=True)
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
-    
-    print(f"Initializing PhonSSM model (Vocabulary size: {len(dataset.vocab)})...")
-    model = PhonSSM()
-    
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    print(f"Loading dataset from: {args.data_dir}")
+    full_dataset = LSCDataset(args.data_dir, augment=False)
+
+    val_size = int(len(full_dataset) * args.val_split)
+    train_size = len(full_dataset) - val_size
+    train_ds, val_ds = random_split(full_dataset, [train_size, val_size], generator=torch.Generator().manual_seed(args.seed))
+
+    # Enable augmentations on training subset only
+    train_ds.dataset.augment = True  # type: ignore[attr-defined]
+
+    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,  collate_fn=collate_fn, num_workers=0)
+    val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=0)
+
+    device = select_device()
+    print(f"Device: {device} | Train: {train_size} | Val: {val_size}")
+
+    model = PhonSSM().to(device)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5, verbose=True)
     criterion = nn.CrossEntropyLoss()
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    
-    print("Starting training loop...")
-    for epoch in range(args.epochs):
-        model.train()
-        epoch_loss = 0.0
-        
-        for batch_idx, batch in enumerate(loader):
-            landmarks = batch['landmarks'].to(device)
-            target_h = batch['handshape'].to(device)
-            target_l = batch['location'].to(device)
-            target_m = batch['movement'].to(device)
-            
-            optimizer.zero_grad()
-            
-            # Forward pass
-            outputs = model(landmarks)
-            
-            # Compute loss for the three orthogonal attributes
-            loss_h = criterion(outputs['handshape'], target_h)
-            loss_l = criterion(outputs['location'], target_l)
-            loss_m = criterion(outputs['movement'], target_m)
-            
-            total_loss = loss_h + loss_l + loss_m
-            total_loss.backward()
-            optimizer.step()
-            
-            epoch_loss += total_loss.item()
-            
-        avg_loss = epoch_loss / len(loader)
-        print(f"Epoch [{epoch+1}/{args.epochs}] - Average Loss: {avg_loss:.4f}")
-        
-    # Save the final checkpoint
-    checkpoint_path = os.path.join(args.checkpoint_dir, "best_model.pt")
-    torch.save(model.state_dict(), checkpoint_path)
-    print(f"Saved checkpoint successfully to {checkpoint_path}")
+
+    best_val_loss = float("inf")
+    best_path = os.path.join(args.checkpoint_dir, "best_model.pt")
+
+    print(f"\nStarting training — {args.epochs} epochs\n{'-'*60}")
+    for epoch in range(1, args.epochs + 1):
+        tr_loss, tr_h, tr_l, tr_m = run_epoch(model, train_loader, criterion, device, optimizer)
+        vl_loss, vl_h, vl_l, vl_m = run_epoch(model, val_loader,   criterion, device)
+
+        scheduler.step(vl_loss)
+
+        flag = ""
+        if vl_loss < best_val_loss:
+            best_val_loss = vl_loss
+            torch.save(model.state_dict(), best_path)
+            flag = " ← best"
+
+        print(
+            f"Epoch {epoch:3d}/{args.epochs}  "
+            f"tr_loss={tr_loss:.4f}  vl_loss={vl_loss:.4f}  "
+            f"acc(h/l/m): {vl_h:.2%}/{vl_l:.2%}/{vl_m:.2%}{flag}"
+        )
+
+    print(f"\nBest checkpoint saved → {best_path}  (val_loss={best_val_loss:.4f})")
+
 
 if __name__ == "__main__":
     main()
