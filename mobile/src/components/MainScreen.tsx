@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
-import Svg, { Circle, Line, Polyline } from 'react-native-svg';
+import Svg, { Circle, Line } from 'react-native-svg';
+import { ManoSpeakIcon } from './ManoSpeakIcon';
 import { useMediaPipeHolistic } from '../hooks/useMediaPipeHolistic';
 import { TranslationService } from '../services/TranslationService';
 import { TtsService } from '../services/TtsService';
@@ -197,8 +198,13 @@ export const MainScreen: React.FC = () => {
     <View style={styles.container}>
       {/* 1. Header Area */}
       <View style={styles.header}>
-        <Text style={styles.title}>ManoSpeak</Text>
-        <Text style={styles.subtitle}>Traductor LSC Offline</Text>
+        <View style={styles.headerBrand}>
+          <ManoSpeakIcon size={42} />
+          <View style={styles.headerText}>
+            <Text style={styles.title}>ManoSpeak</Text>
+            <Text style={styles.subtitle}>Traductor LSC · Offline</Text>
+          </View>
+        </View>
       </View>
 
       {/* 2. Camera View & Overlay */}
@@ -303,16 +309,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     alignItems: 'center',
   },
+  headerBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerText: {
+    marginLeft: 12,
+  },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     color: '#38BDF8',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#94A3B8',
-    marginTop: 4,
+    marginTop: 2,
+    letterSpacing: 0.3,
   },
   cameraContainer: {
     flex: 3,
