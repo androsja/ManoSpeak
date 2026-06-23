@@ -45,3 +45,32 @@ The following patterns emerged during this plan's execution and are candidates f
 **Steps:**
 1. Create `src/__mocks__/fileMock.js` with `module.exports = 1;`.
 2. Add `moduleNameMapper: { '\\.tflite$': '<rootDir>/src/__mocks__/fileMock.js' }` to `jest.config.js`.
+
+## Reusable Patterns Identified in PLAN_manospeak_mobile_coordinate_normalization
+
+### Python-to-TypeScript Numeric Normalizer Pattern
+**Trigger:** Porting a NumPy-based per-frame normalizer to TypeScript for React Native on-device use.  
+**Steps:**
+1. Identify the Python sentinel for "undetected" values (e.g., `np.allclose(x, 0.0)`) and mirror as a strict JS check (`=== 0.0`) for truly padded zeros.
+2. Port all NumPy math as explicit loops (no spread `Math.min(...arr)` for safety on all JS engines); use accumulated min/max in a single pass for efficiency.
+3. Mirror the Python fallback chain exactly: primary anchor → fallback centroid/bbox → all-zero guard.
+4. Add a `scale_factor < EPSILON → 1.0` guard before division.
+5. Apply normalization and clip only to non-zero (detected) landmarks; zero landmarks must remain exactly `[0, 0, 0]`.
+6. Return a new array — never mutate the input.
+7. Write parity tests referencing manually-computed Python values to 6 decimal places.
+
+### Worklet-Safe Pure Service Pattern
+**Trigger:** Injecting a TypeScript service method into a React Native VisionCamera worklet pipeline (between native detector output and a stateful buffer).  
+**Steps:**
+1. Keep the service method as a pure static function (no closures, no async, no native calls) so it is safe to invoke from a worklet context.
+2. Call the service method between the native detector result and the buffer call, inside the `onFrame` worklet.
+3. In tests, mock the service with a jest.mock identity stub — decouples hook tests from the service's math.
+4. Add a dedicated integration test that uses real service + real buffer to verify the output flows through to `getFlatArray()` at the correct byte offsets.
+
+### Normalizer Integration Test Pattern (raw → normalize → buffer → flat array)
+**Trigger:** Any service that transforms landmark data before it enters a FrameBuffer destined for TFLite inference.  
+**Steps:**
+1. Compute a `flatIdx(padFrames, frameIdx, landmarkIdx, coordIdx)` helper that accounts for leading zero-padding in FrameBuffer.
+2. Verify that expected normalized values appear at exact flat offsets — catches off-by-one bugs in both the normalizer and the buffer layout.
+3. Test the sliding-window discard: add `capacity+1` frames and assert that the oldest frame's landmarks are gone from the flat array.
+4. Assert `flat.byteLength === capacity × 543 × 3 × 4` (Float32Array element size) to lock TFLite input shape.
