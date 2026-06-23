@@ -98,6 +98,42 @@ describe('Translation and TTS Integration Services', () => {
       const gloss = await translationService.translateFrameBuffer(frameBuffer);
       expect(gloss).toBe('COLOMBIA');
     });
+
+    test('should pass the correct ArrayBuffer size to tfliteModel.run', async () => {
+      const mockModel = makeMockTfliteModel(0, 0, 0);
+      (loadTensorflowModel as jest.Mock).mockResolvedValue(mockModel);
+      await translationService.loadModel();
+
+      frameBuffer.addFrame(createMockFrame(1.0));
+      await translationService.translateFrameBuffer(frameBuffer);
+
+      expect(mockModel.run).toHaveBeenCalledTimes(1);
+      const inputBuffers = mockModel.run.mock.calls[0][0] as ArrayBuffer[];
+      expect(inputBuffers).toHaveLength(1);
+      // getFlatArray() pads to capacity (5 frames) × 543 landmarks × 3 coords × 4 bytes/float
+      expect(inputBuffers[0].byteLength).toBe(5 * 543 * 3 * 4);
+    });
+
+    test('should return fallback format when key is absent from dictionary and overlay', async () => {
+      // argmax indices (63, 31, 31) are outside the populated dictionary range.
+      (loadTensorflowModel as jest.Mock).mockResolvedValue(makeMockTfliteModel(63, 31, 31));
+      await translationService.loadModel();
+      frameBuffer.addFrame(createMockFrame(1.0));
+
+      const gloss = await translationService.translateFrameBuffer(frameBuffer);
+      expect(gloss).toBe('[H63_L31_M31]');
+    });
+
+    test('should prioritize overlay over dictionary for the same key', async () => {
+      // "1,1,2" resolves to "GRACIAS" in lsc_dictionary.json; registerRecipe should override it.
+      (loadTensorflowModel as jest.Mock).mockResolvedValue(makeMockTfliteModel(1, 1, 2));
+      await translationService.loadModel();
+      translationService.registerRecipe(1, 1, 2, 'CUSTOM_OVERRIDE');
+
+      frameBuffer.addFrame(createMockFrame(1.0));
+      const gloss = await translationService.translateFrameBuffer(frameBuffer);
+      expect(gloss).toBe('CUSTOM_OVERRIDE');
+    });
   });
 
   describe('TtsService Tests', () => {
