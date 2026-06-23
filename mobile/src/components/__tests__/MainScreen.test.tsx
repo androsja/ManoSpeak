@@ -11,16 +11,6 @@ jest.mock('react-native', () => ({
   NativeModules: {},
 }));
 
-jest.mock('react-native-fast-tflite', () => ({
-  loadTensorflowModel: jest.fn().mockResolvedValue({
-    inputs: [],
-    outputs: [],
-    delegates: [],
-    run: jest.fn().mockResolvedValue([]),
-    runSync: jest.fn().mockReturnValue([]),
-  }),
-}));
-
 jest.mock('onnxruntime-react-native', () => ({
   InferenceSession: {
     create: jest.fn().mockResolvedValue({ run: jest.fn() }),
@@ -47,7 +37,7 @@ jest.mock('../../hooks/useMediaPipeHolistic', () => ({
   useMediaPipeHolistic: jest.fn().mockReturnValue({
     hasPermission: true,
     requestPermission: jest.fn(),
-    frameOutput: {},
+    frameProcessor: jest.fn(),
     frameBuffer: {
       size: jest.fn().mockReturnValue(5),
       getFrames: jest.fn().mockReturnValue([]),

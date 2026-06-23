@@ -1,0 +1,6 @@
+Pin onnxruntime-android to 1.24.3 instead of latest.integration
+to avoid SAX XML parser failure on JDK 21.
+
+sed -i '' 's/onnxruntime-android:latest.integration/onnxruntime-android:1.24.3/g' node_modules/onnxruntime-react-native/android/build.gradle
+sed -i '' 's/onnxruntime-android-qnn:latest.integration/onnxruntime-android-qnn:1.24.3/g' node_modules/onnxruntime-react-native/android/build.gradle
+sed -i '' 's/onnxruntime-extensions-android:latest.integration/onnxruntime-extensions-android:1.24.3/g' node_modules/onnxruntime-react-native/android/build.gradle

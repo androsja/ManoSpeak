@@ -15,7 +15,7 @@ export const MainScreen: React.FC = () => {
   const [currentLandmarks, setCurrentLandmarks] = useState<number[][] | null>(null);
 
   // Hook for camera integration and MediaPipe Holistic coordinates streaming
-  const { hasPermission, requestPermission, frameOutput, frameBuffer } = useMediaPipeHolistic(30);
+  const { hasPermission, requestPermission, frameProcessor, frameBuffer } = useMediaPipeHolistic(30);
 
   // Get front camera device
   const cameraDevice = useCameraDevice('front');
@@ -215,7 +215,7 @@ export const MainScreen: React.FC = () => {
               style={StyleSheet.absoluteFill}
               device={cameraDevice}
               isActive={true}
-              outputs={[frameOutput]}
+              frameProcessor={frameProcessor}
             />
             {renderSkeletonOverlay()}
           </View>
