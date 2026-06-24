@@ -96,7 +96,8 @@ def _flip_horizontal(landmarks: np.ndarray) -> np.ndarray:
 def collate_fn(batch: list[dict]) -> dict:
     """Pad variable-length temporal sequences to the longest in the batch."""
     landmarks_list = [item["landmarks"] for item in batch]
-    max_len = max(lm.shape[0] for lm in landmarks_list)
+    input_lengths = torch.tensor([lm.shape[0] for lm in landmarks_list], dtype=torch.long)
+    max_len = input_lengths.max().item()
 
     padded = []
     for lm in landmarks_list:
@@ -109,9 +110,10 @@ def collate_fn(batch: list[dict]) -> dict:
 
     return {
         "landmarks": torch.stack(padded, dim=0),
-        "handshape": torch.stack([item["handshape"] for item in batch]),
-        "location":  torch.stack([item["location"]  for item in batch]),
-        "movement":  torch.stack([item["movement"]  for item in batch]),
+        "input_lengths": input_lengths,
+        "handshape": torch.tensor([item["handshape"] for item in batch], dtype=torch.long),
+        "location":  torch.tensor([item["location"]  for item in batch], dtype=torch.long),
+        "movement":  torch.tensor([item["movement"]  for item in batch], dtype=torch.long),
     }
 
 
@@ -162,19 +164,28 @@ def run_epoch(
     with torch.set_grad_enabled(training):
         for batch in loader:
             lm = batch["landmarks"].to(device)
+            input_lengths = batch["input_lengths"].to(device)
             t_h = batch["handshape"].to(device)
             t_l = batch["location"].to(device)
             t_m = batch["movement"].to(device)
+            
+            # Isolated sign clip: target sequence length is exactly 1 token
+            target_lengths = torch.ones(lm.size(0), dtype=torch.long).to(device)
 
             if training:
                 optimizer.zero_grad()
 
             out = model(lm)
-            # Handshape uses class-weighted loss; location/movement use plain CE
+            
+            # CTC loss expects log-probabilities of shape (T, B, C)
+            log_h = out["handshape"].log_softmax(2).transpose(0, 1)
+            log_l = out["location"].log_softmax(2).transpose(0, 1)
+            log_m = out["movement"].log_softmax(2).transpose(0, 1)
+
             loss = (
-                h_criterion(out["handshape"], t_h)
-                + lm_criterion(out["location"],  t_l)
-                + lm_criterion(out["movement"],  t_m)
+                h_criterion(log_h, t_h, input_lengths, target_lengths)
+                + lm_criterion(log_l, t_l, input_lengths, target_lengths)
+                + lm_criterion(log_m, t_m, input_lengths, target_lengths)
             )
 
             if training:
@@ -183,9 +194,11 @@ def run_epoch(
                 optimizer.step()
 
             total_loss += loss.item()
-            correct_h += (out["handshape"].argmax(dim=1) == t_h).sum().item()
-            correct_l += (out["location"].argmax(dim=1)  == t_l).sum().item()
-            correct_m += (out["movement"].argmax(dim=1)  == t_m).sum().item()
+            
+            # Simple accuracy approximation for isolated sequences: max activation over time
+            correct_h += (out["handshape"].max(dim=1).values.argmax(dim=1) == t_h).sum().item()
+            correct_l += (out["location"].max(dim=1).values.argmax(dim=1)  == t_l).sum().item()
+            correct_m += (out["movement"].max(dim=1).values.argmax(dim=1)  == t_m).sum().item()
             total += t_h.size(0)
 
     n = len(loader)
@@ -238,14 +251,10 @@ def main() -> None:
 
     model = PhonSSM().to(device)
 
-    # Handshape class weights — computed from full dataset before splitting
-    print("Computing handshape class weights...")
-    h_weights = compute_class_weights(full_dataset, model.num_handshapes, "handshape").to(device)
-
-    # Handshape: weighted loss + label smoothing → helps rare classes
-    h_criterion  = nn.CrossEntropyLoss(weight=h_weights, label_smoothing=0.1)
-    # Location / movement: plain CE + label smoothing
-    lm_criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+    # CTC Loss for continuous sequence modeling.
+    # Blanks are set to the maximum class index (63 for handshape, 31 for loc/mov).
+    h_criterion  = nn.CTCLoss(blank=63, zero_infinity=True)
+    lm_criterion = nn.CTCLoss(blank=31, zero_infinity=True)
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     # CosineAnnealing gives a warm-then-cool LR schedule; better than ReduceOnPlateau

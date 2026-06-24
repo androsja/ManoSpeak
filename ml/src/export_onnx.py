@@ -36,7 +36,12 @@ def export(model_path: str, output_path: str) -> None:
         onnx_fp32_path,
         input_names=["landmarks"],
         output_names=["handshape", "location", "movement"],
-        dynamic_axes={"landmarks": {1: "frames"}},
+        dynamic_axes={
+            "landmarks": {1: "frames"},
+            "handshape": {1: "frames"},
+            "location":  {1: "frames"},
+            "movement":  {1: "frames"},
+        },
         opset_version=17,
         dynamo=False,
     )

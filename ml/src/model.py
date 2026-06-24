@@ -58,7 +58,7 @@ class HandshapeBranch(nn.Module):
         self.proj  = nn.Linear(self.HAND_DIM, out_dim)
         self.agan  = AnatomicalGraphAttention(out_dim, out_dim, num_heads=4)
         self.gru   = nn.GRU(out_dim, out_dim, num_layers=1, batch_first=True, bidirectional=False)
-        self.fc    = nn.Linear(out_dim * 2, out_dim)   # mean + max → cat
+        self.fc    = nn.Linear(out_dim, out_dim)   # direct from GRU, no pooling
         self.drop  = nn.Dropout(dropout)
 
     def forward(self, x_full: torch.Tensor) -> torch.Tensor:
@@ -80,12 +80,8 @@ class HandshapeBranch(nn.Module):
         h = self.agan(h) + h                    # residual
         gru_out, _ = self.gru(h)                # (B, T, 128)
 
-        # Mean + max pooling captures both the average and peak hand configuration
-        h_mean = gru_out.mean(dim=1)            # (B, 128)
-        h_max  = gru_out.max(dim=1).values      # (B, 128)
-        pooled = torch.cat([h_mean, h_max], dim=1)  # (B, 256)
-
-        return self.drop(F.relu(self.fc(pooled)))   # (B, 128)
+        # Removed temporal pooling for sequence-to-sequence output
+        return self.drop(F.relu(self.fc(gru_out)))  # (B, T, 128)
 
 
 class PhonSSM(nn.Module):
@@ -95,7 +91,7 @@ class PhonSSM(nn.Module):
     Changes vs v1:
     * HandshapeBranch — dedicated hand-landmark pathway for fine-grained
       finger configuration encoding.
-    * mean + max temporal pooling on the global GRU trunk.
+    * No temporal pooling — outputs per-frame sequences (B, T, num_classes) for CTC.
     * Dropout(0.3) on every classification head.
     * Backward-compatible ONNX signature: input `landmarks` (B, T, 543, 3),
       outputs `handshape`, `location`, `movement` unchanged.
@@ -123,8 +119,8 @@ class PhonSSM(nn.Module):
             self.hidden_dim, self.hidden_dim,
             num_layers=2, batch_first=True, bidirectional=True,
         )
-        # mean + max → cat → 512, then reduce to 256
-        self.fc = nn.Linear(self.hidden_dim * 4, self.hidden_dim)
+        # bidirectional GRU output is hidden_dim * 2
+        self.fc = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
 
         # ── Dedicated handshape branch ────────────────────────────────────
         self.handshape_branch = HandshapeBranch(out_dim=128, dropout=dropout)
@@ -161,18 +157,14 @@ class PhonSSM(nn.Module):
 
         gru_out, _ = self.gru(features)                  # (B, T, 512) — bidirectional
 
-        # Mean + max pooling for richer temporal summary
-        trunk_mean = gru_out.mean(dim=1)                 # (B, 512)
-        trunk_max  = gru_out.max(dim=1).values           # (B, 512)
-        trunk_pool = torch.cat([trunk_mean, trunk_max], dim=1)  # (B, 1024)  ← note: hidden*4=1024
-
-        trunk = F.relu(self.fc(trunk_pool))              # (B, 256)
+        # Removed temporal pooling to preserve sequence output for CTC
+        trunk = F.relu(self.fc(gru_out))                 # (B, T, 256)
 
         # ── Hand-specific branch ──────────────────────────────────────────
-        hand_feat = self.handshape_branch(x)             # (B, 128)
+        hand_feat = self.handshape_branch(x)             # (B, T, 128)
 
         # ── Heads ─────────────────────────────────────────────────────────
-        hs_input = torch.cat([trunk, hand_feat], dim=1)  # (B, 384)
+        hs_input = torch.cat([trunk, hand_feat], dim=-1) # (B, T, 384)
 
         return {
             "handshape": self.handshape_head(hs_input),
