@@ -1,67 +1,64 @@
-import { InferenceSession, Tensor } from 'onnxruntime-react-native';
+import Tts from 'react-native-tts';
 
 export class TtsService {
   private isSpeaking: boolean = false;
-  private onnxSession: InferenceSession | null = null;
-  private isModelLoaded: boolean = false;
 
   constructor() {
-    this.initOnnxSession();
+    this.initTts();
   }
 
-  private async initOnnxSession(): Promise<void> {
+  private async initTts() {
     try {
-      // In production React Native execution, we load the model asset:
-      const modelAsset = require('../../assets/models/tts_voice.onnx');
-      this.onnxSession = await InferenceSession.create(modelAsset);
-      this.isModelLoaded = true;
-      console.log('[TTS Service] ONNX Voice Engine Initialized Successfully.');
+      await Tts.getInitStatus().catch((e) => console.log('Init status bypass (iOS):', e));
+    } catch (e) { }
+
+    try {
+      await Tts.setDefaultLanguage('es-CO'); // Colombian Spanish
     } catch (err) {
-      console.warn('[TTS Service] Native ONNX Engine not available. Using OS speech fallback.', err);
+      console.warn('[TTS Service] es-CO no disponible. Se usará el idioma por defecto.', err);
     }
+    
+    try {
+      await Tts.setDefaultRate(0.5); // Normal speed
+    } catch (err) { }
+    
+    console.log('[TTS Service] TTS Engine Initialized.');
   }
 
   /**
-   * Vocalizes text offline using ONNX Runtime Mobile models with OS fallback.
+   * Vocalizes text out loud using the native OS speech synthesizer.
    */
   public async speak(text: string): Promise<void> {
     if (!text || text.trim() === '') {
       return;
     }
     
-    this.isSpeaking = true;
-
-    if (this.isModelLoaded && this.onnxSession) {
-      try {
-        console.log(`[ONNX TTS Engine] Voces locales activas - Sintetizando: "${text}"`);
-        // Synthesizes phonemes from text using local session:
-        const inputTensor = new Tensor('string', [text], [1]);
-        await this.onnxSession.run({ text: inputTensor });
-      } catch (err) {
-        console.error('[ONNX TTS Engine] Error en síntesis de voz, usando fallback.', err);
-        this.speakFallback(text);
-      }
-    } else {
-      this.speakFallback(text);
+    // Ignore the raw query keys if the model isn't trained yet
+    if (text.startsWith('[H')) {
+      console.log('[TTS] Ignorando salida cruda del modelo no entrenado:', text);
+      return;
     }
     
-    // Simulate vocalization playback latency
+    this.isSpeaking = true;
+    console.log(`[TTS Engine] Hablando en voz alta: "${text}"`);
+    
+    Tts.stop(); // Stop any current speech
+    Tts.speak(text);
+
+    // Simulate vocalization playback latency to prevent overlap
     return new Promise((resolve) => {
       setTimeout(() => {
         this.isSpeaking = false;
         resolve();
-      }, 300);
+      }, 1000);
     });
-  }
-
-  private speakFallback(text: string): void {
-    console.log(`[TTS Fallback Engine] Vocalizando: "${text}"`);
   }
 
   /**
    * Stops current speech synthesis immediately.
    */
   public async stop(): Promise<void> {
+    Tts.stop();
     this.isSpeaking = false;
   }
 

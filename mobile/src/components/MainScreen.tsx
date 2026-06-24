@@ -15,7 +15,7 @@ export const MainScreen: React.FC = () => {
   const [currentLandmarks, setCurrentLandmarks] = useState<number[][] | null>(null);
 
   // Hook for camera integration and MediaPipe Holistic coordinates streaming
-  const { hasPermission, requestPermission, frameProcessor, frameBuffer } = useMediaPipeHolistic(30);
+  const { hasPermission, requestPermission, frameProcessor, frameBuffer, rawLandmarks } = useMediaPipeHolistic(30);
 
   // Get front camera device
   const cameraDevice = useCameraDevice('front');
@@ -45,46 +45,51 @@ export const MainScreen: React.FC = () => {
       const size = frameBuffer.size();
       setBufferSize(size);
       
-      const frames = frameBuffer.getFrames();
-      if (frames.length > 0) {
-        setCurrentLandmarks(frames[frames.length - 1]);
-      }
-      
       requestAnimationFrame(updateLoop);
     };
     updateLoop();
     
+    // Translation loop: Try to translate every 500ms
+    const translationInterval = setInterval(() => {
+      if (frameBuffer.size() >= 30 && !modelLoading) {
+        runTranslation();
+      }
+    }, 500);
+    
     return () => {
       active = false;
+      clearInterval(translationInterval);
     };
-  }, [frameBuffer]);
+  }, [frameBuffer, modelLoading]);
+
+  const lastSpokenWordRef = useRef('');
 
   // Update translation text when buffer changes
   const runTranslation = async () => {
     try {
       const gloss = await translationServiceRef.current.translateFrameBuffer(frameBuffer);
-      setTranslatedText(gloss);
+      if (gloss && gloss !== '') {
+        setTranslatedText(gloss);
+      }
     } catch (err) {
       console.error('Translation error', err);
     }
   };
 
-  // Helper to add a mock gesture frame (representing MediaPipe output)
-  const addMockFrameForSign = (value: number) => {
-    const frame: number[][] = [];
-    for (let i = 0; i < 543; i++) {
-      // Mock coordinates with slight positional offsets to look realistic
-      frame.push([
-        0.5 + Math.sin(i * 0.1) * 0.25,
-        0.5 + Math.cos(i * 0.1) * 0.25,
-        value
-      ]);
+  // Automatically speak when a NEW translation is detected
+  useEffect(() => {
+    if (translatedText && translatedText !== '' && translatedText !== lastSpokenWordRef.current) {
+      lastSpokenWordRef.current = translatedText;
+      ttsServiceRef.current.speak(translatedText);
     }
-    try {
-      frameBuffer.addFrame(frame);
-      runTranslation();
-    } catch (err) {
-      console.error(err);
+  }, [translatedText]);
+
+  // Helper to directly simulate a translated word to test the TTS engine
+  const simulateTranslation = (word: string) => {
+    setTranslatedText(word);
+    // Si la palabra es la misma, el useEffect no se dispara, forzamos hablarla.
+    if (word === lastSpokenWordRef.current) {
+      ttsServiceRef.current.speak(word);
     }
   };
 
@@ -101,19 +106,20 @@ export const MainScreen: React.FC = () => {
     frameBuffer.clear();
     setBufferSize(0);
     setTranslatedText('');
-    setCurrentLandmarks(null);
   };
 
-  // Maps coordinates [0, 1] range to screen canvas percentages
+  // MediaPipe raw landmarks are in [0.0, 1.0] representing percentage of the image dimensions.
+  // We simply multiply by 100 to get the CSS percentage.
   const mapX = (x: number) => `${Math.max(0, Math.min(100, x * 100))}%`;
   const mapY = (y: number) => `${Math.max(0, Math.min(100, y * 100))}%`;
 
   const renderSkeletonOverlay = () => {
-    if (!currentLandmarks || currentLandmarks.length !== 543) {
+    if (!rawLandmarks || rawLandmarks.length !== 543) {
       return null;
     }
 
-    const landmarks = currentLandmarks;
+    const landmarks = rawLandmarks;
+    const isZero = (pt: number[]) => pt[0] === 0 && pt[1] === 0 && pt[2] === 0;
 
     // Define structural points
     const leftShoulder = landmarks[11];
@@ -123,42 +129,52 @@ export const MainScreen: React.FC = () => {
     const leftWrist = landmarks[15];
     const rightWrist = landmarks[16];
 
-    // Left hand landmarks (33 to 53)
-    const leftHandPoints = landmarks.slice(33, 54);
-    // Right hand landmarks (54 to 74)
-    const rightHandPoints = landmarks.slice(54, 75);
+    // Left hand landmarks (501 to 522)
+    const leftHandPoints = landmarks.slice(501, 522);
+    // Right hand landmarks (522 to 543)
+    const rightHandPoints = landmarks.slice(522, 543);
 
     return (
       <Svg style={StyleSheet.absoluteFill}>
         {/* Render Torso / Arm Connections */}
-        <Line
-          x1={mapX(leftShoulder[0])} y1={mapY(leftShoulder[1])}
-          x2={mapX(rightShoulder[0])} y2={mapY(rightShoulder[1])}
-          stroke="#0EA5E9" strokeWidth="3"
-        />
-        <Line
-          x1={mapX(leftShoulder[0])} y1={mapY(leftShoulder[1])}
-          x2={mapX(leftElbow[0])} y2={mapY(leftElbow[1])}
-          stroke="#0EA5E9" strokeWidth="2.5"
-        />
-        <Line
-          x1={mapX(leftElbow[0])} y1={mapY(leftElbow[1])}
-          x2={mapX(leftWrist[0])} y2={mapY(leftWrist[1])}
-          stroke="#0EA5E9" strokeWidth="2.5"
-        />
-        <Line
-          x1={mapX(rightShoulder[0])} y1={mapY(rightShoulder[1])}
-          x2={mapX(rightElbow[0])} y2={mapY(rightElbow[1])}
-          stroke="#0EA5E9" strokeWidth="2.5"
-        />
-        <Line
-          x1={mapX(rightElbow[0])} y1={mapY(rightElbow[1])}
-          x2={mapX(rightWrist[0])} y2={mapY(rightWrist[1])}
-          stroke="#0EA5E9" strokeWidth="2.5"
-        />
+        {!isZero(leftShoulder) && !isZero(rightShoulder) && (
+          <Line
+            x1={mapX(leftShoulder[0])} y1={mapY(leftShoulder[1])}
+            x2={mapX(rightShoulder[0])} y2={mapY(rightShoulder[1])}
+            stroke="#0EA5E9" strokeWidth="3"
+          />
+        )}
+        {!isZero(leftShoulder) && !isZero(leftElbow) && (
+          <Line
+            x1={mapX(leftShoulder[0])} y1={mapY(leftShoulder[1])}
+            x2={mapX(leftElbow[0])} y2={mapY(leftElbow[1])}
+            stroke="#0EA5E9" strokeWidth="2.5"
+          />
+        )}
+        {!isZero(leftElbow) && !isZero(leftWrist) && (
+          <Line
+            x1={mapX(leftElbow[0])} y1={mapY(leftElbow[1])}
+            x2={mapX(leftWrist[0])} y2={mapY(leftWrist[1])}
+            stroke="#0EA5E9" strokeWidth="2.5"
+          />
+        )}
+        {!isZero(rightShoulder) && !isZero(rightElbow) && (
+          <Line
+            x1={mapX(rightShoulder[0])} y1={mapY(rightShoulder[1])}
+            x2={mapX(rightElbow[0])} y2={mapY(rightElbow[1])}
+            stroke="#0EA5E9" strokeWidth="2.5"
+          />
+        )}
+        {!isZero(rightElbow) && !isZero(rightWrist) && (
+          <Line
+            x1={mapX(rightElbow[0])} y1={mapY(rightElbow[1])}
+            x2={mapX(rightWrist[0])} y2={mapY(rightWrist[1])}
+            stroke="#0EA5E9" strokeWidth="2.5"
+          />
+        )}
 
         {/* Render Left Hand Points */}
-        {leftHandPoints.map((pt, idx) => (
+        {leftHandPoints.map((pt, idx) => !isZero(pt) ? (
           <Circle
             key={`lh-${idx}`}
             cx={mapX(pt[0])}
@@ -166,30 +182,30 @@ export const MainScreen: React.FC = () => {
             r="4"
             fill="#10B981"
           />
-        ))}
+        ) : null)}
 
         {/* Render Right Hand Points */}
-        {rightHandPoints.map((pt, idx) => (
+        {rightHandPoints.map((pt, idx) => !isZero(pt) ? (
           <Circle
             key={`rh-${idx}`}
             cx={mapX(pt[0])}
             cy={mapY(pt[1])}
             r="4"
-            fill="#10B981"
+            fill="#F43F5E"
           />
-        ))}
+        ) : null)}
 
-        {/* Render Face Outline points (sampled subset for smooth rendering) */}
-        {landmarks.slice(75, 120).map((pt, idx) => (
+        {/* Render Face Outline points */}
+        {landmarks.slice(75, 120).map((pt, idx) => !isZero(pt) ? (
           <Circle
             key={`face-${idx}`}
             cx={mapX(pt[0])}
             cy={mapY(pt[1])}
             r="2"
-            fill="#F43F5E"
+            fill="#38BDF8"
             opacity={0.7}
           />
-        ))}
+        ) : null)}
       </Svg>
     );
   };
@@ -215,7 +231,9 @@ export const MainScreen: React.FC = () => {
               style={StyleSheet.absoluteFill}
               device={cameraDevice}
               isActive={true}
+              pixelFormat="rgb"
               frameProcessor={frameProcessor}
+              onError={(error) => console.warn('Cámara no disponible (posible simulador):', error)}
             />
             {renderSkeletonOverlay()}
           </View>
@@ -261,19 +279,19 @@ export const MainScreen: React.FC = () => {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => addMockFrameForSign(0.0)} // HOLA recipe
+            onPress={() => simulateTranslation('Hola')}
           >
             <Text style={styles.btnText}>+ Seña: HOLA</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => addMockFrameForSign(1.0 / (543 * 3))} // GRACIAS recipe
+            onPress={() => simulateTranslation('Gracias')}
           >
             <Text style={styles.btnText}>+ Seña: GRACIAS</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => addMockFrameForSign(5.0 / (543 * 3))} // COLOMBIA recipe
+            onPress={() => simulateTranslation('Colombia')}
           >
             <Text style={styles.btnText}>+ Seña: COLOMBIA</Text>
           </TouchableOpacity>
