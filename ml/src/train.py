@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, Subset
 from model import PhonSSM
 from normalizers import normalize_landmarks, apply_gaussian_jitter, apply_time_warping, apply_micro_scaling
 from phonological_labels import PHONOLOGICAL_LABELS
@@ -70,9 +70,10 @@ class LSCDataset(Dataset):
                 landmarks = apply_time_warping(landmarks, warp_factor=warp_factor)
             if np.random.rand() < 0.5:
                 landmarks = apply_micro_scaling(landmarks)
-            # Horizontal flip: mirrors X coordinate → simulates left-handed signer
-            if np.random.rand() < 0.4:
-                landmarks = _flip_horizontal(landmarks)
+            # NOTE: horizontal-flip augmentation is disabled. A correct mirror
+            # must negate X on non-zero landmarks (data is centered in [-1, 1])
+            # AND swap the left/right hand landmark blocks; the previous
+            # `1.0 - x` version corrupted coordinates and the zero mask.
 
         return {
             "landmarks": torch.tensor(landmarks, dtype=torch.float32),
@@ -232,17 +233,22 @@ def main() -> None:
         return
 
     print(f"Loading dataset from: {args.data_dir}")
-    full_dataset = LSCDataset(args.data_dir, augment=False)
+    # Two views over the SAME files: the training view is augmented, the
+    # validation view is not. random_split Subsets share one underlying
+    # dataset object, so toggling `.augment` on it would leak augmentation
+    # into validation and make val metrics (and best-checkpoint selection)
+    # unreliable — hence two separate instances split by the same indices.
+    train_full = LSCDataset(args.data_dir, augment=True)
+    val_full   = LSCDataset(args.data_dir, augment=False)
 
-    val_size   = int(len(full_dataset) * args.val_split)
-    train_size = len(full_dataset) - val_size
-    train_ds, val_ds = random_split(
-        full_dataset, [train_size, val_size],
-        generator=torch.Generator().manual_seed(args.seed),
-    )
-
-    # Enable augmentations on training subset only
-    train_ds.dataset.augment = True  # type: ignore[attr-defined]
+    n_samples  = len(train_full)
+    val_size   = int(n_samples * args.val_split)
+    train_size = n_samples - val_size
+    perm = torch.randperm(
+        n_samples, generator=torch.Generator().manual_seed(args.seed)
+    ).tolist()
+    train_ds = Subset(train_full, perm[:train_size])
+    val_ds   = Subset(val_full,   perm[train_size:])
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,  collate_fn=collate_fn, num_workers=0)
     val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=0)
