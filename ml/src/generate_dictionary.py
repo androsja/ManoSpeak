@@ -39,9 +39,9 @@ def predict_triple(model: PhonSSM, landmarks_path: str, device: torch.device) ->
     with torch.no_grad():
         out = model(tensor)
 
-    h = int(out["handshape"].argmax(dim=1).item())
-    l = int(out["location"].argmax(dim=1).item())
-    m = int(out["movement"].argmax(dim=1).item())
+    h = int(out["handshape"][:, :, :-1].max(dim=1).values.argmax(dim=1).item())
+    l = int(out["location"][:, :, :-1].max(dim=1).values.argmax(dim=1).item())
+    m = int(out["movement"][:, :, :-1].max(dim=1).values.argmax(dim=1).item())
     return (h, l, m)
 
 
