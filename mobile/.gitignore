@@ -1,0 +1,35 @@
+# Node / JS
+node_modules/
+npm-debug.log
+yarn-error.log
+.metro-health-check*
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties
+android/captures/
+*.keystore
+!debug.keystore
+
+# iOS build artifacts and dependencies
+ios/Pods/
+ios/build/
+ios/*.xcworkspace
+ios/.xcode.env.local
+ios/**/xcuserdata/
+*.hmap
+*.ipa
+
+# Model binaries (distributed separately, not tracked in git)
+assets/models/*.onnx
+assets/models/*.onnx.data
+assets/models/*.tflite
+assets/models/*.task
+android/app/src/main/assets/
+
+# Misc
+*.log
+.DS_Store
