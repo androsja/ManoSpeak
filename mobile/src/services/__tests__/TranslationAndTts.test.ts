@@ -21,13 +21,13 @@ function makeOnnxSession(hArgmax: number, lArgmax: number, mArgmax: number) {
     arr[idx] = 1.0;
     return arr;
   };
-  return {
-    run: jest.fn().mockResolvedValue({
-      handshape: { data: makeData(hArgmax, 64) },
-      location:  { data: makeData(lArgmax, 32) },
-      movement:  { data: makeData(mArgmax, 32) },
-    }),
-  };
+    return {
+      run: jest.fn().mockResolvedValue({
+        handshape: { data: makeData(hArgmax, 64), dims: [1, 1, 64] },
+        location:  { data: makeData(lArgmax, 32), dims: [1, 1, 32] },
+        movement:  { data: makeData(mArgmax, 32), dims: [1, 1, 32] },
+      }),
+    };
 }
 
 describe('Translation and TTS Integration Services', () => {
