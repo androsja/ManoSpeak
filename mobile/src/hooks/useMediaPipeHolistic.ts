@@ -5,11 +5,13 @@ import {
   Camera,
   Frame,
 } from 'react-native-vision-camera';
-import { NativeModules } from 'react-native';
+import { VisionCameraProxy } from 'react-native-vision-camera';
+import { useRunOnJS } from 'react-native-worklets-core';
 import { FrameBuffer } from '../services/FrameBuffer';
 import { LandmarkNormalizer } from '../services/LandmarkNormalizer';
 
-const { MediaPipeHolisticDetector } = NativeModules;
+// Initialize the plugin natively using VisionCamera v4 API
+const mediaPipePlugin = VisionCameraProxy.initFrameProcessorPlugin('media_pipe_holistic', {});
 
 interface UseMediaPipeHolisticResult {
   hasPermission: boolean;
@@ -22,27 +24,37 @@ export const useMediaPipeHolistic = (capacity: number = 30): UseMediaPipeHolisti
   const { hasPermission, requestPermission } = useCameraPermission();
   const frameBufferRef = useRef<FrameBuffer>(new FrameBuffer(capacity));
 
-  // react-native-vision-camera v4 API: useFrameProcessor (replaces useFrameOutput in v5)
+  // Safely define the function that must run on the JS thread
+  const addFrameSafely = useRunOnJS((coords: number[][]) => {
+    try {
+      // Normalize coordinates before buffering for the ML model (ALWAYS RUNS)
+      const normalized = LandmarkNormalizer.normalizeFrame(coords);
+      frameBufferRef.current.addFrame(normalized);
+      
+      // Removed UI state updates for raw coordinates to maximize performance
+    } catch (jsErr) {
+      console.log("Error processing frame on JS thread", jsErr);
+    }
+  }, []);
+
+  // react-native-vision-camera v4 API: useFrameProcessor
   const frameProcessor = useFrameProcessor((frame: Frame) => {
     'worklet';
 
     try {
-      // In native code, the frame is processed by MediaPipe Holistic.
-      // Synchronous worklet call to the native detector wrapper.
-      if (MediaPipeHolisticDetector && MediaPipeHolisticDetector.processFrame) {
-        // Send frame reference to native processor
-        const coordinates = MediaPipeHolisticDetector.processFrame(frame) as number[][];
+      if (mediaPipePlugin) {
+        // Send frame reference to native processor synchronously on the worklet thread
+        const coordinates = mediaPipePlugin.call(frame) as unknown as number[][];
+        
         if (coordinates && Array.isArray(coordinates) && coordinates.length === 543) {
-          // Normalize coordinates before buffering (mirrors ml/src/normalizers.py)
-          const normalized = LandmarkNormalizer.normalizeFrame(coordinates);
-          frameBufferRef.current.addFrame(normalized);
+          // Pass the coordinates back to the JS thread to run class methods safely
+          addFrameSafely(coordinates);
         }
       }
-    } catch (_err) {
-      // Silently handle worklet errors to avoid camera crashes
+    } catch (_err: any) {
+      console.log("Worklet Error: ", _err.message || _err);
     }
-    // Note: v4 does NOT require manual frame.dispose() — handled by the framework
-  }, []);
+  }, [addFrameSafely]);
 
   return {
     hasPermission,

@@ -121,4 +121,7 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Google MediaPipe Tasks Vision API (Modern)
+    implementation("com.google.mediapipe:tasks-vision:0.10.20")
 }

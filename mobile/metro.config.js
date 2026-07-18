@@ -8,8 +8,8 @@ const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
  */
 const config = {
   resolver: {
-    // Allow Metro to bundle .tflite model files as binary assets
-    assetExts: [...(getDefaultConfig(__dirname).resolver?.assetExts ?? []), 'tflite'],
+    // Allow Metro to bundle .tflite and .onnx model files as binary assets
+    assetExts: [...(getDefaultConfig(__dirname).resolver?.assetExts ?? []), 'tflite', 'onnx'],
   },
 };
 
