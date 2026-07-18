@@ -1,0 +1,11 @@
+pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'ManoSpeak'
+include ':app'
+includeBuild('../node_modules/@react-native/gradle-plugin')
+
+// react-native-nitro-image is a peer dep of react-native-vision-camera v5
+// but is not auto-discovered; include it explicitly.
+include ':react-native-nitro-image'
+project(':react-native-nitro-image').projectDir = new File('../node_modules/react-native-nitro-image/android')
