@@ -197,10 +197,14 @@ def run_epoch(
 
             total_loss += loss.item()
             
-            # Simple accuracy approximation for isolated sequences: max activation over time
-            correct_h += (out["handshape"].max(dim=1).values.argmax(dim=1) == t_h).sum().item()
-            correct_l += (out["location"].max(dim=1).values.argmax(dim=1)  == t_l).sum().item()
-            correct_m += (out["movement"].max(dim=1).values.argmax(dim=1)  == t_m).sum().item()
+            # Accuracy proxy for isolated signs: strongest NON-blank class over time.
+            # CTC makes the model peaky on the blank token (index 63 for handshape,
+            # 31 for loc/mov), so the blank column must be excluded or the metric
+            # always predicts blank and reads ~0%. This mirrors the mobile decoder,
+            # which discards those same blank indices.
+            correct_h += (out["handshape"][..., :63].max(dim=1).values.argmax(dim=1) == t_h).sum().item()
+            correct_l += (out["location"][..., :31].max(dim=1).values.argmax(dim=1)  == t_l).sum().item()
+            correct_m += (out["movement"][..., :31].max(dim=1).values.argmax(dim=1)  == t_m).sum().item()
             total += t_h.size(0)
 
     n = len(loader)
