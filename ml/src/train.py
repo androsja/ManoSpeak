@@ -289,10 +289,13 @@ def main() -> None:
         elif vl_h > best_h_acc:
             best_h_acc = vl_h
 
+        # Show train vs val handshape accuracy to diagnose under/overfitting.
         print(
             f"Epoch {epoch:3d}/{args.epochs}  "
-            f"tr_loss={tr_loss:.4f}  vl_loss={vl_loss:.4f}  "
-            f"acc(h/l/m): {vl_h:.2%}/{vl_l:.2%}/{vl_m:.2%}{flag}"
+            f"tr_loss={tr_loss:.4f} vl_loss={vl_loss:.4f}  "
+            f"h(tr/vl):{tr_h:.1%}/{vl_h:.1%}  "
+            f"l(tr/vl):{tr_l:.1%}/{vl_l:.1%}  "
+            f"m(tr/vl):{tr_m:.1%}/{vl_m:.1%}{flag}"
         )
 
     print(f"\nBest checkpoint saved → {best_path}  (val_loss={best_val_loss:.4f}, best_h_acc={best_h_acc:.2%})")
