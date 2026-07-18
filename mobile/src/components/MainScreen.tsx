@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator, Animated, Image } from 'react-native';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
-import Svg, { Circle, Line } from 'react-native-svg';
-import { ManoSpeakIcon } from './ManoSpeakIcon';
+import Svg, { Circle, Line, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { useMediaPipeHolistic } from '../hooks/useMediaPipeHolistic';
 import { TranslationService } from '../services/TranslationService';
 import { TtsService } from '../services/TtsService';
@@ -12,20 +11,18 @@ export const MainScreen: React.FC = () => {
   const [bufferSize, setBufferSize] = useState(0);
   const [translatedText, setTranslatedText] = useState('');
   const [speaking, setSpeaking] = useState(false);
-  const [currentLandmarks, setCurrentLandmarks] = useState<number[][] | null>(null);
+
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   // Hook for camera integration and MediaPipe Holistic coordinates streaming
-  const { hasPermission, requestPermission, frameProcessor, frameBuffer, rawLandmarks } = useMediaPipeHolistic(30);
-
-  // Get front camera device
+  const { hasPermission, requestPermission, frameProcessor, frameBuffer } = useMediaPipeHolistic(30);
   const cameraDevice = useCameraDevice('front');
-
-  // References to Services (preserved across renders)
   const translationServiceRef = useRef<TranslationService>(new TranslationService());
   const ttsServiceRef = useRef<TtsService>(new TtsService());
 
   useEffect(() => {
-    // Simulate loading model on mount
     const initModel = async () => {
       try {
         await translationServiceRef.current.loadModel();
@@ -37,23 +34,17 @@ export const MainScreen: React.FC = () => {
     initModel();
   }, []);
 
-  // Frame update loop pulling from frame buffer to render skeleton overlay
   useEffect(() => {
     let active = true;
     const updateLoop = () => {
       if (!active) return;
-      const size = frameBuffer.size();
-      setBufferSize(size);
-      
+      setBufferSize(frameBuffer.size());
       requestAnimationFrame(updateLoop);
     };
     updateLoop();
     
-    // Translation loop: Try to translate every 500ms
     const translationInterval = setInterval(() => {
-      if (frameBuffer.size() >= 30 && !modelLoading) {
-        runTranslation();
-      }
+      if (frameBuffer.size() >= 30 && !modelLoading) runTranslation();
     }, 500);
     
     return () => {
@@ -64,7 +55,6 @@ export const MainScreen: React.FC = () => {
 
   const lastSpokenWordRef = useRef('');
 
-  // Update translation text when buffer changes
   const runTranslation = async () => {
     try {
       const gloss = await translationServiceRef.current.translateFrameBuffer(frameBuffer);
@@ -76,27 +66,31 @@ export const MainScreen: React.FC = () => {
     }
   };
 
-  // Automatically speak when a NEW translation is detected
   useEffect(() => {
     if (translatedText && translatedText !== '' && translatedText !== lastSpokenWordRef.current) {
       lastSpokenWordRef.current = translatedText;
       ttsServiceRef.current.speak(translatedText);
+      triggerTextAnimation();
     }
   }, [translatedText]);
 
-  // Helper to directly simulate a translated word to test the TTS engine
+  const triggerTextAnimation = () => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(20);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, friction: 6, useNativeDriver: true })
+    ]).start();
+  };
+
   const simulateTranslation = (word: string) => {
     setTranslatedText(word);
-    // Si la palabra es la misma, el useEffect no se dispara, forzamos hablarla.
-    if (word === lastSpokenWordRef.current) {
-      ttsServiceRef.current.speak(word);
-    }
+    if (word === lastSpokenWordRef.current) ttsServiceRef.current.speak(word);
+    triggerTextAnimation();
   };
 
   const handleSpeak = async () => {
-    if (!translatedText || translatedText === '') {
-      return;
-    }
+    if (!translatedText || translatedText === '') return;
     setSpeaking(true);
     await ttsServiceRef.current.speak(translatedText);
     setSpeaking(false);
@@ -106,210 +100,86 @@ export const MainScreen: React.FC = () => {
     frameBuffer.clear();
     setBufferSize(0);
     setTranslatedText('');
+    fadeAnim.setValue(0);
   };
 
-  // MediaPipe raw landmarks are in [0.0, 1.0] representing percentage of the image dimensions.
-  // We simply multiply by 100 to get the CSS percentage.
   const mapX = (x: number) => `${Math.max(0, Math.min(100, x * 100))}%`;
   const mapY = (y: number) => `${Math.max(0, Math.min(100, y * 100))}%`;
 
-  const renderSkeletonOverlay = () => {
-    if (!rawLandmarks || rawLandmarks.length !== 543) {
-      return null;
-    }
 
-    const landmarks = rawLandmarks;
-    const isZero = (pt: number[]) => pt[0] === 0 && pt[1] === 0 && pt[2] === 0;
-
-    // Define structural points
-    const leftShoulder = landmarks[11];
-    const rightShoulder = landmarks[12];
-    const leftElbow = landmarks[13];
-    const rightElbow = landmarks[14];
-    const leftWrist = landmarks[15];
-    const rightWrist = landmarks[16];
-
-    // Left hand landmarks (501 to 522)
-    const leftHandPoints = landmarks.slice(501, 522);
-    // Right hand landmarks (522 to 543)
-    const rightHandPoints = landmarks.slice(522, 543);
-
-    return (
-      <Svg style={StyleSheet.absoluteFill}>
-        {/* Render Torso / Arm Connections */}
-        {!isZero(leftShoulder) && !isZero(rightShoulder) && (
-          <Line
-            x1={mapX(leftShoulder[0])} y1={mapY(leftShoulder[1])}
-            x2={mapX(rightShoulder[0])} y2={mapY(rightShoulder[1])}
-            stroke="#0EA5E9" strokeWidth="3"
-          />
-        )}
-        {!isZero(leftShoulder) && !isZero(leftElbow) && (
-          <Line
-            x1={mapX(leftShoulder[0])} y1={mapY(leftShoulder[1])}
-            x2={mapX(leftElbow[0])} y2={mapY(leftElbow[1])}
-            stroke="#0EA5E9" strokeWidth="2.5"
-          />
-        )}
-        {!isZero(leftElbow) && !isZero(leftWrist) && (
-          <Line
-            x1={mapX(leftElbow[0])} y1={mapY(leftElbow[1])}
-            x2={mapX(leftWrist[0])} y2={mapY(leftWrist[1])}
-            stroke="#0EA5E9" strokeWidth="2.5"
-          />
-        )}
-        {!isZero(rightShoulder) && !isZero(rightElbow) && (
-          <Line
-            x1={mapX(rightShoulder[0])} y1={mapY(rightShoulder[1])}
-            x2={mapX(rightElbow[0])} y2={mapY(rightElbow[1])}
-            stroke="#0EA5E9" strokeWidth="2.5"
-          />
-        )}
-        {!isZero(rightElbow) && !isZero(rightWrist) && (
-          <Line
-            x1={mapX(rightElbow[0])} y1={mapY(rightElbow[1])}
-            x2={mapX(rightWrist[0])} y2={mapY(rightWrist[1])}
-            stroke="#0EA5E9" strokeWidth="2.5"
-          />
-        )}
-
-        {/* Render Left Hand Points */}
-        {leftHandPoints.map((pt, idx) => !isZero(pt) ? (
-          <Circle
-            key={`lh-${idx}`}
-            cx={mapX(pt[0])}
-            cy={mapY(pt[1])}
-            r="4"
-            fill="#10B981"
-          />
-        ) : null)}
-
-        {/* Render Right Hand Points */}
-        {rightHandPoints.map((pt, idx) => !isZero(pt) ? (
-          <Circle
-            key={`rh-${idx}`}
-            cx={mapX(pt[0])}
-            cy={mapY(pt[1])}
-            r="4"
-            fill="#F43F5E"
-          />
-        ) : null)}
-
-        {/* Render Face Outline points */}
-        {landmarks.slice(75, 120).map((pt, idx) => !isZero(pt) ? (
-          <Circle
-            key={`face-${idx}`}
-            cx={mapX(pt[0])}
-            cy={mapY(pt[1])}
-            r="2"
-            fill="#38BDF8"
-            opacity={0.7}
-          />
-        ) : null)}
-      </Svg>
-    );
-  };
 
   return (
     <View style={styles.container}>
-      {/* 1. Header Area */}
+      {hasPermission && cameraDevice ? (
+        <View style={StyleSheet.absoluteFill}>
+          <Camera
+            style={StyleSheet.absoluteFill}
+            device={cameraDevice}
+            isActive={true}
+            pixelFormat="rgb"
+            frameProcessor={frameProcessor}
+          />
+
+          <View style={styles.vignette} />
+        </View>
+      ) : (
+        <View style={styles.cameraPlaceholder}>
+          <Text style={styles.cameraText}>Camera Access Required</Text>
+          <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+            <Text style={styles.btnText}>Grant Permission</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Floating Header */}
       <View style={styles.header}>
-        <View style={styles.headerBrand}>
-          <ManoSpeakIcon size={42} />
-          <View style={styles.headerText}>
-            <Text style={styles.title}>ManoSpeak</Text>
-            <Text style={styles.subtitle}>Traductor LSC · Offline</Text>
+        <Image source={require('../../assets/images/logo.png')} style={{ width: 42, height: 42, resizeMode: 'contain' }} />
+        <View style={styles.headerText}>
+          <Text style={styles.title}>VOZUAL</Text>
+          <View style={styles.badgeContainer}>
+            <View style={[styles.statusDot, modelLoading ? styles.dotLoading : styles.dotActive]} />
+            <Text style={styles.subtitle}>{modelLoading ? 'Initializing Neural Engine...' : 'Live Translation Active'}</Text>
           </View>
         </View>
       </View>
 
-      {/* 2. Camera View & Overlay */}
-      <View style={styles.cameraContainer}>
-        {hasPermission && cameraDevice ? (
-          <View style={StyleSheet.absoluteFill}>
-            <Camera
-              style={StyleSheet.absoluteFill}
-              device={cameraDevice}
-              isActive={true}
-              pixelFormat="rgb"
-              frameProcessor={frameProcessor}
-              onError={(error) => console.warn('Cámara no disponible (posible simulador):', error)}
-            />
-            {renderSkeletonOverlay()}
+      {/* Glassmorphism Floating UI */}
+      <View style={styles.glassPanel}>
+        <View style={styles.translationSection}>
+          <Text style={styles.overlayLabel}>Live Decoder</Text>
+          <View style={styles.textContainer}>
+            {translatedText ? (
+              <Animated.Text style={[styles.translatedText, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                {translatedText}
+              </Animated.Text>
+            ) : (
+              <Text style={styles.placeholderText}>Signing will appear here...</Text>
+            )}
           </View>
-        ) : (
-          <View style={styles.cameraPlaceholder}>
-            <Text style={styles.cameraText}>Acceso a Cámara Desactivado</Text>
-            <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
-              <Text style={styles.permissionBtnText}>Solicitar Permiso</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={styles.statsOverlay}>
-          <Text style={styles.statsText}>Buffer: {bufferSize} / 30 frames</Text>
-          {modelLoading ? (
-            <View style={styles.loaderRow}>
-              <ActivityIndicator size="small" color="#38BDF8" />
-              <Text style={styles.loaderText}>Cargando Diccionario LSC...</Text>
-            </View>
-          ) : (
-            <Text style={styles.statusText}>● Diccionario LSC Activo</Text>
-          )}
         </View>
-      </View>
-
-      {/* 3. Translation Overlay Area at the Bottom */}
-      <View style={styles.translationOverlay}>
-        <Text style={styles.overlayLabel}>Traducción LSC:</Text>
-        <View style={styles.textContainer}>
-          {translatedText ? (
-            <Text style={styles.translatedText}>{translatedText}</Text>
-          ) : (
-            <Text style={styles.placeholderText}>
-              Inicie señas frente a la cámara para ver la traducción...
-            </Text>
-          )}
-        </View>
-      </View>
-
-      {/* 4. Controls Console */}
-      <View style={styles.console}>
-        <Text style={styles.consoleLabel}>Simulador de Gestos LSC:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => simulateTranslation('Hola')}
-          >
-            <Text style={styles.btnText}>+ Seña: HOLA</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => simulateTranslation('Gracias')}
-          >
-            <Text style={styles.btnText}>+ Seña: GRACIAS</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => simulateTranslation('Colombia')}
-          >
-            <Text style={styles.btnText}>+ Seña: COLOMBIA</Text>
-          </TouchableOpacity>
-        </ScrollView>
 
         <View style={styles.controlsRow}>
-          <TouchableOpacity
-            style={[styles.ttsButton, (!translatedText || speaking) && styles.disabledButton]}
-            onPress={handleSpeak}
-            disabled={!translatedText || speaking}
-          >
-            <Text style={styles.btnText}>
-              {speaking ? 'Vocalizando...' : '🔊 Hablar Seña'}
-            </Text>
+          <TouchableOpacity style={[styles.actionBtn, styles.btnCyan]} onPress={() => simulateTranslation('Hola')}>
+            <Text style={styles.btnActionText}>HOLA</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-            <Text style={styles.btnText}>🧹 Limpiar Buffer</Text>
+          <TouchableOpacity style={[styles.actionBtn, styles.btnPurple]} onPress={() => simulateTranslation('Gracias')}>
+            <Text style={styles.btnActionText}>GRACIAS</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.btnCyan]} onPress={() => simulateTranslation('Colombia')}>
+            <Text style={styles.btnActionText}>COLOMBIA</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.footerRow}>
+          <Text style={styles.statsText}>Memory Buffer: {bufferSize}/30</Text>
+          <View style={styles.miniControls}>
+            <TouchableOpacity style={styles.miniBtn} onPress={handleSpeak}>
+              <Text style={styles.miniBtnText}>🔊</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.miniBtn} onPress={handleClear}>
+              <Text style={styles.miniBtnText}>🗑️</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
@@ -319,182 +189,168 @@ export const MainScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
-    padding: 16,
+    backgroundColor: '#0B0F19',
+  },
+  vignette: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(11, 15, 25, 0.4)',
   },
   header: {
-    marginTop: 24,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  headerBrand: {
+    position: 'absolute',
+    top: 50,
+    left: 24,
+    right: 24,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 12,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   headerText: {
     marginLeft: 12,
   },
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#38BDF8',
-    letterSpacing: 0.5,
+    color: '#FFFFFF',
+    letterSpacing: 1,
   },
-  subtitle: {
-    fontSize: 12,
-    color: '#94A3B8',
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 2,
-    letterSpacing: 0.3,
   },
-  cameraContainer: {
-    flex: 3,
-    backgroundColor: '#1E293B',
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  dotActive: { backgroundColor: '#00F0FF', shadowColor: '#00F0FF', shadowOpacity: 0.8, shadowRadius: 4 },
+  dotLoading: { backgroundColor: '#F5A623' },
+  subtitle: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  glassPanel: {
+    position: 'absolute',
+    bottom: 30,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(20, 25, 40, 0.65)',
+    borderRadius: 30,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  translationSection: {
+    marginBottom: 20,
+  },
+  overlayLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#00F0FF',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  textContainer: {
+    minHeight: 60,
+    justifyContent: 'center',
+  },
+  translatedText: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 240, 255, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.3)',
+    fontStyle: 'italic',
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 12,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#334155',
-    overflow: 'hidden',
-    position: 'relative',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginHorizontal: 4,
+    borderWidth: 1,
+  },
+  btnCyan: {
+    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+  },
+  btnPurple: {
+    backgroundColor: 'rgba(138, 43, 226, 0.1)',
+    borderColor: 'rgba(138, 43, 226, 0.3)',
+  },
+  btnActionText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 1,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingTop: 16,
+  },
+  statsText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 11,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  miniControls: {
+    flexDirection: 'row',
+  },
+  miniBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  miniBtnText: {
+    fontSize: 16,
   },
   cameraPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   cameraText: {
-    color: '#64748B',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 16,
+    color: '#FFF',
+    marginBottom: 20,
   },
   permissionBtn: {
-    backgroundColor: '#38BDF8',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  permissionBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  statsOverlay: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  statsText: {
-    color: '#38BDF8',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  loaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  loaderText: {
-    color: '#94A3B8',
-    fontSize: 11,
-    marginLeft: 6,
-  },
-  statusText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  translationOverlay: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 12,
-    justifyContent: 'center',
-  },
-  overlayLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    marginBottom: 6,
-  },
-  textContainer: {
-    minHeight: 48,
-    justifyContent: 'center',
-  },
-  translatedText: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    textAlign: 'center',
-  },
-  placeholderText: {
-    fontSize: 13,
-    color: '#64748B',
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  console: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  consoleLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  scroll: {
-    flexDirection: 'row',
-    marginBottom: 14,
-  },
-  actionButton: {
-    backgroundColor: '#0EA5E9',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    marginRight: 10,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  ttsButton: {
-    flex: 1,
-    backgroundColor: '#10B981',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  clearButton: {
-    flex: 1,
-    backgroundColor: '#EF4444',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  disabledButton: {
-    backgroundColor: '#475569',
-    opacity: 0.6,
+    backgroundColor: '#8A2BE2',
+    padding: 12,
+    borderRadius: 12,
   },
   btnText: {
-    color: '#FFFFFF',
+    color: '#FFF',
     fontWeight: '700',
-    fontSize: 14,
-  },
+  }
 });
