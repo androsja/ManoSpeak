@@ -1,43 +1,110 @@
-# Architectural Specification — ManoSpeak
+# Architectural Specification: ManoSpeak
 
-## 1. High-Level Inference Pipeline
-ManoSpeak operates as a zero-latency, local execution pipeline divided into four main layers:
+## 1. Status
+
+ManoSpeak is transitioning from variable-duration isolated sign recognition to a
+constrained continuous recognition pilot. The current model is not release-ready CSLR:
+
+- Training assigns exactly one phonological target triple to each clip.
+- The temporal backbone is a bidirectional GRU.
+- Mobile inference max-pools each phonological head across a complete window.
+- The mobile decoder returns at most one gloss per window.
+
+The target architecture below is gated by `RECOGNITION_CONTRACT.md` and
+`EVALUATION_PROTOCOL.md`. Planned components are not current capabilities.
+
+## 2. Current Pipeline
 
 ```mermaid
 graph TD
-    Camera[Camera Frame Feed] --> MPH[MediaPipe Holistic CPU]
-    MPH --> Norm[Translational & Scale Normalizer]
-    Norm --> SW[Sliding Window Vector Buffer]
-    SW --> PhonSSM[PhonSSM Core Model]
-    PhonSSM --> CTC[CTC Beam Search Decoder]
-    CTC --> GLOSS[Gloss-to-Text Mapping]
-    GLOSS --> ONNX_TTS[ONNX Runtime TTS Engine]
-    ONNX_TTS --> Audio[Device Audio Output]
+    Camera[Camera frame] --> MP[MediaPipe Holistic]
+    MP --> Norm[Shoulder-centered normalizer]
+    Norm --> Capture[Variable-duration clip buffer]
+    Capture --> ONNX[PhonSSM ONNX]
+    ONNX --> Pool[Per-head non-blank max pooling]
+    Pool --> Recipe[Handshape/location/movement recipe]
+    Recipe --> Gloss[Zero or one dictionary gloss]
+    Gloss --> NativeTTS[Native on-device TTS]
 ```
 
-## 2. Component Breakdown
+### Landmark Perception
 
-### Perception: MediaPipe Holistic
-To avoid the CPU/GPU memory footprint of processing high-resolution RGB video frames directly, ManoSpeak uses Google's **MediaPipe Holistic** pipeline to extract geometric coordinate vectors:
-- **BlazePose:** Locates global body alignment and isolates regions of interest (ROI) for the face and hands.
-- **Keypoint Tracking:** Tracks 543 distinct landmark points in 3D:
-  - 33 Pose landmarks (body outline)
-  - 42 Hand landmarks (21 per hand)
-  - 468 Face landmarks (micro-expressions and gaze)
-- This processing runs at 30+ FPS directly on the mobile CPU, collapsing multi-megabyte video frames into dense, light-weight 1D coordinate vectors.
+- Landmark order is 33 pose, 21 left hand, 21 right hand, and 468 face points.
+- Missing groups are represented by zero coordinates.
+- Mobile and ML normalize around the shoulder midpoint and shoulder scale.
+- Camera orientation, mirroring, extraction version, timestamps, and effective FPS must
+  be preserved in future sample manifests.
 
-### Sequence Analysis: Online CSLR via Sliding Windows
-Unlike Isolated Sign Recognition (ISLR), which requires pauses between signs, ManoSpeak implements **Online Continuous Sign Language Recognition (CSLR)**:
-- **Sliding Window:** A fixed temporal window crawls over the live coordinates stream.
-- **CTC (Connectionist Temporal Classification):** Calculates the emission probabilities of words (glosas) plus a special blank token representing transitions and coarticulation.
-- A Beam Search Decoder collapses duplicate adjacent predictions and strips blank tokens to reconstruct the sentence structure incrementally.
+### Current PhonSSM
 
-### Generalization: Phonological State Space Model (PhonSSM)
-To scale to massive vocabularies without training individual classifier models for every word:
-- **Anatomical Graph Attention (AGAN):** Focuses attention on structural joint connections.
-- **Ortogonal Factoring:** PhonSSM decodes the hand shape, the location relative to the torso, and the motion vector into separate, orthogonal embeddings.
-- **Zero-Shot Recognition:** A new word is decoded simply by identifying its components (e.g., *flat hand + forehead + circular motion*) and checking the INSOR LSC dictionary recipes, enabling vocabulary extension without re-training.
+- A global anatomical-attention trunk processes all 543 landmarks.
+- A hand-specific branch processes landmarks 33-74.
+- Per-frame heads emit handshape (64 classes), location (32), and movement (32).
+- CTC blank indices are 63 for handshape and 31 for location/movement.
+- CTC is currently trained with target length one. Per-frame output alone does not make
+  the model continuous.
 
-### Speech Synthesis: On-Device ONNX/TTS
-- **Local Engine:** TTS is handled offline using **ONNX Runtime Mobile** (compiled via `react-native-executorch` for Kokoro/Supertonic voices).
-- **Fallback:** Delegates directly to native operating system engines (`android.speech.tts.TextToSpeech` and `AVSpeechSynthesizer`) if ONNX Runtime is uninitialized or resources are constrained.
+### Current Decoder Limitation
+
+The mobile service independently selects the strongest non-blank handshape, location,
+and movement over the full input. This destroys temporal order and composes one recipe.
+It cannot emit `HOLA -> TU` from one uninterrupted stream.
+
+## 3. Target Continuous Pipeline
+
+```mermaid
+graph TD
+    Camera[Camera frame stream] --> MP[MediaPipe Holistic]
+    MP --> Norm[Normalizer and quality mask]
+    Norm --> Rolling[Bounded rolling buffer]
+    Rolling --> Temporal[Causal or chunked temporal encoder]
+    Temporal --> GlossHead[Gloss plus CTC blank head]
+    Temporal --> Aux[Phonological auxiliary heads]
+    Temporal --> Boundary[Optional boundary/rejection head]
+    GlossHead --> Decoder[Incremental prefix decoder]
+    Aux --> Decoder
+    Boundary --> Decoder
+    Decoder --> Events[Provisional/committed/rejected events]
+    Events --> Transcript[Ordered transcript]
+    Events --> NativeTTS[Committed events only]
+```
+
+### Required Changes
+
+1. Train a primary gloss-vocabulary CTC head with true multi-gloss targets.
+2. Retain phonological heads only as auxiliary losses unless ablation proves another
+   sequence-preserving use.
+3. Replace the bidirectional dependency with a causal or bounded-lookahead encoder.
+4. Train on real coarticulated sequences and non-sign/unknown regions.
+5. Decode incrementally using blank probability, prefix stability, confidence,
+   repetition evidence, and optional boundaries.
+6. Commit ordered events without requiring hand lowering or a neutral pose.
+
+## 4. Data Domains
+
+- LSC70 contains 3,284 six-image transitions from 70 non-expert volunteers. It has no
+  physical FPS metadata in the unified tensors.
+- LSC50 contains 1,000 variable-length sequences from five signers and 20
+  signer/repetition sessions.
+- These sources are evaluated separately and split by signer before augmentation.
+- The current seed-42 random split leaks every signer and is retained only as a frozen
+  reproducibility baseline.
+
+## 5. Vocabulary Strategy
+
+Phonological decomposition is useful supervision but does not prove zero-shot lexical
+recognition. A new gloss is enabled only after linguistic labeling, positive examples,
+confusers, real incoming/outgoing transitions, and signer-disjoint evaluation.
+
+The constrained continuous pilot starts with HOLA, TU, YO, GRACIAS, and ADIOS. The
+system learns reusable glosses and transitions rather than every possible sentence.
+Spanish sentence generation and LSC grammar modeling are separate later components.
+
+## 6. Speech and Privacy
+
+- Recognition ONNX and native operating-system TTS run locally.
+- TTS receives committed event IDs only and speaks each event at most once.
+- Raw camera frames remain in volatile processing memory and are not persisted by
+  default.
+- Diagnostic/personalization landmark retention requires explicit mode, local storage,
+  deletion, and consent controls.

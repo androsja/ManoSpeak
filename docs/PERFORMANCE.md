@@ -1,24 +1,45 @@
-# Performance Benchmarks — ManoSpeak
+# Performance Budgets: ManoSpeak
 
-## 1. Budget and Constraints
+## 1. Measurement Rules
 
-| Metric | Target | Hard Constraint | Validation method |
-| :--- | :--- | :--- | :--- |
-| Landmark Extraction | $\ge 30$ FPS | $24$ FPS | Frame delta metrics |
-| Model Weight Footprint | $\le 10$ MB | $15$ MB | APK / IPA bundle size checks |
-| Model Inference | $\le 20$ ms | $50$ ms | TFLite benchmark tool |
-| Text-to-Speech Latency | $\le 80$ ms | $100$ ms | Synthesizer callback timers |
-| Memory (RAM) Usage | $\le 100$ MB | $150$ MB | Xcode / Android Profiler |
-| Thermal Ceiling | Normal | Low throttling | 10 mins continuous execution |
+Performance is measured on a physical device with a release build. Desktop ONNX timing,
+Metro debug timing, and camera startup are not substitutes for on-device streaming
+measurements.
 
-## 2. Optimizations
+Model inference latency and linguistic commit latency are separate:
 
-### Landmark Downsampling
-If the user's mobile processor undergoes thermal throttling:
-- MediaPipe Holistic detection can be downsampled dynamically from 30 FPS to 24 FPS by discarding every fifth frame.
-- Discard face points that do not represent active linguistic signals (e.g., forehead or outer cheek landmarks), tracking only the mouth, eyes, and eyebrows to reduce coordinate sizes.
+- Inference latency covers one model chunk/window execution.
+- Commit latency is measured from annotated linguistic endpoint to stable committed
+  output and includes decoder lookahead/stability delay.
 
-### ONNX Runtime execution
-ONNX models (`Supertonic`/`Kokoro` TTS) run locally through React Native Executorch.
-- Bind calculations to the hardware neural processing units (NPU) or GPU accelerators via Apple's CoreML delegate and Android's NNAPI delegate to reduce CPU load.
-- If accelerator delegates are unavailable, fall back immediately to OS-native Speech Synthesis engines which operate inside daemon services, eliminating in-app memory spikes.
+## 2. Pilot Budgets
+
+| Metric | Target | Failure threshold | Validation |
+| --- | ---: | ---: | --- |
+| Effective landmark rate | >=24 FPS | <18 FPS sustained | Timestamped accepted frames |
+| Dropped-frame rate | <=5% | >10% sustained | Camera/inference counters |
+| Recognition model footprint | <=15 MB | >20 MB | Packaged model bytes |
+| Chunk inference p95 | <=100 ms | >150 ms | On-device monotonic timers |
+| Commit latency median | <=500 ms | >500 ms | Annotated continuous replay/device test |
+| Commit latency p95 | <=900 ms | >900 ms | Annotated continuous replay/device test |
+| Peak app memory | <=150 MB | >200 MB | Android/iOS profiler |
+| False commits in neutral stream | <0.5/minute | >=0.5/minute | At least 20 labeled minutes |
+| Thermal behavior | No severe throttling | Severe/repeated throttling | 10-minute continuous run |
+
+Targets are acceptance hypotheses until measured by Task 16. Unmeasured values are
+reported as unknown, never as passes.
+
+## 3. Runtime Controls
+
+- Use a bounded rolling landmark buffer; buffer capacity cannot define sign duration.
+- Apply backpressure or controlled frame sampling when inference cannot keep pace.
+- Preserve original timestamps so dropping frames does not distort measured duration.
+- Do not discard landmark groups or change input shape without retraining/export parity.
+- TTS executes only for committed events and must not block camera/inference processing.
+- Release recognition must operate without Metro or a development server.
+
+## 4. Model Selection
+
+The selected model must satisfy recognition and performance gates together. A larger
+model is rejected if latency/thermal limits fail; a faster model is rejected if signer,
+sequence, rejection, or domain accuracy gates fail.

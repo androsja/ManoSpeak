@@ -57,6 +57,16 @@ describe('FrameBuffer Sliding Window', () => {
 });
 ```
 
+This test verifies bounded storage only. A 30-frame buffer is not a sign-duration,
+segmentation, or recognition requirement. Recognition tests must preserve variable
+duration and use the scenarios and held-out gates in `EVALUATION_PROTOCOL.md`.
+
+### Recognition Acceptance
+
+Automated tests cover deterministic decoding, blank runs, repeated signs, unknown
+motion, chunk boundaries, and duplicate TTS commits. Dataset acceptance additionally
+requires signer/source/session-disjoint manifests and cannot be replaced by unit tests.
+
 ### Run Mobile Tests
 ```bash
 cd mobile

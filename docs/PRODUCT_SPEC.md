@@ -1,32 +1,87 @@
-# Product Specification — ManoSpeak
+# Product Specification: ManoSpeak
 
-## 1. Product Vision & Problem Statement
-ManoSpeak is a high-performance, edge-based mobile translation application designed to translate Colombian Sign Language (LSC - Lengua de Señas Colombiana) to spoken audio in real-time. 
+## 1. Product Vision
 
-Traditional sign-to-speech translators often treat signs as static images or raw video frames (RGB), ignoring linguistic grammar. They typically require cloud-based APIs to perform heavy video inference, introducing high network latencies, API costs, and severe privacy violations (uploading video streams of users' private environments).
+ManoSpeak is an offline, on-device mobile system intended to convert Colombian Sign
+Language (LSC) into accessible spoken Spanish. It extracts geometric landmarks from the
+camera instead of transmitting raw video to a cloud service.
 
-ManoSpeak overcomes these boundaries by performing **on-device, geometry-based real-time translation**. Instead of reading raw pixel grids, it extracts skeletal coordinates (landmarks) directly from the device camera and translates continuous signing into natural spoken sentences.
+Continuous conversational translation is the long-term product vision, not the current
+capability. The current checkpoint recognizes isolated clips inconsistently and fails
+the natural variable-length LSC50 domain. Product claims follow the capability levels in
+`RECOGNITION_CONTRACT.md`.
 
-## 2. Linguistic Foundation: The Parametric Nature of Sign Language
-Unlike spoken languages built on sequential phonemes, sign languages are independent, three-dimensional languages that convey meaning through spatial configuration and temporal movement. 
+## 2. Linguistic Foundation
 
-Following William Stokoe's linguistic model, every sign in LSC can be factored into simultaneously executed parameters:
-- **Handshape (Configuración de la mano):** The physical layout of the fingers and palms.
-- **Location (Ubicación):** The position of the hands relative to the signer's body/face.
-- **Movement (Movimiento):** The spatial trajectory, speed, and path taken by the hands.
+LSC is an independent visual-spatial language, not signed Spanish. Relevant concurrent
+features include:
 
-Refined by the **Move-Hold (Movimiento-Detención)** model of Liddell and Johnson, LSC consists of segments where articulation is changing (Move) and segments where postures remain fixed (Hold). 
+- Handshape: finger and palm configuration.
+- Location: position relative to the signer and signing space.
+- Movement: trajectory, direction, speed, repetition, and holds.
+- Orientation and handedness.
+- Non-manual markers: face, head, torso, and gaze.
 
-Additionally, **non-manual markers** (facial expression, head posture, torso tilt, and gaze direction) act as syntactic inflections. In LSC, these elements are critical; they distinguish interrogative, conditional, and negative statements.
+Handshape, location, and movement are useful model supervision, but one independently
+predicted triple is not sufficient to represent arbitrary vocabulary, coarticulation,
+LSC grammar, or Spanish sentence generation.
 
-## 3. Product Goals and Boundaries
-### Core Goals
-- **Continuous Sign Translation:** Translate fluid, conversational LSC signing without forcing the user to pause between individual words (avoiding the limitations of Isolated Sign Language Recognition - ISLR).
-- **LSC Dictionary Alignment:** Support vocabulary scales aligning with national standards, such as the *Diccionario Básico de la Lengua de Señas Colombiana* published by the **Instituto Nacional para Sordos (INSOR)**.
-- **On-Device Offline Execution:** All camera frames, landmark extractions, model inferences, and speech syntheses must execute strictly on-device without active internet requirements.
-- **Empathetic Speech Output:** Synthesis of spoken audio using natural, expressive voices that adapt to the speaker's regional dialect (LSC50 and LSC-W70 research standards).
+## 3. Delivery Levels
 
-### Non-Goals
-- **Sign-to-Sign translation:** ManoSpeak focuses strictly on translating LSC to vocalized Spanish. It does not generate sign movements from text.
-- **Cloud-based model training on mobile:** In-app learning is metric-based (few-shot prototype registration). Large-scale model training is restricted to high-performance servers.
-- **General-purpose video recording:** The camera feed is analyzed in volatile memory for landmark extraction and discarded immediately. No video files are recorded.
+### Level 0: Data Channel
+
+Validate fast, natural, and slow landmark capture. This level does not claim sign
+recognition.
+
+### Level 1: Personalized HOLA
+
+Recognize or reject isolated HOLA for one enrolled signer across held-out sessions and
+speed bins. This is not CSLR.
+
+### Level 2: Constrained Continuous Pilot
+
+Recognize ordered short sequences from HOLA, TU, YO, GRACIAS, and ADIOS without forcing
+hand lowering. The validated signer set and vocabulary must be disclosed.
+
+### Level 3: Expanded Recognition
+
+Expand signer and gloss coverage only after grouped data, confuser, transition,
+continuous, latency, and false-commit gates pass.
+
+## 4. Core Goals
+
+- On-device operation without an active network requirement.
+- No default raw-video retention.
+- Variable-speed and variable-duration signing.
+- Explicit rejection of unknown/non-sign motion instead of forced guesses.
+- Ordered continuous output without a hand-lowering delimiter.
+- Committed-event TTS with no idle or duplicate speech.
+- Signer/source/session-disjoint evaluation and honest capability labels.
+- Incremental vocabulary growth backed by LSC linguistic review.
+
+## 5. Non-Goals for the Current Program
+
+- General conversational LSC or thousands of production-ready glosses.
+- Recording every possible sign combination.
+- Claiming LSC grammar or natural Spanish generation from one-gloss dictionary lookup.
+- Sign-to-sign animation generation.
+- Silent collection or automatic use of personal samples for training.
+- Cloud-based mobile inference or raw-camera upload.
+- On-device foundation-model training.
+
+## 6. User Experience Requirements
+
+- Diagnostic and enrollment modes clearly announce requested action, start, completion,
+  retry, and deletion.
+- Normal recognition is rolling and does not require pressing Start per sign.
+- Provisional text may change; spoken output occurs only after a stable commit.
+- Unknown motion remains silent.
+- The camera preview is hidden in normal recognition unless a specific diagnostic needs
+  it.
+- Permission, model, camera, TTS, and lifecycle errors have visible recovery states.
+
+## 7. Release Boundary
+
+A release may claim only the highest capability level whose complete held-out gates pass
+under `EVALUATION_PROTOCOL.md`. Pooled accuracy cannot hide a failed source, signer,
+speed bin, transition direction, or non-sign rejection gate.
