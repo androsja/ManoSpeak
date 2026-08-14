@@ -1,0 +1,27 @@
+#!/bin/zsh
+
+set -eu
+
+readonly MANOSPEAK_REPO="/Users/jflorezgaleano/Documents/JulianFlorez/ManoSpeak"
+readonly MANOSPEAK_PYTHON="/private/tmp/manospeak-capture-venv/bin/python"
+readonly VOZUAL_LOG_DIR="$HOME/Library/Logs/VOZUAL"
+readonly VOZUAL_CACHE_DIR="$HOME/Library/Caches/VOZUAL"
+
+mkdir -p "$VOZUAL_LOG_DIR" "$VOZUAL_CACHE_DIR/matplotlib"
+export MPLCONFIGDIR="$VOZUAL_CACHE_DIR/matplotlib"
+
+if [[ ! -x "$MANOSPEAK_PYTHON" ]]; then
+    osascript -e 'display alert "VOZUAL no puede iniciar" message "No se encontró el entorno local de Python. Abre el proyecto ManoSpeak para repararlo." as critical'
+    exit 1
+fi
+
+if [[ ! -f "$MANOSPEAK_REPO/ml/src/sign_authoring_editor.py" ]]; then
+    osascript -e 'display alert "VOZUAL no puede iniciar" message "No se encontró el proyecto ManoSpeak en su ubicación original." as critical'
+    exit 1
+fi
+
+cd "$MANOSPEAK_REPO"
+exec /usr/bin/arch -arm64 \
+    "$MANOSPEAK_PYTHON" \
+    "$MANOSPEAK_REPO/ml/src/sign_authoring_editor.py" \
+    >> "$VOZUAL_LOG_DIR/editor.log" 2>&1
