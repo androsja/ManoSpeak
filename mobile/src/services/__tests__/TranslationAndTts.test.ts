@@ -1,5 +1,37 @@
 jest.mock('react-native', () => ({
   NativeModules: {},
+  Platform: { OS: 'android' },
+}));
+
+jest.mock('react-native-fs', () => ({
+  DocumentDirectoryPath: '/tmp',
+  MainBundlePath: '/tmp',
+  copyFileAssets: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockTtsHandlers: Record<string, Array<(event: { utteranceId: string }) => void>> = {};
+
+jest.mock('react-native-tts', () => ({
+  __esModule: true,
+  default: {
+    getInitStatus: jest.fn().mockResolvedValue(undefined),
+    setDefaultLanguage: jest.fn().mockResolvedValue(undefined),
+    setDefaultRate: jest.fn().mockResolvedValue(undefined),
+    speak: jest.fn().mockImplementation(() => {
+      setTimeout(() => {
+        mockTtsHandlers['tts-finish']?.forEach((handler) =>
+          handler({ utteranceId: 'mock-utterance' }),
+        );
+      }, 0);
+      return 'mock-utterance';
+    }),
+    stop: jest.fn().mockResolvedValue(true),
+    addEventListener: jest.fn().mockImplementation((event, handler) => {
+      mockTtsHandlers[event] = mockTtsHandlers[event] ?? [];
+      mockTtsHandlers[event].push(handler);
+    }),
+    removeEventListener: jest.fn(),
+  },
 }));
 
 jest.mock('onnxruntime-react-native', () => ({
@@ -28,6 +60,22 @@ function makeOnnxSession(hArgmax: number, lArgmax: number, mArgmax: number) {
         movement:  { data: makeData(mArgmax, 32), dims: [1, 1, 32] },
       }),
     };
+}
+
+function makeOffsetPeakSession() {
+  const handshape = new Float32Array(2 * 64);
+  const location = new Float32Array(2 * 32);
+  const movement = new Float32Array(2 * 32);
+  handshape[40] = 3.0;
+  location[32 + 6] = 3.0;
+  movement[1] = 3.0;
+  return {
+    run: jest.fn().mockResolvedValue({
+      handshape: { data: handshape, dims: [1, 2, 64] },
+      location: { data: location, dims: [1, 2, 32] },
+      movement: { data: movement, dims: [1, 2, 32] },
+    }),
+  };
 }
 
 describe('Translation and TTS Integration Services', () => {
@@ -80,6 +128,14 @@ describe('Translation and TTS Integration Services', () => {
       expect(await translationService.translateFrameBuffer(frameBuffer)).toBe('COLOMBIA');
     });
 
+    test('combines CTC head peaks that occur at different frames', async () => {
+      (InferenceSession.create as jest.Mock).mockResolvedValue(makeOffsetPeakSession());
+      await translationService.loadModel();
+      frameBuffer.addFrame(createMockFrame());
+
+      expect(await translationService.translateFrameBuffer(frameBuffer)).toBe('GRACIAS');
+    });
+
     test('passes correct float32 tensor dims to ONNX session', async () => {
       (InferenceSession.create as jest.Mock).mockResolvedValue(makeOnnxSession(0, 0, 0));
       await translationService.loadModel();
@@ -87,20 +143,19 @@ describe('Translation and TTS Integration Services', () => {
       await translationService.translateFrameBuffer(frameBuffer);
 
       expect(Tensor).toHaveBeenCalledTimes(1);
-      const [type, data, dims] = (Tensor as jest.Mock).mock.calls[0];
+      const [type, data, dims] = (Tensor as unknown as jest.Mock).mock.calls[0];
       expect(type).toBe('float32');
       expect(dims).toEqual([1, 5, 543, 3]);
       expect(data).toBeInstanceOf(Float32Array);
       expect((data as Float32Array).length).toBe(5 * 543 * 3);
     });
 
-    test('returns fallback format when key is absent from dictionary', async () => {
-      // (63, 31, 31) is outside all phonological label ranges — not in dictionary
+    test('returns no gloss for CTC blank output', async () => {
       (InferenceSession.create as jest.Mock).mockResolvedValue(makeOnnxSession(63, 31, 31));
       await translationService.loadModel();
       frameBuffer.addFrame(createMockFrame());
 
-      expect(await translationService.translateFrameBuffer(frameBuffer)).toBe('[H63_L31_M31]');
+      expect(await translationService.translateFrameBuffer(frameBuffer)).toBe('');
     });
 
     test('overlay takes priority over dictionary for same key', async () => {

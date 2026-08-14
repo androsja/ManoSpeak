@@ -1,7 +1,6 @@
 package com.manospeak
 
 import android.graphics.Bitmap
-import android.graphics.ColorSpace
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -12,13 +11,17 @@ import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.holisticlandmarker.HolisticLandmarker
 import com.google.mediapipe.tasks.vision.holisticlandmarker.HolisticLandmarkerResult
 import com.google.mediapipe.tasks.vision.core.RunningMode
-import com.google.mediapipe.framework.image.BitmapImageBuilder
-import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
-import java.util.Optional
 
 import com.google.mediapipe.tasks.core.Delegate
 
 class MediaPipeFrameProcessorPlugin(proxy: VisionCameraProxy, options: Map<String, Any>?) : FrameProcessorPlugin() {
+
+    companion object {
+        private const val TARGET_MAX_DIMENSION = 384f
+        private const val PERF_LOG_EVERY_N_FRAMES = 24
+    }
+
+    private var frameCounter = 0L
 
     private val holistic: HolisticLandmarker
 
@@ -28,9 +31,13 @@ class MediaPipeFrameProcessorPlugin(proxy: VisionCameraProxy, options: Map<Strin
             .setDelegate(Delegate.GPU)
             .build()
             
+        // VIDEO mode tracks landmarks between frames instead of re-detecting from
+        // scratch, which both cuts per-frame latency (~160ms observed in IMAGE mode)
+        // and matches the training extraction (preprocess.py uses
+        // static_image_mode=False, i.e. tracking mode).
         val holisticOptions = HolisticLandmarker.HolisticLandmarkerOptions.builder()
             .setBaseOptions(baseOptions)
-            .setRunningMode(RunningMode.IMAGE)
+            .setRunningMode(RunningMode.VIDEO)
             .build()
             
         holistic = HolisticLandmarker.createFromOptions(proxy.context, holisticOptions)
@@ -40,8 +47,8 @@ class MediaPipeFrameProcessorPlugin(proxy: VisionCameraProxy, options: Map<Strin
     override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
         try {
             val image = frame.image
-            Log.d("ManoSpeak", "Frame received: format=${image.format}, ${image.width}x${image.height}")
-            
+            val perfStart = android.os.SystemClock.elapsedRealtime()
+
             // VisionCamera with pixelFormat="rgb" gives RGBA_8888 (Format 1 or 0x22).
             // We must extract the pixels safely into a Bitmap because MediaPipe tasks-vision
             // has a bug where it rejects native YUV/hardware images in createImage()
@@ -70,23 +77,40 @@ class MediaPipeFrameProcessorPlugin(proxy: VisionCameraProxy, options: Map<Strin
             // We also apply a horizontal flip (-1f scale on X) because it's a front camera (mirror effect),
             // which is critical so the AI doesn't confuse left and right hands for sign language.
             val matrix = android.graphics.Matrix()
+            // Downscale before inference: MediaPipe resizes to its model input size
+            // internally, so a smaller bitmap loses no landmark quality but cuts the
+            // copy/rotate cost that was back-pressuring the camera HAL to ~6 FPS.
+            val maxDimension = maxOf(finalBitmap.width, finalBitmap.height).toFloat()
+            val downscale = TARGET_MAX_DIMENSION / maxDimension
+            if (downscale < 1f) {
+                matrix.postScale(downscale, downscale)
+            }
             matrix.postRotate(270f)
             matrix.postScale(-1f, 1f)
-            
-            // Apply rotation and flip
-            val rotatedBitmap = Bitmap.createBitmap(finalBitmap, 0, 0, finalBitmap.width, finalBitmap.height, matrix, false)
+
+            // Apply downscale, rotation, and flip in a single bitmap pass
+            val rotatedBitmap = Bitmap.createBitmap(finalBitmap, 0, 0, finalBitmap.width, finalBitmap.height, matrix, true)
             
             val mpImage = com.google.mediapipe.framework.image.BitmapImageBuilder(rotatedBitmap).build()
-            
-            val result = holistic.detect(mpImage)
+            val perfBitmapDone = android.os.SystemClock.elapsedRealtime()
+
+            // VIDEO mode needs a monotonically increasing timestamp in milliseconds
+            val result = holistic.detectForVideo(mpImage, frame.timestamp / 1_000_000)
+            val perfDetectDone = android.os.SystemClock.elapsedRealtime()
+
+            frameCounter += 1
+            if (frameCounter % PERF_LOG_EVERY_N_FRAMES == 1L) {
+                Log.i(
+                    "ManoSpeakPerf",
+                    "src=${image.width}x${image.height} scaled=${rotatedBitmap.width}x${rotatedBitmap.height} " +
+                    "bitmap=${perfBitmapDone - perfStart}ms detect=${perfDetectDone - perfBitmapDone}ms"
+                )
+            }
             
             if (result == null) {
                 Log.w("ManoSpeak", "Holistic detect returned null")
                 return emptyMockArray()
             }
-            
-            val pose = result.poseLandmarks()
-            Log.d("ManoSpeak", "Holistic success! Pose points: ${pose?.size ?: 0}")
             
             return extractLandmarks(result)
         } catch (t: Throwable) {

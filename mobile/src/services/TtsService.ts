@@ -2,10 +2,20 @@ import Tts from 'react-native-tts';
 
 export class TtsService {
   private isSpeaking: boolean = false;
+  private finishCurrentSpeech: (() => void) | null = null;
+  private currentUtteranceId: string | number | null = null;
 
   constructor() {
+    Tts.addEventListener('tts-finish', this.handleSpeechTerminal);
+    Tts.addEventListener('tts-cancel', this.handleSpeechTerminal);
     this.initTts();
   }
+
+  private handleSpeechTerminal = (event: { utteranceId: string | number }) => {
+    if (String(event.utteranceId) === String(this.currentUtteranceId)) {
+      this.finishCurrentSpeech?.();
+    }
+  };
 
   private async initTts() {
     try {
@@ -39,18 +49,26 @@ export class TtsService {
       return;
     }
     
+    this.finishCurrentSpeech?.();
     this.isSpeaking = true;
+    await Tts.stop();
     console.log(`[TTS Engine] Hablando en voz alta: "${text}"`);
-    
-    Tts.stop(); // Stop any current speech
-    Tts.speak(text);
 
-    // Simulate vocalization playback latency to prevent overlap
     return new Promise((resolve) => {
-      setTimeout(() => {
+      let fallbackTimer: ReturnType<typeof setTimeout>;
+
+      const finish = () => {
+        clearTimeout(fallbackTimer);
         this.isSpeaking = false;
+        this.currentUtteranceId = null;
+        if (this.finishCurrentSpeech === finish) this.finishCurrentSpeech = null;
         resolve();
-      }, 1000);
+      };
+      this.currentUtteranceId = Tts.speak(text);
+      this.finishCurrentSpeech = finish;
+
+      const wordCount = text.trim().split(/\s+/).length;
+      fallbackTimer = setTimeout(finish, Math.max(4000, wordCount * 1000));
     });
   }
 
@@ -58,7 +76,9 @@ export class TtsService {
    * Stops current speech synthesis immediately.
    */
   public async stop(): Promise<void> {
-    Tts.stop();
+    this.finishCurrentSpeech?.();
+    this.currentUtteranceId = null;
+    await Tts.stop();
     this.isSpeaking = false;
   }
 

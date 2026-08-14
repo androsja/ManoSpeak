@@ -54,37 +54,19 @@ export class TranslationService {
     const lData = result['location'].data as Float32Array;
     const mData = result['movement'].data as Float32Array;
 
-    const decodedGlosses: string[] = [];
-    let prevSymbol = 'BLANK';
+    // Each CTC head may emit its non-blank peak at a different frame. Pool each
+    // head independently across the window before composing the phonological key.
+    const handshape = strongestNonblankClass(hData, T_frames, 64, 63);
+    const location = strongestNonblankClass(lData, T_frames, 32, 31);
+    const movement = strongestNonblankClass(mData, T_frames, 32, 31);
+    const key = `${handshape},${location},${movement}`;
 
-    // Removed MOCK_DICT to prevent false 'Hola' predictions on 0,0,0
-
-    for (let t = 0; t < T_frames; t++) {
-      const h_t = argmaxSlice(hData, t * 64, 64);
-      const l_t = argmaxSlice(lData, t * 32, 32);
-      const m_t = argmaxSlice(mData, t * 32, 32);
-
-      // Blank tokens are the maximum index (63 for Handshape, 31 for Location/Movement)
-      if (h_t === 63 || l_t === 31 || m_t === 31) {
-        prevSymbol = 'BLANK';
-        continue;
-      }
-
-      const key = `${h_t},${l_t},${m_t}`;
-      
-      // CTC logic: collapse consecutive duplicate symbols
-      if (key !== prevSymbol) {
-        console.log(`[TranslationService] Predicted raw key: ${key}`);
-        const gloss = this.overlay.get(key) ?? LSC_DICT[key];
-        if (gloss) {
-            console.log(`[TranslationService] MATCH FOUND: ${gloss}`);
-            decodedGlosses.push(gloss);
-        }
-        prevSymbol = key;
-      }
+    console.log(`[TranslationService] Predicted pooled key: ${key}`);
+    const gloss = this.overlay.get(key) ?? LSC_DICT[key] ?? '';
+    if (gloss) {
+      console.log(`[TranslationService] MATCH FOUND: ${gloss}`);
     }
-
-    return decodedGlosses.join(' ');
+    return gloss;
   }
 
   public registerRecipe(handshape: number, location: number, movement: number, gloss: string): void {
@@ -92,15 +74,23 @@ export class TranslationService {
   }
 }
 
-function argmaxSlice(arr: Float32Array, offset: number, length: number): number {
-  let bestIdx = 0;
-  let maxVal = -Infinity;
-  for (let i = 0; i < length; i++) {
-    const val = arr[offset + i];
-    if (val > maxVal) {
-      maxVal = val;
-      bestIdx = i;
+function strongestNonblankClass(
+  data: Float32Array,
+  frames: number,
+  classCount: number,
+  blankIndex: number,
+): number {
+  let strongestClass = 0;
+  let strongestLogit = -Infinity;
+  for (let frame = 0; frame < frames; frame++) {
+    const offset = frame * classCount;
+    for (let classIndex = 0; classIndex < blankIndex; classIndex++) {
+      const logit = data[offset + classIndex];
+      if (logit > strongestLogit) {
+        strongestLogit = logit;
+        strongestClass = classIndex;
+      }
     }
   }
-  return bestIdx;
+  return strongestClass;
 }
