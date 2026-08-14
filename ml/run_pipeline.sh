@@ -5,7 +5,7 @@
 # Runs fully UNBUFFERED so progress and milestones stream to the log live.
 # Emits ">>> [HH:MM:SS] ..." milestone lines that a monitor can watch.
 #
-# Usage:   ./run_pipeline.sh [EPOCHS] [BATCH] [LR]
+# Usage:   ./run_pipeline.sh [EPOCHS] [BATCH] [LR] [RESUME_FROM] [START_EPOCH] [BEST_VAL_LOSS]
 # Default: 800 epochs, batch 16, lr 1e-3
 #
 # Stages:
@@ -20,12 +20,21 @@ cd "$(dirname "$0")"                       # -> ml/
 EPOCHS="${1:-800}"
 BATCH="${2:-16}"
 LR="${3:-1e-3}"
+RESUME_FROM="${4:-}"
+START_EPOCH="${5:-0}"
+BEST_VAL_LOSS="${6:-}"
+LOG_FILE="${LOG_FILE:-training.log}"
 
 export PYTHONUNBUFFERED=1                  # live stdout, no Python buffering
+
+exec >> "${LOG_FILE}" 2>&1
 
 milestone() { echo ">>> [$(date '+%H:%M:%S')] $*"; }
 
 milestone "PIPELINE START — epochs=${EPOCHS} batch=${BATCH} lr=${LR}"
+if [ -n "${RESUME_FROM}" ]; then
+  milestone "Resume enabled — checkpoint=${RESUME_FROM} start_epoch=${START_EPOCH} best_val_loss=${BEST_VAL_LOSS:-inf}"
+fi
 
 # --- Stage 0: stop any stale training process -----------------------------
 if pkill -f "src/train.py" 2>/dev/null; then
@@ -35,7 +44,19 @@ fi
 
 # --- Stage 1: training ----------------------------------------------------
 milestone "STAGE 1/2 — Training started"
-poetry run python src/train.py --epochs "${EPOCHS}" --batch_size "${BATCH}" --lr "${LR}"
+TRAIN_ARGS=(
+  --epochs "${EPOCHS}"
+  --batch_size "${BATCH}"
+  --lr "${LR}"
+)
+if [ -n "${RESUME_FROM}" ]; then
+  TRAIN_ARGS+=(--resume_from "${RESUME_FROM}" --start_epoch "${START_EPOCH}")
+  if [ -n "${BEST_VAL_LOSS}" ]; then
+    TRAIN_ARGS+=(--best_val_loss "${BEST_VAL_LOSS}")
+  fi
+fi
+
+poetry run python src/train.py "${TRAIN_ARGS[@]}"
 TRAIN_RC=$?
 if [ "${TRAIN_RC}" -ne 0 ]; then
   milestone "STAGE 1/2 FAILED — training exited with code ${TRAIN_RC}"

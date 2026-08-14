@@ -2,11 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# MediaPipe Holistic landmark indices for both hands (right + left).
-# Right hand: 501–521 (21 pts), Left hand: 522–542 (21 pts).
-# Combined: indices [501, 542] in the 543-point full array.
-_HAND_START = 501
-_HAND_END   = 543   # exclusive  → 42 landmarks × 3 = 126 features
+# ManoSpeak stores MediaPipe Holistic landmarks as pose, left hand, right hand,
+# then face. Both preprocessing implementations use this exact 543-point order.
+_HAND_START = 33
+_HAND_END = 75  # exclusive: 42 landmarks x 3 coordinates = 126 features
 
 
 class AnatomicalGraphAttention(nn.Module):
@@ -44,7 +43,7 @@ class HandshapeBranch(nn.Module):
     """
     Dedicated hand-landmark branch for handshape classification.
 
-    Operates on the 42 hand keypoints only (right + left, indices 501-542),
+    Operates on the 42 hand keypoints only (left + right, indices 33-74),
     giving the model a fine-grained, uncluttered view of finger configuration
     that the global trunk cannot provide.
 
@@ -73,7 +72,7 @@ class HandshapeBranch(nn.Module):
             # Slice hand landmarks and flatten: (B, T, 42, 3) → (B, T, 126)
             hand = x_full[:, :, _HAND_START:_HAND_END, :].reshape(B, T, self.HAND_DIM)
         else:
-            # Already flattened: (B, T, 1629), hand slice = [1503:1629]
+            # Already flattened: (B, T, 1629), hand slice = [99:225]
             hand = x_full[:, :, _HAND_START * 3 : _HAND_END * 3]
 
         h = F.relu(self.proj(hand))             # (B, T, 128)
