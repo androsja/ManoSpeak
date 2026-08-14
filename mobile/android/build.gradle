@@ -19,4 +19,16 @@ buildscript {
     }
 }
 
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == "com.microsoft.onnxruntime" &&
+                    details.requested.name == "onnxruntime-android") {
+                details.useVersion("1.24.3")
+                details.because("Avoid latest.integration metadata resolution failures during Android builds.")
+            }
+        }
+    }
+}
+
 apply plugin: "com.facebook.react.rootproject"

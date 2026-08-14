@@ -68,6 +68,7 @@ def enableProguardInReleaseBuilds = false
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'org.webkit:android-jsc:+'
+def configuredArchitectures = (project.findProperty('reactNativeArchitectures') ?: 'armeabi-v7a,arm64-v8a,x86,x86_64').split(',')
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -82,13 +83,16 @@ android {
         versionCode 1
         versionName "1.0"
         ndk {
-            abiFilters "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
+            abiFilters(*configuredArchitectures)
         }
     }
 
     packagingOptions {
         pickFirst 'lib/**/libc++_shared.so'
         pickFirst 'lib/**/libfbjni.so'
+        pickFirst 'META-INF/androidx.appcompat_appcompat.version'
+        pickFirst 'META-INF/androidx.swiperefreshlayout_swiperefreshlayout.version'
+        pickFirst 'META-INF/androidx.*.version'
     }
     signingConfigs {
         debug {

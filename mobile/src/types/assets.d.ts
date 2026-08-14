@@ -8,3 +8,8 @@ declare module '*.onnx' {
   const assetHandle: number;
   export default assetHandle;
 }
+
+declare module '*.glb' {
+  const assetHandle: number;
+  export default assetHandle;
+}

@@ -1,5 +1,6 @@
 module.exports = {
   preset: 'ts-jest',
+  watchman: false,
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.ts?(x)', '**/?(*.)+(spec|test).ts?(x)'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
@@ -15,5 +16,6 @@ module.exports = {
   moduleNameMapper: {
     '\\.tflite$': '<rootDir>/src/__mocks__/fileMock.js',
     '\\.onnx$': '<rootDir>/src/__mocks__/fileMock.js',
+    '\\.(png|jpe?g)$': '<rootDir>/src/__mocks__/fileMock.js',
   },
 };

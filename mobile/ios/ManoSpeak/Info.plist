@@ -26,6 +26,10 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>ManoSpeak requiere acceso a la cámara para realizar la traducción de señas LSC en tiempo real y fuera de línea.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ManoSpeak usa el micrófono para escuchar palabras y mostrar su seña en LSC.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>ManoSpeak convierte temporalmente el habla en texto para activar las señas del avatar.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

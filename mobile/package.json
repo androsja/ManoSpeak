@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "build:avatar-runtime": "bash tools/build-avatar-runtime.sh",
     "ios": "react-native run-ios",
     "start": "react-native start",
     "test": "jest",
@@ -11,14 +12,17 @@
     "lint": "echo 'No lint errors'"
   },
   "dependencies": {
+    "@react-native-voice/voice": "^3.2.4",
     "onnxruntime-react-native": "^1.24.3",
     "react": "18.3.1",
     "react-native": "0.76.3",
     "react-native-fs": "^2.20.0",
     "react-native-svg": "^15.8.0",
     "react-native-tts": "^4.1.1",
-    "react-native-vision-camera": "^4.7.3",
-    "react-native-worklets-core": "^1.6.3"
+    "react-native-vision-camera": "4.7.3",
+    "react-native-webview": "13.16.0",
+    "react-native-worklets-core": "1.6.3",
+    "three": "0.180.0"
   },
   "devDependencies": {
     "@react-native-community/cli": "^15.0.1",
@@ -29,6 +33,7 @@
     "@react-native/metro-config": "^0.76.3",
     "@types/jest": "^29.5.0",
     "@types/react": "^18.3.0",
+    "esbuild": "^0.25.9",
     "jest": "^29.5.0",
     "metro": "^0.81.5",
     "metro-config": "^0.81.5",
