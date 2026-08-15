@@ -361,18 +361,18 @@ class SignAuthoringEditor:
             font=("Arial", 9),
         ).pack(anchor="w")
 
-        created_card = tk.Frame(review_card, bg=card_soft, padx=12, pady=10)
+        created_card = tk.Frame(review_card, bg=card_soft, padx=14, pady=13)
         created_card.pack(fill="x", pady=(12, 0))
         tk.Label(
             created_card,
-            text="PALABRAS CREADAS",
+            text="BIBLIOTECA DE SEÑAS",
             fg=accent,
             bg=card_soft,
             font=("Arial", 9, "bold"),
         ).pack(anchor="w")
         tk.Label(
             created_card,
-            text="Orden alfabético. EN APP significa que el celular puede usarla; SOLO VOZUAL aún no se publica.",
+            text="1. Selecciona una seña.  2. Cárgala para editarla o publícala cuando esté aprobada.",
             fg=muted,
             bg=card_soft,
             font=("Arial", 8),
@@ -405,33 +405,37 @@ class SignAuthoringEditor:
         scrollbar.pack(side="right", fill="y")
         self.created_sign_list.configure(yscrollcommand=scrollbar.set)
         self.created_sign_list.bind("<Double-Button-1>", lambda _event: self._load_created_sign())
+        action_row = tk.Frame(created_card, bg=card_soft)
+        action_row.pack(fill="x", pady=(8, 0))
+        action_row.grid_columnconfigure(0, weight=1)
+        action_row.grid_columnconfigure(1, weight=1)
         tk.Button(
-            created_card,
-            text="CARGAR SEÑA SELECCIONADA",
+            action_row,
+            text="CARGAR Y EDITAR",
             command=self._load_created_sign,
             bg="#26384e",
             fg=text,
             activebackground="#344b65",
             activeforeground=text,
-            disabledforeground="#6e7f95",
             relief="flat",
             font=("Arial", 9, "bold"),
-        ).pack(fill="x", pady=(7, 0), ipady=6)
+            cursor="pointinghand",
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 4), ipady=7)
         tk.Button(
-            created_card,
-            text="PUBLICAR SEÑA EN APP MÓVIL",
+            action_row,
+            text="PUBLICAR EN APP MÓVIL",
             command=self._publish_selected_sign,
             bg=accent,
             fg=background,
             activebackground="#63e5df",
             activeforeground=background,
-            disabledforeground="#6e7f95",
             relief="flat",
             font=("Arial", 9, "bold"),
-        ).pack(fill="x", pady=(5, 0), ipady=6)
+            cursor="pointinghand",
+        ).grid(row=0, column=1, sticky="ew", padx=(4, 0), ipady=7)
         tk.Button(
             created_card,
-            text="ACTUALIZAR HISTORIAL",
+            text="↻  ACTUALIZAR BIBLIOTECA",
             command=self._refresh_created_signs,
             bg="#172638",
             fg=text,
@@ -448,54 +452,59 @@ class SignAuthoringEditor:
         )
 
         result = tk.Frame(review_card, bg=card)
-        result.pack(fill="both", expand=True, pady=(16, 0))
-        tk.Label(result, text="COMPROBAR RESULTADO", fg=muted, bg=card, font=("Arial", 9, "bold")).pack(anchor="w", pady=(0, 8))
+        result.pack(fill="both", expand=True, pady=(14, 0))
+        tk.Label(result, text="REVISAR LA SEÑAL CARGADA", fg=muted, bg=card, font=("Arial", 9, "bold")).pack(anchor="w", pady=(0, 3))
+        tk.Label(
+            result,
+            text="Analiza o carga una seña para activar sus vistas. Los botones te indicarán qué falta.",
+            fg="#6f8298",
+            bg=card,
+            font=("Arial", 8),
+        ).pack(anchor="w", pady=(0, 8))
         self.tracking_button = tk.Button(
             result,
-            text="VER PUNTOS DETECTADOS",
+            text="VER PUNTOS DETECTADOS  ·  ANALIZA UNA SEÑA PRIMERO",
             command=self._open_tracking_preview,
             bg="#26384e",
-            fg="#172638",
-            disabledforeground="#647386",
+            fg=text,
+            activebackground="#344b65",
+            activeforeground=text,
             relief="flat",
             font=("Arial", 11, "bold"),
-            state="disabled",
         )
         self.tracking_button.pack(fill="x", ipady=10, pady=(0, 8))
         self.skeleton_button = tk.Button(
             result,
-            text="VER ESQUELETO CAPTURADO",
+            text="VER ESQUELETO CAPTURADO  ·  CARGA UNA SEÑA PRIMERO",
             command=self._open_skeleton_preview,
             bg="#26384e",
-            fg="#172638",
-            disabledforeground="#647386",
+            fg=text,
+            activebackground="#344b65",
+            activeforeground=text,
             relief="flat",
             font=("Arial", 11, "bold"),
-            state="disabled",
         )
         self.skeleton_button.pack(fill="x", ipady=10, pady=(0, 8))
         self.preview_button = tk.Button(
             result,
-            text="VER ANIMACIÓN DEL AVATAR",
+            text="VER ANIMACIÓN DEL AVATAR  ·  GENERA O CARGA UNA SEÑA",
             command=self._generate_preview,
             bg=danger,
-            fg="#172638",
-            disabledforeground="#647386",
+            fg=text,
             activebackground="#ff7890",
-            activeforeground="#172638",
+            activeforeground=text,
             font=("Arial", 11, "bold"),
             relief="flat",
-            state="disabled",
         )
         self.preview_button.pack(fill="x", ipady=10, pady=(0, 8))
         tk.Button(
             result,
             text="EDITAR PARÁMETROS POR SEGUNDO  ⚙",
             command=self._open_advanced_dialog,
-            bg=card,
-            fg="#172638",
-            activebackground=card,
-            activeforeground="#172638",
+            bg="#26384e",
+            fg=text,
+            activebackground="#344b65",
+            activeforeground=text,
             relief="flat",
             font=("Arial", 10, "bold"),
             cursor="pointinghand",
@@ -1354,15 +1363,17 @@ class SignAuthoringEditor:
         self.tracking_preview_path = None
         self.skeleton_preview_path = None
         self.tracking_button.configure(
-            state="disabled", text="VER PUNTOS DETECTADOS"
+            state="normal", text="VER PUNTOS DETECTADOS  ·  ANALIZA UNA SEÑA PRIMERO"
         )
-        self.skeleton_button.configure(state="disabled", text="VER ESQUELETO CAPTURADO")
+        self.skeleton_button.configure(
+            state="normal", text="VER ESQUELETO CAPTURADO  ·  CARGA UNA SEÑA PRIMERO"
+        )
         self.save_button.configure(
             state="disabled", text="GUARDAR SIN GENERAR (BLOQUEADO)"
         )
         self.apply_adjustments_button.configure(state="disabled")
         self.preview_button.configure(
-            state="disabled", text="VER ANIMACIÓN DEL AVATAR"
+            state="normal", text="VER ANIMACIÓN DEL AVATAR  ·  GENERA O CARGA UNA SEÑA"
         )
         self.step_status.set("VIDEO LISTO: pulsa CREAR ANIMACIÓN.")
         self._set_stage(1)
@@ -1390,11 +1401,11 @@ class SignAuthoringEditor:
         if self.tracking_preview_path is not None:
             self.tracking_capture = cv2.VideoCapture(str(self.tracking_preview_path))
         self.tracking_button.configure(
-            state="normal" if self.tracking_preview_path else "disabled",
+            state="normal",
             text=(
                 "VER MANO, BRAZO Y 468 PUNTOS DE LA CARA"
                 if self.tracking_preview_path
-                else "VISTA DE PUNTOS NO DISPONIBLE"
+                else "VER PUNTOS DETECTADOS  ·  ANALIZA UNA SEÑA PRIMERO"
             ),
         )
 
@@ -1418,11 +1429,11 @@ class SignAuthoringEditor:
             skeleton_candidate if skeleton_candidate.is_file() else None
         )
         self.skeleton_button.configure(
-            state="normal" if self.skeleton_preview_path else "disabled",
+            state="normal",
             text=(
                 "VER ESQUELETO CAPTURADO (SIN AVATAR)"
                 if self.skeleton_preview_path
-                else "ESQUELETO CAPTURADO NO DISPONIBLE"
+                else "VER ESQUELETO CAPTURADO  ·  CARGA UNA SEÑA PRIMERO"
             ),
         )
 
