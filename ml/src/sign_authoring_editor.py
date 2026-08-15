@@ -85,6 +85,9 @@ class SignAuthoringEditor:
         self.created_sign_labels: dict[str, str] = {}
         self.created_sign_list: tk.Listbox | None = None
         self.mobile_library_status = tk.StringVar(value="APP MÓVIL: leyendo biblioteca…")
+        self.library_selection_status = tk.StringVar(
+            value="Selecciona una seña para editarla o publicarla."
+        )
         self.reference_frames: list[list[list[float]]] = []
         self.reference_fps = 30
         self.reference_active_hand = "right"
@@ -386,6 +389,15 @@ class SignAuthoringEditor:
             bg=card_soft,
             font=("Arial", 8, "bold"),
         ).pack(anchor="w", pady=(0, 6))
+        tk.Label(
+            created_card,
+            textvariable=self.library_selection_status,
+            fg="#d7e1ed",
+            bg=card_soft,
+            font=("Arial", 8),
+            wraplength=380,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
         list_frame = tk.Frame(created_card, bg=card_soft)
         list_frame.pack(fill="x")
         self.created_sign_list = tk.Listbox(
@@ -404,6 +416,7 @@ class SignAuthoringEditor:
         scrollbar = tk.Scrollbar(list_frame, command=self.created_sign_list.yview)
         scrollbar.pack(side="right", fill="y")
         self.created_sign_list.configure(yscrollcommand=scrollbar.set)
+        self.created_sign_list.bind("<<ListboxSelect>>", self._on_created_sign_selection)
         self.created_sign_list.bind("<Double-Button-1>", lambda _event: self._load_created_sign())
         action_row = tk.Frame(created_card, bg=card_soft)
         action_row.pack(fill="x", pady=(8, 0))
@@ -435,7 +448,7 @@ class SignAuthoringEditor:
         ).grid(row=0, column=1, sticky="ew", padx=(4, 0), ipady=7)
         tk.Button(
             created_card,
-            text="↻  ACTUALIZAR BIBLIOTECA",
+            text="↻  RECARGAR LISTA DE SEÑAS",
             command=self._refresh_created_signs,
             bg="#172638",
             fg="#172638",
@@ -1182,6 +1195,9 @@ class SignAuthoringEditor:
         self.mobile_library_status.set(f"APP MÓVIL ({len(published_glosses)}): {available}")
         if self.created_sign_paths and self.created_sign_list.size() > 0:
             self.created_sign_list.selection_set(0)
+            self._on_created_sign_selection()
+        else:
+            self.library_selection_status.set("No hay señas guardadas todavía.")
 
     @staticmethod
     def _published_mobile_glosses() -> set[str]:
@@ -1202,11 +1218,15 @@ class SignAuthoringEditor:
         payload = {"version": 1, "publishedGlosses": sorted(glosses)}
         manifest.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
-    def _selected_created_gloss(self) -> tuple[str, Path, Path] | None:
+    def _selected_created_gloss(
+        self, silent: bool = False
+    ) -> tuple[str, Path, Path] | None:
         if self.created_sign_list is None:
             return None
         selected = self.created_sign_list.curselection()
         if not selected:
+            if silent:
+                return None
             messagebox.showinfo("Palabras creadas", "Selecciona una palabra guardada.", parent=self.root)
             return None
         label = str(self.created_sign_list.get(selected[0]))
@@ -1215,6 +1235,21 @@ class SignAuthoringEditor:
         if paths is None:
             return None
         return gloss, paths[0], paths[1]
+
+    def _on_created_sign_selection(self, _event: tk.Event[tk.Misc] | None = None) -> None:
+        """Explain the selected library item before the user chooses an action."""
+        selected = self._selected_created_gloss(silent=True)
+        if selected is None:
+            return
+        gloss, _recipe_path, _landmark_path = selected
+        state = (
+            "ya está publicada: el celular la incluirá en la próxima instalación."
+            if gloss in self._published_mobile_glosses()
+            else "solo existe en VOZUAL: publícala cuando su revisión esté aprobada."
+        )
+        self.library_selection_status.set(
+            f"Seleccionada: {gloss}. CARGAR Y EDITAR abre sus vistas y parámetros; {state}"
+        )
 
     def _publish_selected_sign(self) -> None:
         """Export the selected captured motion and opt it into the mobile catalog."""
@@ -1310,7 +1345,16 @@ class SignAuthoringEditor:
         self.step_status.set(f"SEÑA CARGADA: {gloss}. Puedes editarla y regenerarla.")
         mobile_state = "está disponible en la app móvil" if gloss in self._published_mobile_glosses() else "todavía es solo de VOZUAL"
         self.status.set(f"Receta cargada desde {recipe_path.name}; {mobile_state}.")
+        self.library_selection_status.set(
+            f"✓ {gloss} está cargada. Usa las vistas de revisión debajo o EDITAR PARÁMETROS POR SEGUNDO."
+        )
         self._set_stage(3)
+        messagebox.showinfo(
+            "Seña cargada",
+            f"{gloss} quedó cargada para editar.\n\n"
+            "Ahora puedes abrir Puntos, Esqueleto, Animación o Parámetros por segundo en la sección Revisar.",
+            parent=self.root,
+        )
 
     def _choose_video(self) -> None:
         recording_dir = self._recording_directory()
