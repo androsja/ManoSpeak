@@ -51,6 +51,7 @@ POSE_ARM_INDICES = {
     "right": (12, 14, 16),
 }
 HAND_CONNECTIONS = tuple(mp.solutions.hands.HAND_CONNECTIONS)
+POSE_CONNECTIONS = tuple(mp.solutions.pose.POSE_CONNECTIONS)
 FACE_ANCHORS = (
     (FACE_CHIN, "MENTON", (0, 90, 255)),
     (FACE_UPPER_LIP, "BOCA", (255, 80, 220)),
@@ -348,6 +349,149 @@ def write_tracking_preview(
     return output_path
 
 
+def write_landmark_skeleton_preview(
+    frames: list[list[list[float]]],
+    active_hand: str,
+    output_path: Path,
+    fps: float,
+) -> Path:
+    """Render the stored landmark motion without an avatar retargeting step.
+
+    This is intentionally a clean projected skeleton, not a recording overlay.
+    It gives authors a direct visual proof of the mathematical motion asset that
+    will later be mapped to an avatar rig.
+    """
+    if not frames:
+        raise ValueError("Cannot render a skeleton preview without landmark frames.")
+    width, height, margin = 720, 720, 44
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    writer = cv2.VideoWriter(
+        str(output_path),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps if fps > 0.0 else 30.0,
+        (width, height),
+    )
+    if not writer.isOpened():
+        raise RuntimeError("The skeleton-preview MP4 encoder could not be opened.")
+
+    visible_points = [
+        point
+        for frame in frames
+        for point in frame
+        if tracked(point) and -0.2 <= point[0] <= 1.2 and -0.2 <= point[1] <= 1.4
+    ]
+    if not visible_points:
+        raise ValueError("The captured sequence contains no visible landmarks.")
+    minimum_x = min(point[0] for point in visible_points)
+    maximum_x = max(point[0] for point in visible_points)
+    minimum_y = min(point[1] for point in visible_points)
+    maximum_y = max(point[1] for point in visible_points)
+    extent = max(maximum_x - minimum_x, maximum_y - minimum_y, 0.2) * 1.12
+    center_x = (minimum_x + maximum_x) * 0.5
+    center_y = (minimum_y + maximum_y) * 0.5
+
+    def pixel(point: list[float]) -> tuple[int, int]:
+        # One shared scale keeps the measured pose geometry intact while
+        # fitting the whole captured upper body into the review frame.
+        scale = (min(width, height) - margin * 2) / extent
+        return (
+            int(round(width * 0.5 + (point[0] - center_x) * scale)),
+            int(round(height * 0.5 + (point[1] - center_y) * scale)),
+        )
+
+    def draw_connection(
+        image: np.ndarray,
+        points: list[list[float]],
+        first: int,
+        second: int,
+        color: tuple[int, int, int],
+        thickness: int,
+    ) -> None:
+        if tracked(points[first]) and tracked(points[second]):
+            cv2.line(image, pixel(points[first]), pixel(points[second]), color, thickness, cv2.LINE_AA)
+
+    active_start = LEFT_HAND_START if active_hand == "left" else RIGHT_HAND_START
+    try:
+        for frame_number, frame in enumerate(frames, start=1):
+            image = np.full((height, width, 3), (16, 29, 44), dtype=np.uint8)
+            pose = frame[:33]
+            for first, second in POSE_CONNECTIONS:
+                draw_connection(image, pose, first, second, (217, 214, 32), 4)
+            for index, point in enumerate(pose):
+                if tracked(point):
+                    cv2.circle(image, pixel(point), 5 if index in (11, 12, 13, 14, 15, 16) else 3, (250, 248, 245), -1, cv2.LINE_AA)
+
+            # MediaPipe body pose and Face Mesh are separate landmark sets.
+            # Join their measured chin to the shoulder midpoint so the review
+            # reads as one articulated skeleton rather than floating dots.
+            chin = frame[FACE_CHIN]
+            if tracked(pose[11]) and tracked(pose[12]) and tracked(chin):
+                shoulder_midpoint = [
+                    (pose[11][0] + pose[12][0]) * 0.5,
+                    (pose[11][1] + pose[12][1]) * 0.5,
+                    0.0,
+                ]
+                cv2.line(image, pixel(shoulder_midpoint), pixel(chin), (217, 214, 32), 4, cv2.LINE_AA)
+            face_points = [
+                point for point in frame[FACE_START : FACE_START + 468] if tracked(point)
+            ]
+            if len(face_points) >= 8:
+                left = min(point[0] for point in face_points)
+                right = max(point[0] for point in face_points)
+                top = min(point[1] for point in face_points)
+                bottom = max(point[1] for point in face_points)
+                face_center = pixel([(left + right) * 0.5, (top + bottom) * 0.5, 0.0])
+                face_size = pixel([right, bottom, 0.0])
+                face_origin = pixel([left, top, 0.0])
+                axes = (
+                    max(8, abs(face_size[0] - face_origin[0]) // 2),
+                    max(10, abs(face_size[1] - face_origin[1]) // 2),
+                )
+                cv2.ellipse(image, face_center, axes, 0, 0, 360, (180, 180, 180), 2, cv2.LINE_AA)
+
+            for side, start in (("left", LEFT_HAND_START), ("right", RIGHT_HAND_START)):
+                hand = frame[start : start + HAND_COUNT]
+                color = (64, 220, 255) if side == active_hand else (130, 120, 90)
+                for first, second in HAND_CONNECTIONS:
+                    draw_connection(image, hand, first, second, color, 3)
+                for point in hand:
+                    if tracked(point):
+                        cv2.circle(image, pixel(point), 3, color, -1, cv2.LINE_AA)
+                pose_wrist = POSE_LEFT_WRIST if side == "left" else POSE_RIGHT_WRIST
+                if tracked(frame[pose_wrist]) and tracked(hand[0]):
+                    cv2.line(image, pixel(frame[pose_wrist]), pixel(hand[0]), color, 3, cv2.LINE_AA)
+
+            # Face points are sparse on purpose: they establish head and mouth
+            # movement without obscuring the skeletal arm and hand route.
+            for point in frame[FACE_START : FACE_START + 468 : 6]:
+                if tracked(point):
+                    cv2.circle(image, pixel(point), 1, (150, 150, 150), -1, cv2.LINE_AA)
+            cv2.putText(
+                image,
+                "ESQUELETO CAPTURADO - SIN CORRECCION DE AVATAR",
+                (24, 34),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.58,
+                (225, 225, 225),
+                2,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                image,
+                f"CUADRO {frame_number}/{len(frames)} - MANO ACTIVA: {'IZQUIERDA' if active_start == LEFT_HAND_START else 'DERECHA'}",
+                (24, 62),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.48,
+                (32, 214, 206),
+                1,
+                cv2.LINE_AA,
+            )
+            writer.write(image)
+    finally:
+        writer.release()
+    return output_path
+
+
 def detected_hand_center(frame: list[list[float]], side: str) -> np.ndarray | None:
     start = LEFT_HAND_START if side == "left" else RIGHT_HAND_START
     points = [point for point in frame[start : start + HAND_COUNT] if tracked(point)]
@@ -524,6 +668,10 @@ def import_video(
         mirror,
         source_fps,
     )
+    skeleton_preview_path = output_dir / f"{gloss.lower()}_captured_skeleton.mp4"
+    write_landmark_skeleton_preview(
+        frames, choose_active_hand(frames), skeleton_preview_path, output_fps
+    )
     payload: dict[str, Any] = {
         "version": 3,
         "purpose": "creator_reference",
@@ -539,6 +687,7 @@ def import_video(
             "finalDurationMs": round((len(frames) / output_fps) * 1000),
             "temporallyResampled": final_duration_seconds is not None,
             "trackingPreview": str(tracking_preview_path),
+            "skeletonPreview": str(skeleton_preview_path),
             "landmarkLayout": "pose33_left21_right21_face468",
             "localOnly": True,
         },

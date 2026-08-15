@@ -151,6 +151,26 @@ def test_recipe_accepts_editable_motion_points_at_any_second() -> None:
     recipe.validate(11)
 
 
+def test_recipe_accepts_closing_keyframe_at_captured_duration() -> None:
+    recipe = SignRecipe(
+        version=1,
+        gloss="MAMA",
+        landmark_source="reference.json",
+        active_hand="left",
+        contact_anchor="chest",
+        contact_frame=10,
+        release_frame=25,
+        palm_at_contact="camera",
+        palm_at_release="up",
+        forward_distance=0.45,
+        return_to_rest=True,
+        output_fps=30,
+        motion_keyframes=[{"kind": "exit", "time_seconds": 1.0}],
+    )
+
+    recipe.validate(30)
+
+
 def test_recipe_rejects_duplicate_motion_point_times() -> None:
     recipe = SignRecipe(
         version=1,

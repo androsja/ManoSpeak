@@ -7,6 +7,7 @@ from src.video_sign_import import (
     infer_contact,
     infer_contact_window,
     resample_landmark_sequence,
+    write_landmark_skeleton_preview,
 )
 
 
@@ -170,3 +171,18 @@ def test_tracking_overlay_draws_face_points_and_contact_anchors() -> None:
     assert np.any(overlay[330, 400] != 0)  # chin
     assert np.any(overlay[282, 400] != 0)  # mouth
     assert np.any(overlay[168, 400] != 0)  # forehead
+
+
+def test_skeleton_preview_renders_the_saved_landmark_motion(tmp_path) -> None:
+    frames = [empty_frame(), empty_frame()]
+    for frame, wrist_x in zip(frames, (0.35, 0.65)):
+        frame[11] = [0.3, 0.35, 0.0]
+        frame[13] = [0.36, 0.50, 0.0]
+        frame[15] = [wrist_x, 0.62, 0.0]
+        for index in range(21):
+            frame[33 + index] = [wrist_x + index * 0.002, 0.62, 0.0]
+
+    output = write_landmark_skeleton_preview(frames, "left", tmp_path / "motion.mp4", 30)
+
+    assert output.is_file()
+    assert output.stat().st_size > 0

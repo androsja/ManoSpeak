@@ -13,9 +13,12 @@ import {
 } from 'react-native';
 import { extractKnownSpeechWords } from '../services/VoiceCommandService';
 import { AvatarClip, SkeletalAvatar } from './SkeletalAvatar';
+import publishedSigns from '../../assets/motions/published_signs.json';
 
-const KNOWN_WORDS = ['hola', 'gracias'] as const;
-type KnownWord = typeof KNOWN_WORDS[number];
+// Only clips explicitly published to the mobile avatar belong here. A sign
+// may be safely kept and edited in VOZUAL without becoming active on phones.
+const KNOWN_WORDS = publishedSigns.publishedGlosses.map((gloss) => gloss.toLowerCase());
+type KnownWord = string;
 type SpeechEvent = { value?: string[]; error?: string };
 type NativeVoiceModule = {
   startSpeech: (locale: string, options: Record<string, unknown>, callback: (error?: string) => void) => void;
@@ -235,8 +238,9 @@ export function ListenerScreen() {
     }
     playingRef.current = false;
     setPlayingSign(false);
-    // Preserve the sign's final skeletal pose. The next sign cross-fades from
-    // this exact posture instead of resetting the avatar to its rest pose.
+    // Wait in a neutral posture instead of holding the last sign's hand pose.
+    setActiveClip('IDLE');
+    setPlaybackId((value) => value + 1);
   }, []);
 
   return (
@@ -248,13 +252,13 @@ export function ListenerScreen() {
 
       <View style={styles.avatarCard}>
         <SkeletalAvatar clip={activeClip} playbackId={playbackId} onClipEnd={onSignEnd} />
-        {!playingSign && <Text style={styles.hint}>Di “hola” o “gracias” para ver la seña</Text>}
+        {!playingSign && <Text style={styles.hint}>Di una palabra publicada para ver la seña</Text>}
       </View>
 
       <View style={styles.panel}>
         <Text style={styles.title}>Escucha y traduce</Text>
         <Text style={styles.description}>
-          Activa el micrófono. Cuando la app escuche una palabra conocida, el avatar hará la seña correspondiente.
+          Activa el micrófono. Cuando la app escuche una palabra conocida, verás su esqueleto de movimiento correspondiente.
         </Text>
         <Pressable
           accessibilityRole="button"

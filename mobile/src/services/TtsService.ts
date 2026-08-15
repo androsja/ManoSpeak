@@ -25,7 +25,10 @@ export class TtsService {
     try {
       await Tts.setDefaultLanguage('es-CO'); // Colombian Spanish
     } catch (err) {
-      console.warn('[TTS Service] es-CO no disponible. Se usará el idioma por defecto.', err);
+      // Some Android images do not ship the Colombian Spanish voice. This is
+      // an expected fallback, so keep it informational instead of surfacing a
+      // React Native warning banner over the app UI.
+      console.log('[TTS Service] es-CO no disponible; se usará el idioma por defecto.');
     }
     
     try {

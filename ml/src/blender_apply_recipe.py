@@ -84,7 +84,9 @@ def solve_elbow(wrist: Vector, hint: Vector) -> tuple[Vector, Vector]:
             shoulder.z - 0.24 + 0.06 * activity,
         )
     )
-    stable_hint = hint.lerp(anatomical_hint, 0.88)
+    # Keep a clearly observed elbow as the primary cue for the arm fold.
+    # The anatomical corridor only guards against isolated tracker outliers.
+    stable_hint = hint.lerp(anatomical_hint, 0.35)
     plane = stable_hint - shoulder
     plane -= direction * plane.dot(direction)
     if plane.length < 1e-5:
@@ -403,6 +405,51 @@ def manual_adjustment(frame: int) -> Vector:
     return entry_adjustment * entry_weight + exit_adjustment * exit_weight
 
 
+def facial_value(frame: int, name: str) -> float:
+    """Return a smooth facial morph amount from the editor timeline."""
+    timeline = recipe.get("motion_keyframes", [])
+    if not timeline:
+        return 0.0
+    points = sorted(
+        (float(point["time_seconds"]), float(point.get(name, 0.0)))
+        for point in timeline
+    )
+    current_seconds = (frame - 1) / max(1, int(recipe["output_fps"]))
+    if current_seconds <= points[0][0]:
+        return points[0][1]
+    if current_seconds >= points[-1][0]:
+        return points[-1][1]
+    for (start_time, start_value), (end_time, end_value) in zip(points, points[1:]):
+        if start_time <= current_seconds <= end_time:
+            weight = smoothstep(
+                (current_seconds - start_time) / max(1e-6, end_time - start_time)
+            )
+            return start_value + (end_value - start_value) * weight
+    return 0.0
+
+
+def animate_facial_expression() -> None:
+    """Key the avatar's existing facial shape keys from local recipe values."""
+    morphs = {
+        "jaw_open": ("Jaw_Open", "jawOpen", "Mouth_Drop_Lower", "mouthLowerDownLeft", "mouthLowerDownRight"),
+        "eye_wide": ("Eye_Wide_L", "Eye_Wide_R", "eyeWideLeft", "eyeWideRight"),
+        "brow_raise": ("Brow_Raise_Inner_L", "Brow_Raise_Inner_R", "browInnerUp", "browOuterUpLeft", "browOuterUpRight"),
+    }
+    meshes = [
+        item for item in bpy.context.scene.objects
+        if item.type == "MESH" and item.data.shape_keys is not None
+    ]
+    for frame in range(1, end_frame + 1):
+        for name, target_names in morphs.items():
+            value = min(1.0, max(0.0, facial_value(frame, name)))
+            for mesh in meshes:
+                for target_name in target_names:
+                    key = mesh.data.shape_keys.key_blocks.get(target_name)
+                    if key is not None:
+                        key.value = value
+                        key.keyframe_insert(data_path="value", frame=frame)
+
+
 path = [
     (
         frame,
@@ -430,9 +477,10 @@ if recipe["return_to_rest"]:
             Vector(
                 (
                     wrist.x,
-                    min(wrist.y, safe_front_y)
-                    if frame >= contact_start_frame
-                    and abs(wrist.x) < torso_half_width
+                    # More-negative Y is closer to the camera. A noisy pose
+                    # depth must not pull a torso-adjacent hand forward.
+                    max(wrist.y, safe_front_y)
+                    if abs(wrist.x) < torso_half_width
                     else wrist.y,
                     wrist.z,
                 )
@@ -453,7 +501,7 @@ def key_anatomical_path(route: list[tuple[int, Vector, Vector]]) -> None:
         if previous_elbow is not None:
             # Tracker outliers must not move the elbow to the opposite side of
             # the arm in a single frame. Wrist motion remains unsmoothed.
-            elbow = previous_elbow.lerp(elbow, 0.58)
+            elbow = previous_elbow.lerp(elbow, 0.76)
         previous_elbow = elbow.copy()
         wrist_target.location = reachable_wrist
         wrist_target.keyframe_insert(data_path="location", frame=frame)
@@ -656,6 +704,11 @@ if contact_hand_indices:
             corrected_path.append((frame, corrected_wrist, corrected_hint))
         path = corrected_path
         key_anatomical_path(path)
+
+# The hand path and the facial expression are authored independently, but are
+# keyed on exactly the same frames. This makes a sign such as MAMÁ able to
+# combine chin contact with an open mouth and intentional eye expression.
+animate_facial_expression()
 
 scene = bpy.context.scene
 scene.frame_start = 1

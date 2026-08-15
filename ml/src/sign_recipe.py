@@ -74,7 +74,10 @@ class SignRecipe:
         )
         if any(not math.isfinite(value) or abs(value) > 30.0 for value in adjustments):
             raise ValueError("Motion adjustments must be between -30 and 30 cm.")
-        duration_seconds = (frame_count - 1) / self.output_fps
+        # A captured sequence with N samples at FPS represents N / FPS seconds
+        # in the authoring timeline.  In particular, a 30-frame 30-fps take
+        # must allow its closing keyframe at 1.0 s.
+        duration_seconds = frame_count / self.output_fps
         seen_times: set[float] = set()
         for keyframe in self.motion_keyframes:
             kind = str(keyframe.get("kind", "point"))
@@ -87,6 +90,11 @@ class SignRecipe:
                     float(keyframe.get("lateral_cm", 0.0)),
                     float(keyframe.get("depth_cm", 0.0)),
                 )
+                facial_values = (
+                    float(keyframe.get("jaw_open", 0.0)),
+                    float(keyframe.get("eye_wide", 0.0)),
+                    float(keyframe.get("brow_raise", 0.0)),
+                )
             except (KeyError, TypeError, ValueError) as error:
                 raise ValueError("Motion points require numeric time and offsets.") from error
             if not math.isfinite(time_seconds) or not 0.0 <= time_seconds <= duration_seconds + 1e-6:
@@ -97,6 +105,8 @@ class SignRecipe:
             seen_times.add(rounded_time)
             if any(not math.isfinite(value) or abs(value) > 30.0 for value in values):
                 raise ValueError("Motion point offsets must be between -30 and 30 cm.")
+            if any(not math.isfinite(value) or not 0.0 <= value <= 1.0 for value in facial_values):
+                raise ValueError("Facial motion values must be between 0 and 1.")
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

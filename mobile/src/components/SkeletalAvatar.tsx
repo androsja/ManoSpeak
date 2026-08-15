@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
 
-export type AvatarClip = 'IDLE' | 'HOLA' | 'GRACIAS';
+export type AvatarClip = string;
 
 type Props = {
   clip: AvatarClip;
@@ -43,8 +43,8 @@ export function SkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
       onClipEnd();
     } else if (message.type === 'error') {
       const detail = message.message || 'Error desconocido del motor 3D.';
-      console.error(`[Avatar 3D] ${detail}`);
-      setRuntimeError(`No se pudo cargar el avatar 3D: ${detail}`);
+      console.error(`[Captured skeleton] ${detail}`);
+      setRuntimeError(`No se pudo cargar el esqueleto: ${detail}`);
     }
   }, [onClipEnd, playbackId]);
 
@@ -67,7 +67,7 @@ export function SkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
         overScrollMode="never"
         scrollEnabled={false}
       />
-      {!ready && !runtimeError && <Text style={styles.status}>Cargando avatar 3D…</Text>}
+      {!ready && !runtimeError && <Text style={styles.status}>Cargando esqueleto capturado…</Text>}
       {!!runtimeError && <Text style={styles.status}>{runtimeError}</Text>}
     </View>
   );
