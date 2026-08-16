@@ -1,6 +1,7 @@
 import {
   extractKnownSpeechWords,
   normalizeSpeech,
+  selectKnownSpeechAlternative,
   speechContainsWord,
 } from '../VoiceCommandService';
 
@@ -26,5 +27,30 @@ describe('VoiceCommandService', () => {
       'hola',
       'hola',
     ]);
+  });
+
+  it('recognizes a published multi-word sign as one canonical clip name', () => {
+    expect(extractKnownSpeechWords('Buenos dias, hola', ['BUENOS DÍAS', 'HOLA'])).toEqual([
+      'BUENOS DÍAS',
+      'HOLA',
+    ]);
+  });
+
+  it('selects a later recognition alternative when it contains a published sign', () => {
+    expect(selectKnownSpeechAlternative(
+      ['ola', 'hola'],
+      ['HOLA', 'GRACIAS'],
+    )).toBe('hola');
+  });
+
+  it('preserves recognizer order when alternatives have the same match count', () => {
+    expect(selectKnownSpeechAlternative(
+      ['hola', 'gracias'],
+      ['HOLA', 'GRACIAS'],
+    )).toBe('hola');
+  });
+
+  it('returns an empty result when the recognizer supplies no alternatives', () => {
+    expect(selectKnownSpeechAlternative(undefined, ['HOLA'])).toBe('');
   });
 });

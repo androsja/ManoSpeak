@@ -8,6 +8,7 @@ type Props = {
   clip: AvatarClip;
   playbackId: number;
   onClipEnd: () => void;
+  onReady?: () => void;
 };
 
 type RuntimeMessage = {
@@ -16,7 +17,7 @@ type RuntimeMessage = {
   message?: string;
 };
 
-export function SkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
+export function SkeletalAvatar({clip, playbackId, onClipEnd, onReady}: Props) {
   const webView = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
   const [runtimeError, setRuntimeError] = useState('');
@@ -39,6 +40,7 @@ export function SkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
     if (message.type === 'ready') {
       setRuntimeError('');
       setReady(true);
+      onReady?.();
     } else if (message.type === 'ended' && message.playbackId === playbackId) {
       onClipEnd();
     } else if (message.type === 'error') {
@@ -46,7 +48,7 @@ export function SkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
       console.error(`[Captured skeleton] ${detail}`);
       setRuntimeError(`No se pudo cargar el esqueleto: ${detail}`);
     }
-  }, [onClipEnd, playbackId]);
+  }, [onClipEnd, onReady, playbackId]);
 
   return (
     <View style={styles.container}>

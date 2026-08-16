@@ -1,4 +1,27 @@
 {
   "version": 1,
-  "publishedGlosses": ["HOLA"]
+  "publishedGlosses": [
+    "ADI\u00d3S",
+    "BUENAS NOCHES",
+    "BUENAS TARDES",
+    "BUENOS D\u00cdAS",
+    "GRACIAS",
+    "HACER",
+    "HOLA",
+    "IR",
+    "MAMA",
+    "NECESITAR",
+    "NO",
+    "PERD\u00d3N",
+    "POR FAVOR",
+    "QUERER",
+    "QU\u00c9",
+    "SABER",
+    "S\u00cd",
+    "TENER",
+    "T\u00da",
+    "VENIR",
+    "VER",
+    "YO"
+  ]
 }

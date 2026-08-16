@@ -78,10 +78,19 @@ const linePositions = new Float32Array((segments.length + 1) * 6);
 lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
 const skeleton = new THREE.LineSegments(
   lineGeometry,
-  new THREE.LineBasicMaterial({color: 0x20d6ce, linewidth: 2}),
+  // Bright cyan keeps the moving arms and fingers legible over the quiet
+  // mannequin silhouette, especially when a hand rises near the face.
+  new THREE.LineBasicMaterial({
+    color: 0xa5fff9,
+    linewidth: 2,
+    // The reference motion is the foreground information. Keeping it out of
+    // the depth buffer avoids fingers fading when they cross the torso.
+    depthTest: false,
+    depthWrite: false,
+  }),
 );
 scene.add(skeleton);
-skeleton.renderOrder = 2;
+skeleton.renderOrder = 10;
 
 // Keep landmarks in two layers: hands/body joints must be easy to read, while
 // Face Mesh remains detailed without becoming a solid white mask.
@@ -97,10 +106,11 @@ const joints = new THREE.Points(
     size: 4.2,
     sizeAttenuation: true,
     depthTest: false,
+    depthWrite: false,
   }),
 );
 scene.add(joints);
-joints.renderOrder = 3;
+joints.renderOrder = 11;
 
 const faceGeometry = new THREE.BufferGeometry();
 const facePositions = new Float32Array(468 * 3);
@@ -112,10 +122,11 @@ const facePoints = new THREE.Points(
     size: 2.8,
     sizeAttenuation: true,
     depthTest: false,
+    depthWrite: false,
   }),
 );
 scene.add(facePoints);
-facePoints.renderOrder = 3;
+facePoints.renderOrder = 11;
 
 // These landmark groups make non-manual LSC information legible on a small
 // screen. They are still the captured Face Mesh coordinates, merely drawn in
@@ -136,10 +147,11 @@ const expressionPoints = new THREE.Points(
     size: 5.2,
     sizeAttenuation: true,
     depthTest: false,
+    depthWrite: false,
   }),
 );
 scene.add(expressionPoints);
-expressionPoints.renderOrder = 4;
+expressionPoints.renderOrder = 12;
 
 const headGeometry = new THREE.BufferGeometry();
 const headPositions = new Float32Array(25 * 3);
@@ -162,7 +174,16 @@ torsoGeometry.setAttribute('position', new THREE.BufferAttribute(torsoPositions,
 torsoGeometry.setIndex([0, 1, 2, 0, 2, 3]);
 const torso = new THREE.Mesh(
   torsoGeometry,
-  new THREE.MeshBasicMaterial({color: 0x33495c, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide}),
+  new THREE.MeshBasicMaterial({
+    // The torso is only a positional guide. It must never compete with a
+    // hand drawn over it, so keep it faint and out of depth testing.
+    color: 0x202a38,
+    transparent: true,
+    opacity: 0.22,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  }),
 );
 scene.add(torso);
 torso.renderOrder = 0;
@@ -174,21 +195,24 @@ const mannequinSegments: Array<[number, number, number]> = [
   [23, 25, 0.18], [25, 27, 0.14], [24, 26, 0.18], [26, 28, 0.14],
 ];
 const limbMaterial = new THREE.MeshBasicMaterial({
-  color: 0x405a70,
+  // MeshBasicMaterial is intentionally used so the limbs remain illuminated
+  // consistently on Android WebView, independent of device lighting.
+  color: 0x6f9abc,
   transparent: true,
-  opacity: 0.96,
+  opacity: 1,
   depthWrite: false,
+  depthTest: false,
 });
 const limbCapsules = mannequinSegments.map(() => {
   // The unscaled capsule is two world units tall: a central section of one
   // and two round caps. It is scaled per captured shoulder/elbow/wrist pair.
   const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 6, 12), limbMaterial);
-  capsule.renderOrder = 1;
+  capsule.renderOrder = 5;
   scene.add(capsule);
   return capsule;
 });
 const neck = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 6, 12), limbMaterial);
-neck.renderOrder = 1;
+neck.renderOrder = 5;
 scene.add(neck);
 
 const bodyJointGeometry = new THREE.BufferGeometry();
@@ -196,10 +220,16 @@ const bodyJointPositions = new Float32Array(12 * 3);
 bodyJointGeometry.setAttribute('position', new THREE.BufferAttribute(bodyJointPositions, 3));
 const bodyJoints = new THREE.Points(
   bodyJointGeometry,
-  new THREE.PointsMaterial({color: 0x6be3dc, size: 5.0, sizeAttenuation: true, depthTest: false}),
+  new THREE.PointsMaterial({
+    color: 0x6be3dc,
+    size: 5.0,
+    sizeAttenuation: true,
+    depthTest: false,
+    depthWrite: false,
+  }),
 );
 scene.add(bodyJoints);
-bodyJoints.renderOrder = 3;
+bodyJoints.renderOrder = 11;
 
 const headFill = new THREE.Mesh(
   new THREE.CircleGeometry(1, 48),
@@ -231,6 +261,9 @@ let pendingMotion: Motion | undefined;
 
 const RETURN_TO_REST_SECONDS = 0.42;
 const SIGN_TRANSITION_SECONDS = 0.18;
+// Captures may be trimmed to only their active frames. Keep every published
+// sign visible long enough to be perceived instead of flashing back to rest.
+const MIN_SIGN_PLAYBACK_SECONDS = 1.35;
 
 function send(type: string, detail: Record<string, unknown> = {}) {
   window.ReactNativeWebView?.postMessage(JSON.stringify({type, ...detail}));
@@ -776,9 +809,13 @@ function animate() {
     }
   } else if (activeMotion) {
     const elapsed = (performance.now() - activeStartedAt) / 1000;
+    const playbackFps = Math.min(
+      Math.max(1, activeMotion.fps),
+      Math.max(1, (activeMotion.frames.length - 1) / MIN_SIGN_PLAYBACK_SECONDS),
+    );
     const frameIndex = Math.min(
       activeMotion.frames.length - 1,
-      Math.floor(elapsed * Math.max(1, activeMotion.fps)),
+      Math.floor(elapsed * playbackFps),
     );
     if (frameIndex !== lastFrame) {
       setFrame(activeMotion.frames[frameIndex]);
