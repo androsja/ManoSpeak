@@ -4,6 +4,8 @@ import android.app.PictureInPictureParams
 import android.content.res.Configuration
 import android.os.Build
 import android.util.Rational
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.modules.core.DeviceEventManagerModule
@@ -11,6 +13,7 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnable
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 class MainActivity : ReactActivity() {
+  private var nativePipAvatar: NativePipAvatarView? = null
 
   override fun onResume() {
     super.onResume()
@@ -67,8 +70,31 @@ class MainActivity : ReactActivity() {
     newConfig: Configuration,
   ) {
     super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+    if (isInPictureInPictureMode) showNativePipAvatar() else hideNativePipAvatar()
     emitPipState(isInPictureInPictureMode)
     if (!isInPictureInPictureMode) schedulePipStateChecks()
+  }
+
+  private fun showNativePipAvatar() {
+    if (nativePipAvatar != null) return
+    val avatar = NativePipAvatarView(this)
+    findViewById<ViewGroup>(android.R.id.content).addView(
+      avatar,
+      FrameLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.MATCH_PARENT,
+      ),
+    )
+    nativePipAvatar = avatar
+    NativePipAvatarController.attach(avatar)
+  }
+
+  private fun hideNativePipAvatar() {
+    nativePipAvatar?.let { avatar ->
+      NativePipAvatarController.detach(avatar)
+      (avatar.parent as? ViewGroup)?.removeView(avatar)
+    }
+    nativePipAvatar = null
   }
 
   /**

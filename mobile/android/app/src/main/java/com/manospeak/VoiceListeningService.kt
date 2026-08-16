@@ -33,6 +33,7 @@ class VoiceListeningService : Service() {
   private var scheduledRestart: Runnable? = null
   private var lastPartialResults: ArrayList<String>? = null
   private var speechStarted = false
+  private var recognitionLanguageIndex = 0
 
   override fun onCreate() {
     super.onCreate()
@@ -49,14 +50,14 @@ class VoiceListeningService : Service() {
         .setOngoing(true)
         .build(),
     )
-    // Give the activity-owned recognizer enough time to release the microphone
-    // before the service creates its independent PiP recognizer.
-    scheduleRecognition(delayMillis = 650L, recreate = true)
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    // Android retains the activity-owned speech session briefly after
+    // SpeechRecognizer.destroy(). Give it time to release the remote Google
+    // recognition slot before the foreground service requests a new one.
     if (recognizer == null && scheduledRestart == null) {
-      scheduleRecognition(delayMillis = 650L, recreate = true)
+      scheduleRecognition(delayMillis = INITIAL_HANDOFF_DELAY_MILLIS, recreate = true)
     }
     return START_STICKY
   }
@@ -97,10 +98,14 @@ class VoiceListeningService : Service() {
 
     val sessionId = ++activeSessionId
     try {
+      // PiP must use the same Android-selected recognition provider as the
+      // visible screen. Forcing Google's explicit service here produced
+      // ERROR_NO_MATCH after the microphone had already detected speech on
+      // some devices, so no transcript ever reached the avatar queue.
       recognizer = SpeechRecognizer.createSpeechRecognizer(this).also {
         it.setRecognitionListener(createRecognitionListener(sessionId))
       }
-      Log.i(TAG, "Created service-owned recognizer session=$sessionId")
+      Log.i(TAG, "Created default service-owned recognizer session=$sessionId")
     } catch (error: Exception) {
       Log.e(TAG, "Unable to create service-owned recognizer", error)
       sendSpeechEvent(EVENT_ERROR, error = error.message ?: "No se pudo iniciar el micrófono.")
@@ -113,7 +118,11 @@ class VoiceListeningService : Service() {
     val current = recognizer ?: return
     try {
       recognitionInProgress = true
-      Log.i(TAG, "Starting service-owned recognition session=$activeSessionId")
+      Log.i(
+        TAG,
+        "Starting service-owned recognition session=$activeSessionId " +
+          "language=${RECOGNITION_LANGUAGES[recognitionLanguageIndex]}",
+      )
       current.startListening(createRecognitionIntent())
     } catch (error: Exception) {
       recognitionInProgress = false
@@ -200,6 +209,24 @@ class VoiceListeningService : Service() {
         lastPartialResults = null
         sendSpeechEvent(EVENT_ERROR, error = error.toString())
 
+        // Pixel devices can open the microphone for es-CO and detect voice,
+        // yet return ERROR_NO_MATCH because their Google/SODA installation
+        // has no compatible Colombian Spanish pack. Only rotate locale when
+        // speech was genuinely detected; ordinary silence must not change it.
+        if (
+          (error == SpeechRecognizer.ERROR_NO_MATCH ||
+            error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) &&
+          speechStarted
+        ) {
+          recognitionLanguageIndex =
+            (recognitionLanguageIndex + 1) % RECOGNITION_LANGUAGES.size
+          Log.i(
+            TAG,
+            "Retrying detected speech with language=" +
+              RECOGNITION_LANGUAGES[recognitionLanguageIndex],
+          )
+        }
+
         val requiresRecreation =
           error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
             error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
@@ -248,11 +275,16 @@ class VoiceListeningService : Service() {
   private fun createRecognitionIntent(): Intent =
     Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
       putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-      putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-CO")
-      putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es-CO")
+      putExtra(
+        RecognizerIntent.EXTRA_LANGUAGE,
+        RECOGNITION_LANGUAGES[recognitionLanguageIndex],
+      )
       putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
       putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-      putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+      // The Pixel reports that its on-device SODA pack does not support
+      // es-CO. Explicitly allow Google's network recognizer instead of ending
+      // every PiP phrase with ERROR_NO_MATCH.
+      putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
     }
 
   private fun sendSpeechEvent(
@@ -291,5 +323,7 @@ class VoiceListeningService : Service() {
 
     private const val CHANNEL_ID = "vozual_voice_listening"
     private const val NOTIFICATION_ID = 2701
+    private const val INITIAL_HANDOFF_DELAY_MILLIS = 900L
+    private val RECOGNITION_LANGUAGES = arrayOf("es-CO", "es-ES", "es-MX")
   }
 }

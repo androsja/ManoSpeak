@@ -50,10 +50,6 @@ const pictureInPicture = NativeModules.VozualPictureInPicture as {
 } | undefined;
 
 export function ListenerScreen() {
-  const restartTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
-  const speechStartWatchdogTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
-  const speechHealthTimer = useRef<ReturnType<typeof setInterval> | undefined>();
-  const restartRecognitionRef = useRef<(delayMillis: number) => void>(() => undefined);
   const libraryHintTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
   const recognitionGeneration = useRef(0);
   const recognitionReadyRef = useRef(false);
@@ -62,9 +58,9 @@ export function ListenerScreen() {
   const listeningRef = useRef(false);
   const playingRef = useRef(false);
   const pictureInPictureModeRef = useRef(false);
-  // PiP uses an Android Service-owned SpeechRecognizer. Keeping the
-  // activity-owned recognizer alive at the same time makes both recognizers
-  // compete for the microphone and eventually leaves PiP without results.
+  // The foreground service owns recognition in PiP; RCTVoice owns it while
+  // the activity is fully visible. They must never use the microphone at the
+  // same time.
   const nativePipSpeechActiveRef = useRef(false);
   const signQueue = useRef<KnownWord[]>([]);
   const recognizedWords = useRef<KnownWord[]>([]);
@@ -132,7 +128,16 @@ export function ListenerScreen() {
     const previous = recognizedWords.current;
     const extendsPrevious = previous.every((word, index) => words[index] === word);
     if (extendsPrevious && words.length > previous.length) {
-      signQueue.current.push(...words.slice(previous.length));
+      const newWords = words.slice(previous.length);
+      // Android can preserve a pending Home playback while the PiP surface is
+      // being attached. PiP must favour the newly spoken word instead of
+      // waiting for that invisible playback to finish.
+      if (pictureInPictureModeRef.current) {
+        signQueue.current = [];
+        playingRef.current = false;
+        setPlayingSign(false);
+      }
+      signQueue.current.push(...newWords);
       recognizedWords.current = words;
       playNextSign();
     } else if (words.length === 0) {
@@ -172,56 +177,35 @@ export function ListenerScreen() {
     nativeVoice.startSpeech('es-CO', options, callback);
   }, []);
 
-  const releaseActivitySpeechRecognizer = useCallback(async () => {
-    if (!nativeVoice) return;
-    await new Promise<void>((resolve) => {
-      let finished = false;
-      const finish = () => {
-        if (finished) return;
-        finished = true;
-        resolve();
-      };
-      const timeout = setTimeout(finish, 1600);
-      nativeVoice.cancelSpeech(() => {
-        nativeVoice.destroySpeech(() => {
-          clearTimeout(timeout);
-          finish();
-        });
-      });
-    });
-  }, []);
-
-  const clearSpeechStartWatchdog = useCallback(() => {
-    if (!speechStartWatchdogTimer.current) return;
-    clearTimeout(speechStartWatchdogTimer.current);
-    speechStartWatchdogTimer.current = undefined;
-  }, []);
-
   const markRecognitionUnavailable = useCallback(() => {
     recognitionReadyRef.current = false;
     nativeStartInFlight.current = false;
     setRecognitionReady(false);
-    clearSpeechStartWatchdog();
-  }, [clearSpeechStartWatchdog]);
+  }, []);
 
-  const waitForSpeechStart = useCallback((generation: number) => {
-    clearSpeechStartWatchdog();
+  const startActivityRecognition = useCallback(async () => {
+    if (!listeningRef.current || nativePipSpeechActiveRef.current) return;
+    const generation = recognitionGeneration.current;
+    nativePipSpeechActiveRef.current = false;
+    nativeStartInFlight.current = true;
     recognitionReadyRef.current = false;
     setRecognitionReady(false);
     lastRecognitionActivity.current = Date.now();
-    speechStartWatchdogTimer.current = setTimeout(() => {
-      speechStartWatchdogTimer.current = undefined;
-      if (!listeningRef.current || generation !== recognitionGeneration.current) return;
-      if (nativePipSpeechActiveRef.current) return;
-
-      // The native start callback only confirms that Android accepted the
-      // request. If onSpeechStart never arrives, the remote recognizer has
-      // disconnected and must be recreated.
+    await startNativeSpeech({
+      EXTRA_LANGUAGE_MODEL: 'LANGUAGE_MODEL_FREE_FORM',
+      EXTRA_MAX_RESULTS: 5,
+      EXTRA_PARTIAL_RESULTS: true,
+      VOZUAL_CONTINUOUS: true,
+      REQUEST_PERMISSIONS_AUTO: true,
+    }, (error) => {
       nativeStartInFlight.current = false;
-      nativeVoice?.cancelSpeech(() => undefined);
-      restartRecognitionRef.current(180);
-    }, 3200);
-  }, [clearSpeechStartWatchdog]);
+      if (error && listeningRef.current && generation === recognitionGeneration.current) {
+        listeningRef.current = false;
+        setListening(false);
+        setErrorMessage('No se pudo iniciar el reconocimiento de voz. Intenta activarlo nuevamente.');
+      }
+    });
+  }, [startNativeSpeech]);
 
   const startListening = useCallback(async () => {
     if (listeningRef.current) return;
@@ -249,22 +233,9 @@ export function ListenerScreen() {
         return;
       }
       recognitionGeneration.current += 1;
-      const generation = recognitionGeneration.current;
       listeningRef.current = true;
       setListening(true);
-      nativeStartInFlight.current = true;
-      waitForSpeechStart(generation);
-      await startNativeSpeech({
-        EXTRA_LANGUAGE_MODEL: 'LANGUAGE_MODEL_FREE_FORM',
-        EXTRA_MAX_RESULTS: 5,
-        EXTRA_PARTIAL_RESULTS: true,
-        REQUEST_PERMISSIONS_AUTO: true,
-      }, (error) => {
-        nativeStartInFlight.current = false;
-        if (error && listeningRef.current && generation === recognitionGeneration.current) {
-          restartRecognitionRef.current(500);
-        }
-      });
+      await startActivityRecognition();
     } catch (error) {
       listeningRef.current = false;
       markRecognitionUnavailable();
@@ -273,7 +244,16 @@ export function ListenerScreen() {
     } finally {
       setStarting(false);
     }
-  }, [markRecognitionUnavailable, startNativeSpeech, waitForSpeechStart]);
+  }, [markRecognitionUnavailable, startActivityRecognition]);
+
+  const releaseActivityRecognition = useCallback(async () => {
+    if (!nativeVoice) return;
+    await new Promise<void>((resolve) => {
+      nativeVoice.cancelSpeech(() => {
+        nativeVoice.destroySpeech(() => resolve());
+      });
+    });
+  }, []);
 
   const enterFloatingMode = useCallback(async () => {
     if (!avatarReady) {
@@ -284,21 +264,23 @@ export function ListenerScreen() {
       setErrorMessage('La ventana flotante no está disponible en este Android.');
       return;
     }
-    // Obtain permission while the activity is visible. The recognizer itself
-    // is handed over to the foreground service before Android enters PiP.
+    // Obtain permission while the activity is visible, then hand recognition
+    // to Android's microphone foreground service before entering PiP.
     if (!listeningRef.current) await startListening();
     if (!listeningRef.current) return;
     nativePipSpeechActiveRef.current = true;
     recognitionGeneration.current += 1;
     markRecognitionUnavailable();
-    if (restartTimer.current) {
-      clearTimeout(restartTimer.current);
-      restartTimer.current = undefined;
-    }
-    // RCTVoice keeps its SpeechRecognizer instance after cancelSpeech. Fully
-    // release it before the foreground service claims the microphone; keeping
-    // both instances alive can leave the service in ERROR_RECOGNIZER_BUSY.
-    await releaseActivitySpeechRecognizer();
+    await releaseActivityRecognition();
+    // PiP mounts a different avatar renderer. Do not carry an in-flight Home
+    // animation into it: keeping playingRef true makes PiP enqueue recognised
+    // words forever without ever calling playNextSign for them.
+    signQueue.current = [];
+    recognizedWords.current = [];
+    playingRef.current = false;
+    setPlayingSign(false);
+    setActiveClip('IDLE');
+    setPlaybackId((value) => value + 1);
     // Switch away from the WebGL WebView before Android takes the PiP
     // snapshot. Some devices deliver onPictureInPictureModeChanged after
     // the snapshot, which otherwise captures a black WebView surface.
@@ -309,29 +291,35 @@ export function ListenerScreen() {
       if (!entered) {
         nativePipSpeechActiveRef.current = false;
         applyPictureInPictureState(false);
-        recognitionGeneration.current += 1;
-        restartRecognitionRef.current(180);
         setErrorMessage('No se pudo abrir la ventana flotante.');
+        await startActivityRecognition();
       }
     } catch {
       nativePipSpeechActiveRef.current = false;
       applyPictureInPictureState(false);
-      recognitionGeneration.current += 1;
-      restartRecognitionRef.current(180);
       setErrorMessage('No se pudo abrir la ventana flotante.');
+      await startActivityRecognition();
     }
-  }, [applyPictureInPictureState, avatarReady, markRecognitionUnavailable, releaseActivitySpeechRecognizer, startListening]);
+  }, [
+    applyPictureInPictureState,
+    avatarReady,
+    markRecognitionUnavailable,
+    releaseActivityRecognition,
+    startActivityRecognition,
+    startListening,
+  ]);
 
-  const switchFromServiceToActivitySpeech = useCallback(async (reason: string) => {
-    if (!nativePipSpeechActiveRef.current) return;
-    nativePipSpeechActiveRef.current = false;
+  const finishPictureInPictureSession = useCallback(async (reason: string) => {
     pictureInPicture?.reportPlaybackEvent('speech-fallback', reason);
     await pictureInPicture?.stopListeningService();
-    if (!listeningRef.current) return;
-    recognitionGeneration.current += 1;
-    markRecognitionUnavailable();
-    restartRecognitionRef.current(240);
-  }, [markRecognitionUnavailable]);
+    nativePipSpeechActiveRef.current = false;
+    recognitionReadyRef.current = false;
+    setRecognitionReady(false);
+    if (listeningRef.current) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      await startActivityRecognition();
+    }
+  }, [startActivityRecognition]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener(
@@ -339,10 +327,11 @@ export function ListenerScreen() {
       (isInPictureInPictureMode: boolean) => {
         const compact = Boolean(isInPictureInPictureMode);
         applyPictureInPictureState(compact);
-        if (isInPictureInPictureMode && !listeningRef.current) {
-          void startListening();
-        } else if (!isInPictureInPictureMode && nativePipSpeechActiveRef.current) {
-          void switchFromServiceToActivitySpeech('left-pip');
+        if (isInPictureInPictureMode) {
+          nativePipSpeechActiveRef.current = true;
+          if (!listeningRef.current) void startListening();
+        } else if (!isInPictureInPictureMode) {
+          void finishPictureInPictureSession('left-pip');
         }
       },
     );
@@ -357,7 +346,7 @@ export function ListenerScreen() {
       subscription.remove();
       appStateSubscription.remove();
     };
-  }, [applyPictureInPictureState, startListening, switchFromServiceToActivitySpeech, syncPictureInPictureState]);
+  }, [applyPictureInPictureState, finishPictureInPictureSession, startListening, syncPictureInPictureState]);
 
   const stopListening = useCallback(async () => {
     // Disable the session before calling the native module: stop/cancel emit
@@ -366,10 +355,6 @@ export function ListenerScreen() {
     nativePipSpeechActiveRef.current = false;
     recognitionGeneration.current += 1;
     markRecognitionUnavailable();
-    if (restartTimer.current) {
-      clearTimeout(restartTimer.current);
-      restartTimer.current = undefined;
-    }
     recognizedWords.current = [];
     setTranscript('');
     setListening(false);
@@ -391,49 +376,8 @@ export function ListenerScreen() {
       return undefined;
     }
     const emitter = DeviceEventEmitter;
-    const restartRecognition = (delayMillis: number) => {
-      if (!listeningRef.current || nativePipSpeechActiveRef.current) return;
-      if (restartTimer.current) clearTimeout(restartTimer.current);
-      const generation = recognitionGeneration.current;
-      restartTimer.current = setTimeout(() => {
-        restartTimer.current = undefined;
-        if (
-          !nativeVoice ||
-          !listeningRef.current ||
-          nativePipSpeechActiveRef.current ||
-          generation !== recognitionGeneration.current
-        ) {
-          return;
-        }
-        if (nativeStartInFlight.current) {
-          restartRecognition(400);
-          return;
-        }
-        nativeStartInFlight.current = true;
-        waitForSpeechStart(generation);
-        void startNativeSpeech({
-          EXTRA_LANGUAGE_MODEL: 'LANGUAGE_MODEL_FREE_FORM',
-          EXTRA_MAX_RESULTS: 5,
-          EXTRA_PARTIAL_RESULTS: true,
-        }, (error) => {
-          nativeStartInFlight.current = false;
-          // Some Android engines briefly report "recognizer busy" while the
-          // previous phrase is closing. Keep the continuous-listening contract
-          // by retrying, but only while this same user session remains active.
-          if (error && listeningRef.current && generation === recognitionGeneration.current) {
-            restartRecognition(650);
-          }
-        });
-      }, delayMillis);
-    };
-    restartRecognitionRef.current = restartRecognition;
     const startSubscription = emitter.addListener('onSpeechStart', () => {
       if (nativePipSpeechActiveRef.current) return;
-      if (restartTimer.current) {
-        clearTimeout(restartTimer.current);
-        restartTimer.current = undefined;
-      }
-      clearSpeechStartWatchdog();
       nativeStartInFlight.current = false;
       recognitionReadyRef.current = true;
       lastRecognitionActivity.current = Date.now();
@@ -454,12 +398,10 @@ export function ListenerScreen() {
       lastRecognitionActivity.current = Date.now();
       onSpeechResults(event);
       markRecognitionUnavailable();
-      restartRecognition(350);
     });
     const errorSubscription = emitter.addListener('onSpeechError', (event: SpeechEvent) => {
       if (nativePipSpeechActiveRef.current) return;
       markRecognitionUnavailable();
-      restartRecognition(500);
       if (event.error) setErrorMessage('');
     });
     const endSubscription = emitter.addListener('onSpeechEnd', () => {
@@ -467,7 +409,6 @@ export function ListenerScreen() {
       // Android recognition is phrase-based: it normally ends after silence
       // even when the user still wants continuous listening.
       markRecognitionUnavailable();
-      restartRecognition(250);
     });
     const volumeSubscription = emitter.addListener('onSpeechVolumeChanged', () => {
       if (nativePipSpeechActiveRef.current) return;
@@ -503,28 +444,9 @@ export function ListenerScreen() {
       },
     );
 
-    speechHealthTimer.current = setInterval(() => {
-      if (
-        !listeningRef.current ||
-        nativePipSpeechActiveRef.current ||
-        !recognitionReadyRef.current
-      ) return;
-      if (Date.now() - lastRecognitionActivity.current < 9000) return;
-
-      // Some Android speech services disappear without emitting onSpeechEnd
-      // or onSpeechError. Treat a silent event stream as a dead connection.
-      markRecognitionUnavailable();
-      nativeVoice.cancelSpeech(() => undefined);
-      restartRecognition(220);
-    }, 3000);
     return () => {
       listeningRef.current = false;
       recognitionGeneration.current += 1;
-      if (restartTimer.current) clearTimeout(restartTimer.current);
-      clearSpeechStartWatchdog();
-      if (speechHealthTimer.current) clearInterval(speechHealthTimer.current);
-      speechHealthTimer.current = undefined;
-      restartRecognitionRef.current = () => undefined;
       startSubscription.remove();
       partialResultsSubscription.remove();
       finalResultsSubscription.remove();
@@ -537,7 +459,7 @@ export function ListenerScreen() {
       speechAudio?.restoreAudioAfter(900);
       if (libraryHintTimer.current) clearTimeout(libraryHintTimer.current);
     };
-  }, [clearSpeechStartWatchdog, markRecognitionUnavailable, onSpeechResults, startNativeSpeech, waitForSpeechStart]);
+  }, [markRecognitionUnavailable, onSpeechResults]);
 
   const onSignEnd = useCallback(() => {
     const nextWord = signQueue.current.shift();

@@ -37,6 +37,9 @@ class PictureInPictureModule(context: ReactApplicationContext) :
       return
     }
     try {
+      // Start the microphone foreground service while the activity is still
+      // visible. Android does not deliver microphone input to an
+      // activity-owned recognizer after the activity enters PiP.
       ContextCompat.startForegroundService(
         reactApplicationContext,
         Intent(reactApplicationContext, VoiceListeningService::class.java),
@@ -52,6 +55,7 @@ class PictureInPictureModule(context: ReactApplicationContext) :
 
   @ReactMethod
   fun stopListeningService(promise: Promise) {
+    stopAnimationClock()
     promise.resolve(stopVoiceListeningService())
   }
 
@@ -73,12 +77,53 @@ class PictureInPictureModule(context: ReactApplicationContext) :
       ?.replace(Regex("[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 _-]"), "_")
       ?: "none"
     Log.i(TAG, "React PiP event=$safeEvent publishedGloss=$safeGloss")
+    if (event == "play-sign") {
+      NativePipAvatarController.play(publishedGloss ?: return)
+      startAnimationClock()
+    }
   }
 
   private fun stopVoiceListeningService(): Boolean =
     reactApplicationContext.stopService(
       Intent(reactApplicationContext, VoiceListeningService::class.java),
     )
+
+  // React Native pauses JS timers in PiP on some Android builds. The native
+  // foreground path remains active, so it supplies a short-lived frame clock
+  // whenever a sign has been requested.
+  private var animationClock: Runnable? = null
+
+  private fun startAnimationClock() {
+    stopAnimationClock()
+    var remainingFrames = 120 // Four seconds at 30 FPS covers a full sign and return pose.
+    val clock = object : Runnable {
+      override fun run() {
+        val payload = Arguments.createMap()
+        try {
+          reactApplicationContext
+            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+            .emit("onVozualPipAnimationFrame", payload)
+        } catch (bridgeError: RuntimeException) {
+          Log.e(TAG, "Could not forward PiP animation frame", bridgeError)
+          stopAnimationClock()
+          return
+        }
+        remainingFrames -= 1
+        if (remainingFrames > 0 && animationClock === this) {
+          mainHandler.postDelayed(this, 33L)
+        } else {
+          animationClock = null
+        }
+      }
+    }
+    animationClock = clock
+    mainHandler.post(clock)
+  }
+
+  private fun stopAnimationClock() {
+    animationClock?.let(mainHandler::removeCallbacks)
+    animationClock = null
+  }
 
   private fun forwardSpeechEvent(event: String, values: ArrayList<String>?, error: String?) {
     mainHandler.post {
@@ -102,6 +147,7 @@ class PictureInPictureModule(context: ReactApplicationContext) :
   }
 
   override fun invalidate() {
+    stopAnimationClock()
     if (activeModule?.get() === this) activeModule = null
     super.invalidate()
   }

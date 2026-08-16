@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {NativeModules, StyleSheet, View} from 'react-native';
+import {DeviceEventEmitter, NativeModules, StyleSheet, View} from 'react-native';
 import RNFS from 'react-native-fs';
 import Svg, {G, Line, Path, Polygon} from 'react-native-svg';
 import publishedSigns from '../../assets/motions/published_signs.json';
@@ -287,12 +287,22 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
   const displayedFrame = useRef<MotionFrame>();
   const restReference = useRef<MotionFrame>();
   const bindings = useRef<ArmBinding[]>(neutralBindings());
-  const animation = useRef<number>();
+  const animationTick = useRef<((now: number) => void)>();
 
   const display = (nextFrame: MotionFrame) => {
     displayedFrame.current = nextFrame;
     setFrame(nextFrame);
   };
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('onVozualPipAnimationFrame', () => {
+      animationTick.current?.(performance.now());
+    });
+    return () => {
+      animationTick.current = undefined;
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -314,7 +324,11 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
   useEffect(() => {
     if (!ready) return undefined;
     let cancelled = false;
-    if (animation.current !== undefined) cancelAnimationFrame(animation.current);
+    animationTick.current = undefined;
+
+    const scheduleFrame = (tick: (now: number) => void) => {
+      animationTick.current = tick;
+    };
 
     const animateTransition = (start: MotionFrame, target: MotionFrame, duration: number, complete?: () => void) => {
       const startedAt = performance.now();
@@ -323,10 +337,10 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
         const progress = Math.min(1, (now - startedAt) / duration);
         const smooth = progress * progress * (3 - 2 * progress);
         display(mixFrame(start, target, smooth));
-        if (progress < 1) animation.current = requestAnimationFrame(tick);
+        if (progress < 1) scheduleFrame(tick);
         else complete?.();
       };
-      animation.current = requestAnimationFrame(tick);
+      scheduleFrame(tick);
     };
 
     if (clip === 'IDLE') {
@@ -338,7 +352,7 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
       }
       return () => {
         cancelled = true;
-        if (animation.current !== undefined) cancelAnimationFrame(animation.current);
+        animationTick.current = undefined;
       };
     }
 
@@ -361,10 +375,10 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
             display(motion.frames[index]);
             lastFrame = index;
           }
-          if (index < motion.frames.length - 1) animation.current = requestAnimationFrame(tick);
+          if (index < motion.frames.length - 1) scheduleFrame(tick);
           else onClipEnd();
         };
-        animation.current = requestAnimationFrame(tick);
+        scheduleFrame(tick);
       };
       const current = displayedFrame.current;
       if (current) animateTransition(current, motion.frames[0], SIGN_TRANSITION_MS, play);
@@ -380,7 +394,7 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
 
     return () => {
       cancelled = true;
-      if (animation.current !== undefined) cancelAnimationFrame(animation.current);
+      animationTick.current = undefined;
     };
   }, [clip, onClipEnd, playbackId, ready]);
 
