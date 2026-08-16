@@ -173,10 +173,11 @@ def draw_tracking_overlay(
     """Draw the exact landmarks used by retargeting on the source image."""
     overlay = image.copy()
     height, width = overlay.shape[:2]
-    hand_start = LEFT_HAND_START if active_hand == "left" else RIGHT_HAND_START
-    hand_points = frame[hand_start : hand_start + HAND_COUNT]
     face_points = frame[FACE_START : FACE_START + 468]
-    shoulder_index, elbow_index, pose_wrist_index = POSE_ARM_INDICES[active_hand]
+    hand_specs = (
+        ("left", LEFT_HAND_START, (80, 220, 255)),
+        ("right", RIGHT_HAND_START, (22, 217, 209)),
+    )
 
     # Face Mesh is part of the retargeting input, so expose every detected
     # facial landmark in the diagnostic video. Drawing points without the full
@@ -214,77 +215,60 @@ def draw_tracking_overlay(
             cv2.LINE_AA,
         )
 
-    arm_indices = (shoulder_index, elbow_index, pose_wrist_index)
-    for first, second in zip(arm_indices, arm_indices[1:]):
-        if tracked(frame[first]) and tracked(frame[second]):
-            cv2.line(
-                overlay,
-                _pixel(frame[first], width, height),
-                _pixel(frame[second], width, height),
-                (0, 215, 255),
-                5,
-                cv2.LINE_AA,
-            )
+    detected_hands: dict[str, int] = {}
+    for side, hand_start, hand_color in hand_specs:
+        shoulder_index, elbow_index, pose_wrist_index = POSE_ARM_INDICES[side]
+        arm_indices = (shoulder_index, elbow_index, pose_wrist_index)
+        arm_thickness = 5 if side == active_hand else 3
+        for first, second in zip(arm_indices, arm_indices[1:]):
+            if tracked(frame[first]) and tracked(frame[second]):
+                cv2.line(
+                    overlay,
+                    _pixel(frame[first], width, height),
+                    _pixel(frame[second], width, height),
+                    hand_color,
+                    arm_thickness,
+                    cv2.LINE_AA,
+                )
 
-    labels = (
-        (shoulder_index, "HOMBRO", (255, 80, 210)),
-        (elbow_index, "CODO", (0, 215, 255)),
-        (pose_wrist_index, "MUNECA CUERPO", (255, 210, 30)),
-    )
-    for index, label, color in labels:
-        if not tracked(frame[index]):
-            continue
-        center = _pixel(frame[index], width, height)
-        cv2.circle(overlay, center, 9, color, -1, cv2.LINE_AA)
-        cv2.putText(
-            overlay,
-            label,
-            (center[0] + 12, center[1] - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.55,
-            color,
-            2,
-            cv2.LINE_AA,
-        )
-
-    for first, second in HAND_CONNECTIONS:
-        if tracked(hand_points[first]) and tracked(hand_points[second]):
-            cv2.line(
-                overlay,
-                _pixel(hand_points[first], width, height),
-                _pixel(hand_points[second], width, height),
-                (22, 217, 209),
-                3,
-                cv2.LINE_AA,
-            )
-    detected_count = sum(tracked(point) for point in hand_points)
-    for index, point in enumerate(hand_points):
-        if not tracked(point):
-            continue
-        center = _pixel(point, width, height)
-        color = (40, 40, 255) if index == 0 else (255, 255, 255)
-        radius = 8 if index == 0 else 5
-        cv2.circle(overlay, center, radius, color, -1, cv2.LINE_AA)
-        if index == 0:
-            cv2.putText(
-                overlay,
-                "MUNECA MANO (PUNTO 0)",
-                (center[0] + 12, center[1] + 24),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.55,
-                color,
-                2,
-                cv2.LINE_AA,
-            )
+        hand_points = frame[hand_start : hand_start + HAND_COUNT]
+        for first, second in HAND_CONNECTIONS:
+            if tracked(hand_points[first]) and tracked(hand_points[second]):
+                cv2.line(
+                    overlay,
+                    _pixel(hand_points[first], width, height),
+                    _pixel(hand_points[second], width, height),
+                    hand_color,
+                    3 if side == active_hand else 2,
+                    cv2.LINE_AA,
+                )
+        detected_hands[side] = sum(tracked(point) for point in hand_points)
+        for index, point in enumerate(hand_points):
+            if not tracked(point):
+                continue
+            center = _pixel(point, width, height)
+            color = (40, 40, 255) if index == 0 else (255, 255, 255)
+            radius = 8 if index == 0 else 5
+            cv2.circle(overlay, center, radius, color, -1, cv2.LINE_AA)
+            if index == 0 and side == active_hand:
+                cv2.putText(
+                    overlay,
+                    "MUNECA MANO ACTIVA (PUNTO 0)",
+                    (center[0] + 12, center[1] + 24),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    color,
+                    2,
+                    cv2.LINE_AA,
+                )
 
     panel = overlay.copy()
     cv2.rectangle(panel, (0, 0), (width, 82), (7, 17, 31), -1)
     cv2.addWeighted(panel, 0.88, overlay, 0.12, 0.0, overlay)
-    side = "IZQUIERDA" if active_hand == "left" else "DERECHA"
     cv2.putText(
         overlay,
         (
-            f"MANO: {side} {detected_count}/21 | "
+            f"MANOS: IZQ {detected_hands['left']}/21 | DER {detected_hands['right']}/21 | "
             f"CARA: {detected_face_count}/468"
         ),
         (24, 34),
@@ -296,7 +280,7 @@ def draw_tracking_overlay(
     )
     cv2.putText(
         overlay,
-        "Cara: celeste | Menton: naranja | Rojo: muneca de mano",
+        "Ambas manos y brazos: colores distintos | Cara: celeste | Rojo: muneca activa",
         (24, 66),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.5,
