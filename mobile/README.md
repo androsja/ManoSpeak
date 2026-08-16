@@ -23,4 +23,22 @@ npm install
 npm run lint
 npm test
 ```
+
+## Published Sign Assets
+
+VOZUAL keeps the editable source motions as JSON files in `assets/motions`.
+Android does not package those verbose files. Run the avatar build before an
+Android build:
+
+```bash
+npm run build:avatar-runtime
+```
+
+The build compiles every published motion into a versioned `.motion.bin` file
+under `android/app/src/main/assets/avatar/motions`. Each coordinate is stored as
+a signed 16-bit integer at a scale of 10,000, preserving all body, hand, and face
+landmarks with a maximum quantization error of 0.00005 coordinate units. The
+React Native PiP renderer and the full WebView renderer decode the same compact
+format, while VOZUAL continues to edit the lossless JSON source.
+
 Refer to [DEVELOPMENT_COMMANDS.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/docs/DEVELOPMENT_COMMANDS.md) for execution details.

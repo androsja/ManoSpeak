@@ -1,9 +1,12 @@
 import * as THREE from 'three';
+import {
+  decodeCompactMotion,
+  MotionFrame,
+  MotionPoint as Point,
+  SignMotion as Motion,
+} from '../src/services/CompactSignMotion';
 
 type ClipName = string;
-type Point = [number, number, number];
-type MotionFrame = {bodyHands: Point[]; face: Point[]};
-type Motion = {fps: number; frames: MotionFrame[]};
 type HeadShape = {center: THREE.Vector3; radiusX: number; radiusY: number; chin: THREE.Vector3};
 
 declare global {
@@ -708,9 +711,9 @@ function retargetMotion(motion: Motion): Motion {
 }
 
 async function loadMotion(clip: string) {
-  const response = await fetch(`./motions/${clip.toLowerCase()}.motion.json`);
+  const response = await fetch(`./motions/${clip.toLowerCase()}.motion.bin`);
   if (!response.ok) throw new Error(`No se pudo cargar el movimiento ${clip}.`);
-  const motion = await response.json() as Motion;
+  const motion = decodeCompactMotion(new Uint8Array(await response.arrayBuffer()));
   if (!Array.isArray(motion.frames) || motion.frames.length < 2) {
     throw new Error(`El movimiento ${clip} no contiene cuadros suficientes.`);
   }

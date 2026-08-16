@@ -13,8 +13,7 @@ fi
 
 mkdir -p "${OUTPUT_DIR}/motions"
 cp tools/avatar/index.html "${OUTPUT_DIR}/index.html"
-cp "${MOTION_DIR}"/*.motion.json "${OUTPUT_DIR}/motions/"
-cp "${MOTION_DIR}/published_signs.json" "${OUTPUT_DIR}/motions/"
+node tools/compact-sign-motion.js "${MOTION_DIR}" "${OUTPUT_DIR}/motions"
 
 esbuild tools/avatar-runtime.ts \
   --bundle \

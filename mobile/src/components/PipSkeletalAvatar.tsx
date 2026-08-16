@@ -4,10 +4,14 @@ import RNFS from 'react-native-fs';
 import Svg, {G, Line, Path, Polygon} from 'react-native-svg';
 import publishedSigns from '../../assets/motions/published_signs.json';
 import {AvatarClip} from './SkeletalAvatar';
+import {
+  decodeBase64Bytes,
+  decodeCompactMotion,
+  MotionFrame,
+  SignMotion as Motion,
+} from '../services/CompactSignMotion';
 
 type Point = [number, number, number];
-type MotionFrame = {bodyHands: Point[]; face: Point[]};
-type Motion = {fps: number; frames: MotionFrame[]};
 type ArmBinding = {shoulder: number; elbow: number; wrist: number; hip: number; handStart?: number};
 type ScreenPoint = {x: number; y: number};
 
@@ -141,9 +145,9 @@ async function loadMotion(clip: string): Promise<Motion> {
   const key = clip.trim().toUpperCase();
   const cached = motionCache.get(key);
   if (cached) return cached;
-  const filename = `${clip.trim().toLowerCase()}.motion.json`;
-  const content = await RNFS.readFileAssets(`avatar/motions/${filename}`, 'utf8');
-  const parsed = JSON.parse(content) as Motion;
+  const filename = `${clip.trim().toLowerCase()}.motion.bin`;
+  const content = await RNFS.readFileAssets(`avatar/motions/${filename}`, 'base64');
+  const parsed = decodeCompactMotion(decodeBase64Bytes(content));
   if (!Array.isArray(parsed.frames) || parsed.frames.length < 2) {
     throw new Error(`Motion ${clip} does not contain enough frames.`);
   }
