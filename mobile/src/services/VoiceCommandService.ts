@@ -15,50 +15,113 @@ export function speechContainsWord(text: string, word: string): boolean {
     && normalizedText.split(' ').includes(normalizedWord);
 }
 
+type SpeechCandidate = {
+  canonical: string;
+  tokens: string[];
+};
+
+function speechCandidates(knownWords: SpeechVocabulary): SpeechCandidate[] {
+  return knownWords.flatMap((entry) => {
+    const canonical = typeof entry === 'string' ? entry : entry.gloss;
+    const phrases = typeof entry === 'string' ? [entry] : [entry.gloss, ...(entry.aliases ?? [])];
+    return phrases.map((phrase) => ({
+      canonical,
+      tokens: normalizeSpeech(phrase).split(' ').filter(Boolean),
+    }));
+  }).filter((candidate) => candidate.tokens.length > 0).sort(
+    (first, second) => second.tokens.length - first.tokens.length,
+  );
+}
+
+function speechMatchTokenCount(text: string, candidates: readonly SpeechCandidate[]): number {
+  const spokenTokens = normalizeSpeech(text).split(' ').filter(Boolean);
+  let tokenCount = 0;
+  for (let index = 0; index < spokenTokens.length;) {
+    const match = candidates.find((candidate) => candidate.tokens.every(
+      (token, offset) => spokenTokens[index + offset] === token,
+    ));
+    if (!match) {
+      index += 1;
+      continue;
+    }
+    tokenCount += match.tokens.length;
+    index += match.tokens.length;
+  }
+  return tokenCount;
+}
+
 export function extractKnownSpeechWords(
   text: string,
-  knownWords: readonly string[],
+  knownWords: SpeechVocabulary,
 ): string[] {
-  const candidates = knownWords
-    .map((word) => ({
-      canonical: word,
-      normalized: normalizeSpeech(word),
-    }))
-    .filter((candidate) => candidate.normalized.length > 0)
-    // Prefer the longest phrase so "buenos días" is one sign rather than
-    // two unrelated tokens when both expressions exist in a future catalog.
-    .sort((first, second) => second.normalized.split(' ').length - first.normalized.split(' ').length);
+  const candidates = speechCandidates(knownWords);
   const spokenTokens = normalizeSpeech(text).split(' ').filter(Boolean);
   const matches: string[] = [];
 
   for (let index = 0; index < spokenTokens.length;) {
-    const match = candidates.find((candidate) => {
-      const phrase = candidate.normalized.split(' ');
-      return phrase.every((token, offset) => spokenTokens[index + offset] === token);
-    });
+    const match = candidates.find((candidate) => candidate.tokens.every(
+      (token, offset) => spokenTokens[index + offset] === token,
+    ));
     if (!match) {
       index += 1;
       continue;
     }
     matches.push(match.canonical);
-    index += match.normalized.split(' ').length;
+    index += match.tokens.length;
   }
   return matches;
 }
 
+/**
+ * A partial result may still be the beginning of another published sign. For
+ * example, keep "no" pending while Android decides whether it becomes the
+ * independently published expression "no entiendo". This applies to every
+ * multi-word vocabulary entry, not to a hard-coded list of phrases.
+ */
+export function shouldDeferPartialSpeechMatch(
+  text: string,
+  knownWords: SpeechVocabulary,
+): boolean {
+  const spokenTokens = normalizeSpeech(text).split(' ').filter(Boolean);
+  if (spokenTokens.length === 0) return false;
+  const candidates = speechCandidates(knownWords);
+  for (let start = 0; start < spokenTokens.length; start += 1) {
+    const suffix = spokenTokens.slice(start);
+    const exact = new Set(candidates.filter((candidate) =>
+      candidate.tokens.length === suffix.length
+      && candidate.tokens.every((token, index) => token === suffix[index]),
+    ).map((candidate) => candidate.canonical));
+    if (exact.size === 0) continue;
+    if (candidates.some((candidate) => candidate.tokens.length > suffix.length
+      && !exact.has(candidate.canonical)
+      && suffix.every((token, index) => candidate.tokens[index] === token))) return true;
+  }
+  return false;
+}
+
 export function selectKnownSpeechAlternative(
   alternatives: readonly string[] | undefined,
-  knownWords: readonly string[],
+  knownWords: SpeechVocabulary,
 ): string {
   if (!alternatives || alternatives.length === 0) return '';
 
+  const candidates = speechCandidates(knownWords);
   return alternatives
     .map((text, index) => ({
       index,
       text,
+      matchedTokens: speechMatchTokenCount(text, candidates),
       matchCount: extractKnownSpeechWords(text, knownWords).length,
     }))
     .sort((first, second) =>
-      second.matchCount - first.matchCount || first.index - second.index,
+      second.matchedTokens - first.matchedTokens
+      || second.matchCount - first.matchCount
+      || first.index - second.index,
     )[0].text;
 }
+export type SpeechSign = {
+  gloss: string;
+  aliases?: readonly string[];
+};
+
+type SpeechVocabulary = readonly (string | SpeechSign)[];

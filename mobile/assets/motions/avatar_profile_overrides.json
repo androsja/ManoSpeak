@@ -1,0 +1,45 @@
+{
+  "AGUA": {
+    "rigLeftHandShape": "thumb-up",
+    "rigContactLandmark": 4,
+    "rigContactSnap": 1.0,
+    "rigContactUseAvatarAnchor": true,
+    "contactStartFrame": 15,
+    "contactEndFrame": 35,
+    "contactAnchor": "chin"
+  },
+  "AMIGO": {
+    "forceTwoHands": true,
+    "rigLeftHandShape": "index-only",
+    "rigRightHandShape": "index-only",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigRightPalmScaleMin": 1.0,
+    "rigRightPalmScaleMax": 1.0
+  },
+  "AYUDAR": {
+    "forceTwoHands": true,
+    "rigLeftHandShape": "captured",
+    "rigRightHandShape": "captured",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigRightPalmScaleMin": 1.0,
+    "rigRightPalmScaleMax": 1.0,
+    "rigLeftHandFrontDepth": 0.38,
+    "rigRightHandFrontDepth": 0.32,
+    "rigLeftHandDepthScale": 7.2,
+    "rigRightHandDepthScale": 2.2,
+    "rigRightHandTrackingRepair": "stable-palm"
+  },
+  "HAMBRE": {
+    "forceTwoHands": true,
+    "rigFistHands": true,
+    "rigHandFrontDepth": 0.38
+  },
+  "TÚ": {
+    "rigPointingHand": true
+  },
+  "YO": {
+    "rigSelfPointingHand": true
+  }
+}

@@ -3,7 +3,7 @@ import AVFoundation
 import Foundation
 
 private let repository = URL(fileURLWithPath: "/Users/jflorezgaleano/Documents/JulianFlorez/ManoSpeak")
-private let python = URL(fileURLWithPath: "/private/tmp/manospeak-capture-venv/bin/python")
+private let python = repository.appendingPathComponent("ml/.venv-editor/bin/python")
 private let editor = repository.appendingPathComponent("ml/src/sign_authoring_editor.py")
 
 private func showAlert(title: String, message: String, openSettings: Bool = false) {
@@ -28,7 +28,7 @@ private func launchEditor() {
     guard FileManager.default.isExecutableFile(atPath: python.path) else {
         showAlert(
             title: "VOZUAL no puede iniciar",
-            message: "No se encontró el entorno local de Python."
+            message: "No se encontró el entorno permanente del editor. Vuelve a ejecutar desktop/macos/build_app.sh."
         )
         NSApplication.shared.terminate(nil)
         return

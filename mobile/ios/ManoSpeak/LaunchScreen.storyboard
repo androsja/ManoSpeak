@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23094" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="VOZ-UAL-root">
+    <device id="retina6_12" orientation="portrait" appearance="dark"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23084"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+    </dependencies>
+    <scenes>
+        <scene sceneID="VOZ-UAL-scene">
+            <objects>
+                <viewController id="VOZ-UAL-root" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="VOZ-UAL-view">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="VOZUAL" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="VOZ-UAL-label">
+                                <rect key="frame" x="118" y="398" width="157" height="56"/>
+                                <fontDescription key="fontDescription" type="boldSystem" pointSize="40"/>
+                                <color key="textColor" red="0.968" green="0.976" blue="0.988" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            </label>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="VOZ-UAL-safe"/>
+                        <color key="backgroundColor" red="0.027" green="0.067" blue="0.122" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="VOZ-UAL-label" firstAttribute="centerX" secondItem="VOZ-UAL-view" secondAttribute="centerX" id="VOZ-center-x"/>
+                            <constraint firstItem="VOZ-UAL-label" firstAttribute="centerY" secondItem="VOZ-UAL-view" secondAttribute="centerY" id="VOZ-center-y"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="VOZ-UAL-first" sceneMemberID="firstResponder"/>
+            </objects>
+        </scene>
+    </scenes>
+</document>

@@ -1,6 +1,7 @@
 import numpy as np
 
 from src.video_sign_import import (
+    audit_hand_tracking,
     build_recipe,
     choose_active_hand,
     draw_tracking_overlay,
@@ -13,6 +14,63 @@ from src.video_sign_import import (
 
 def empty_frame() -> list[list[float]]:
     return [[0.0, 0.0, 0.0] for _ in range(543)]
+
+
+def open_hand(offset_x: float = 0.0) -> list[list[float]]:
+    hand = [[offset_x, 0.2, 0.0] for _ in range(21)]
+    hand[0] = [offset_x, 0.2, 0.0]
+    hand[1:5] = [
+        [offset_x - 0.02 * index, 0.2 + 0.02 * index, -0.002 * index]
+        for index in range(1, 5)
+    ]
+    for finger_index, chain in enumerate(
+        ((5, 6, 7, 8), (9, 10, 11, 12), (13, 14, 15, 16), (17, 18, 19, 20))
+    ):
+        root_x = offset_x + 0.06 - finger_index * 0.04
+        for segment_index, landmark_index in enumerate(chain):
+            hand[landmark_index] = [
+                root_x,
+                0.24 + finger_index * 0.002 + segment_index * 0.045,
+                finger_index * 0.003,
+            ]
+    return hand
+
+
+def frames_with_left_hands(hands: list[list[list[float]]]) -> list[list[list[float]]]:
+    frames = []
+    for hand in hands:
+        frame = empty_frame()
+        frame[33:54] = hand
+        frames.append(frame)
+    return frames
+
+
+def test_audit_hand_tracking_accepts_a_stable_translated_hand() -> None:
+    frames = frames_with_left_hands(
+        [open_hand(0.0), open_hand(0.01), open_hand(0.02)]
+    )
+
+    quality = audit_hand_tracking(frames, "left")
+
+    assert quality.valid_frame_count == 3
+    assert quality.unstable_frames == []
+
+
+def test_audit_hand_tracking_detects_collapsed_and_reversed_palm() -> None:
+    stable = open_hand(0.0)
+    reversed_hand = open_hand(0.01)
+    reversed_hand[5], reversed_hand[17] = reversed_hand[17], reversed_hand[5]
+    collapsed = open_hand(0.02)
+    collapsed[17] = [collapsed[5][0] + 0.001, collapsed[5][1] + 0.001, 0.0]
+    frames = frames_with_left_hands(
+        [stable, reversed_hand, collapsed, open_hand(0.03)]
+    )
+
+    quality = audit_hand_tracking(frames, "left")
+
+    assert quality.palm_orientation_flip_frames
+    assert 2 in quality.palm_collapse_frames
+    assert quality.unstable_frames
 
 
 def test_choose_active_hand_uses_wrist_motion() -> None:

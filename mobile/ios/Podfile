@@ -8,17 +8,21 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
+# This project uses React Native's static-library integration. Firebase's SPM
+# products require dynamic linkage, so resolve Firebase through CocoaPods.
+$RNFirebaseDisableSPM = true
+
+# Firebase's iOS SDK includes Swift modules. Static frameworks expose their
+# generated compatibility headers without adding dynamic runtime frameworks.
+use_frameworks! :linkage => :static
+$RNFirebaseAsStaticFramework = true
 
 target 'ManoSpeak' do
   config = use_native_modules!
 
   use_react_native!(
     :path => config[:reactNativePath],
+    :hermes_enabled => false,
     # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
@@ -41,6 +45,15 @@ target 'ManoSpeak' do
       target.build_configurations.each do |config|
         current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1' if current.to_f < 15.1
+
+        # Worklets 1.6 imports JavaScriptCore through ReactCommon's source
+        # layout. Static frameworks do not expose the legacy `jsc/` prefix,
+        # so keep that source include available to this pod only.
+        if target.name == 'react-native-worklets-core'
+          search_paths = Array(config.build_settings['HEADER_SEARCH_PATHS'])
+          react_common = '"${PODS_ROOT}/../../node_modules/react-native/ReactCommon"'
+          config.build_settings['HEADER_SEARCH_PATHS'] = search_paths | ['$(inherited)', react_common]
+        end
       end
     end
   end

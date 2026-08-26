@@ -3,13 +3,19 @@ import {DeviceEventEmitter, NativeModules, StyleSheet, View} from 'react-native'
 import RNFS from 'react-native-fs';
 import Svg, {G, Line, Path, Polygon} from 'react-native-svg';
 import publishedSigns from '../../assets/motions/published_signs.json';
-import {AvatarClip} from './SkeletalAvatar';
+import {AvatarClip, AvatarRenderMode} from './SkeletalAvatar';
 import {
   decodeBase64Bytes,
   decodeCompactMotion,
   MotionFrame,
   SignMotion as Motion,
 } from '../services/CompactSignMotion';
+import {
+  coarticulateSignMotion,
+  PHRASE_COAST_TO_REST_RATIO,
+  PHRASE_CONTINUATION_GRACE_MS,
+  signPlaybackRange,
+} from '../services/SignPhraseContinuity';
 
 type Point = [number, number, number];
 type ArmBinding = {shoulder: number; elbow: number; wrist: number; hip: number; handStart?: number};
@@ -18,6 +24,9 @@ type ScreenPoint = {x: number; y: number};
 type Props = {
   clip: AvatarClip;
   playbackId: number;
+  playbackSpeed: number;
+  continuePhrase: boolean;
+  renderMode: AvatarRenderMode;
   onClipEnd: () => void;
 };
 
@@ -26,10 +35,13 @@ const VIEW_HEIGHT = 1000;
 const RETURN_TO_REST_MS = 420;
 const SIGN_TRANSITION_MS = 180;
 const MIN_SIGN_PLAYBACK_SECONDS = 1.35;
+const MAX_FACE_HORIZONTAL_DISTANCE = 0.12;
+const MAX_FACE_VERTICAL_DISTANCE = 0.18;
+const MAX_HAND_DISTANCE_FROM_WRIST = 0.26;
 
 const BODY_SEGMENTS: Array<[number, number]> = [
   [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
-  [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28],
+  [11, 23], [12, 24], [23, 24],
 ];
 const HAND_SEGMENTS: Array<[number, number]> = [
   [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8],
@@ -40,7 +52,7 @@ const ARMS: ArmBinding[] = [
   {shoulder: 11, elbow: 13, wrist: 15, hip: 23},
   {shoulder: 12, elbow: 14, wrist: 16, hip: 24},
 ];
-const MAJOR_JOINTS = [11, 13, 15, 12, 14, 16, 23, 25, 27, 24, 26, 28];
+const MAJOR_JOINTS = [11, 13, 15, 12, 14, 16, 23, 24];
 const EXPRESSION_LANDMARKS = [
   33, 133, 159, 145, 263, 362, 386, 374,
   70, 105, 107, 336, 334, 300,
@@ -52,6 +64,14 @@ const motionCache = new Map<string, Motion>();
 const pictureInPictureDiagnostics = NativeModules.VozualPictureInPicture as {
   reportPlaybackEvent?: (event: string, publishedGloss: string) => void;
 } | undefined;
+
+function motionAssetName(clip: string): string {
+  const normalized = clip.trim().toLowerCase();
+  if (!normalized) throw new Error(`Motion ${clip} has no usable asset name.`);
+  return `m_${Array.from(normalized, character =>
+    character.codePointAt(0)!.toString(16).padStart(6, '0'),
+  ).join('')}`;
+}
 
 function valid(point: Point | undefined): point is Point {
   return point != null && point.some(value => Math.abs(value) > 1e-8);
@@ -145,7 +165,7 @@ async function loadMotion(clip: string): Promise<Motion> {
   const key = clip.trim().toUpperCase();
   const cached = motionCache.get(key);
   if (cached) return cached;
-  const filename = `${clip.trim().toLowerCase()}.motion.bin`;
+  const filename = `${motionAssetName(clip)}.motion.bin`;
   const content = await RNFS.readFileAssets(`avatar/motions/${filename}`, 'base64');
   const parsed = decodeCompactMotion(decodeBase64Bytes(content));
   if (!Array.isArray(parsed.frames) || parsed.frames.length < 2) {
@@ -258,11 +278,34 @@ function project(point: Point): ScreenPoint {
 
 function projectFace(point: Point, anchor: Point | undefined): ScreenPoint | undefined {
   if (!valid(point) || !anchor) return undefined;
+  // MediaPipe occasionally emits a stale facial landmark far from the face.
+  // A point can be numerically valid while still being anatomically impossible.
+  if (
+    Math.abs(point[0] - anchor[0]) > MAX_FACE_HORIZONTAL_DISTANCE ||
+    Math.abs(point[1] - anchor[1]) > MAX_FACE_VERTICAL_DISTANCE
+  ) return undefined;
   return project([
     anchor[0] + (point[0] - anchor[0]) * 1.05,
     anchor[1] + (point[1] - anchor[1]) * 1.18,
     point[2],
   ]);
+}
+
+function renderableBodyPoint(
+  frame: MotionFrame,
+  point: Point,
+  index: number,
+  bindings: ArmBinding[],
+): boolean {
+  if (!valid(point)) return false;
+  const handBinding = bindings.find(binding =>
+    binding.handStart !== undefined &&
+    index >= binding.handStart &&
+    index < binding.handStart + 21,
+  );
+  if (!handBinding) return true;
+  const wrist = frame.bodyHands[handBinding.wrist];
+  return valid(wrist) && squaredDistance(point, wrist) <= MAX_HAND_DISTANCE_FROM_WRIST ** 2;
 }
 
 function circlePath(points: Array<ScreenPoint | undefined>, radius: number): string {
@@ -281,7 +324,7 @@ function frameSegments(bindings: ArmBinding[]): Array<[number, number]> {
   return segments;
 }
 
-export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
+export function PipSkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase, renderMode, onClipEnd}: Props) {
   const [frame, setFrame] = useState<MotionFrame>();
   const [ready, setReady] = useState(false);
   const displayedFrame = useRef<MotionFrame>();
@@ -343,12 +386,20 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
       scheduleFrame(tick);
     };
 
-    if (clip === 'IDLE') {
+    if (clip === 'IDLE' || clip === 'PHRASE_WAIT') {
       const current = displayedFrame.current;
       const reference = restReference.current ?? current;
       if (current && reference) {
-        bindings.current = neutralBindings();
-        animateTransition(current, makeRestPose(reference, bindings.current), RETURN_TO_REST_MS);
+        const rest = makeRestPose(reference, neutralBindings());
+        const target = clip === 'PHRASE_WAIT'
+          ? mixFrame(current, rest, PHRASE_COAST_TO_REST_RATIO)
+          : rest;
+        if (clip === 'IDLE') bindings.current = neutralBindings();
+        animateTransition(
+          current,
+          target,
+          clip === 'PHRASE_WAIT' ? PHRASE_CONTINUATION_GRACE_MS : RETURN_TO_REST_MS,
+        );
       }
       return () => {
         cancelled = true;
@@ -359,31 +410,57 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
     loadMotion(clip).then(motion => {
       if (cancelled) return;
       pictureInPictureDiagnostics?.reportPlaybackEvent?.('motion-loaded', clip);
-      bindings.current = bindingsForMotion(motion);
+      const playbackRange = signPlaybackRange(motion);
+      const startFrame = continuePhrase ? playbackRange.continuationStartFrame : 0;
+      const endFrame = Math.max(startFrame, playbackRange.endFrame);
+      const previousFrame = displayedFrame.current;
+      const previousBindings = bindings.current;
+      const targetBindings = bindingsForMotion(motion);
+      const playbackMotion = continuePhrase && previousFrame
+        ? coarticulateSignMotion(
+          motion,
+          previousFrame,
+          startFrame,
+          endFrame,
+          previousBindings,
+          targetBindings,
+        )
+        : motion;
+      bindings.current = targetBindings;
       restReference.current = motion.frames[0];
       const play = () => {
         const startedAt = performance.now();
         const playbackFps = Math.min(
           Math.max(1, motion.fps),
-          Math.max(1, (motion.frames.length - 1) / MIN_SIGN_PLAYBACK_SECONDS),
-        );
+          Math.max(1, (endFrame - startFrame) / MIN_SIGN_PLAYBACK_SECONDS),
+        ) * playbackSpeed;
         let lastFrame = -1;
         const tick = (now: number) => {
           if (cancelled) return;
-          const index = Math.min(motion.frames.length - 1, Math.floor(((now - startedAt) / 1000) * playbackFps));
+          const index = Math.min(
+            endFrame,
+            startFrame + Math.floor(((now - startedAt) / 1000) * playbackFps),
+          );
           if (index !== lastFrame) {
-            display(motion.frames[index]);
+            display(playbackMotion.frames[index]);
             lastFrame = index;
           }
-          if (index < motion.frames.length - 1) scheduleFrame(tick);
+          if (index < endFrame) scheduleFrame(tick);
           else onClipEnd();
         };
         scheduleFrame(tick);
       };
       const current = displayedFrame.current;
-      if (current) animateTransition(current, motion.frames[0], SIGN_TRANSITION_MS, play);
+      if (current) {
+        animateTransition(
+          current,
+          playbackMotion.frames[startFrame],
+          continuePhrase ? 100 : SIGN_TRANSITION_MS,
+          play,
+        );
+      }
       else {
-        display(motion.frames[0]);
+        display(playbackMotion.frames[startFrame]);
         play();
       }
     }).catch(error => {
@@ -396,13 +473,15 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
       cancelled = true;
       animationTick.current = undefined;
     };
-  }, [clip, onClipEnd, playbackId, ready]);
+  }, [clip, continuePhrase, onClipEnd, playbackId, playbackSpeed, ready]);
 
   const drawing = useMemo(() => {
     if (!frame) return undefined;
     const bodyHands = frame.bodyHands;
     const anchor = faceAnchor(frame.face);
-    const projected = bodyHands.map(point => valid(point) ? project(point) : undefined);
+    const projected = bodyHands.map((point, index) =>
+      renderableBodyPoint(frame, point, index, bindings.current) ? project(point) : undefined,
+    );
     const face = frame.face.map(point => projectFace(point, anchor));
     const expression = EXPRESSION_LANDMARKS.map(index => projectFace(frame.face[index], anchor));
     const torsoIndexes = [11, 12, 24, 23];
@@ -423,7 +502,7 @@ export function PipSkeletalAvatar({clip, playbackId, onClipEnd}: Props) {
 
   return (
     <View style={styles.container} accessibilityLabel="Esqueleto capturado de VOZUAL en ventana flotante">
-      {drawing && <Svg width="100%" height="100%" viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} preserveAspectRatio="xMidYMid meet">
+      {renderMode === 'points' && drawing && <Svg width="100%" height="100%" viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} preserveAspectRatio="xMidYMid meet">
         <G>
           {drawing.torso.length === 4 && <Polygon
             points={drawing.torso.map(point => `${point.x},${point.y}`).join(' ')}

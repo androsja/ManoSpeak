@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -57,10 +57,131 @@ FACE_ANCHORS = (
     (FACE_UPPER_LIP, "BOCA", (255, 80, 220)),
     (FACE_FOREHEAD, "FRENTE", (80, 255, 120)),
 )
+HAND_SEGMENTS = (
+    (0, 1), (1, 2), (2, 3), (3, 4),
+    (0, 5), (5, 6), (6, 7), (7, 8),
+    (0, 9), (9, 10), (10, 11), (11, 12),
+    (0, 13), (13, 14), (14, 15), (15, 16),
+    (0, 17), (17, 18), (18, 19), (19, 20),
+)
+
+
+@dataclass(frozen=True)
+class HandTrackingQuality:
+    """Non-destructive review signals for one captured 21-point hand."""
+
+    frame_count: int
+    valid_frame_count: int
+    palm_orientation_flip_frames: list[int]
+    palm_collapse_frames: list[int]
+    phalanx_outlier_frames: list[int]
+    unstable_frames: list[int]
 
 
 def tracked(point: list[float]) -> bool:
     return any(abs(value) > 1e-8 for value in point)
+
+
+def _palm_normal(hand: list[list[float]]) -> np.ndarray | None:
+    wrist = np.asarray(hand[0], dtype=np.float64)
+    index_root = np.asarray(hand[5], dtype=np.float64)
+    pinky_root = np.asarray(hand[17], dtype=np.float64)
+    normal = np.cross(index_root - wrist, pinky_root - wrist)
+    length = float(np.linalg.norm(normal))
+    return normal / length if length > 1e-8 else None
+
+
+def _hand_segment_lengths(hand: list[list[float]]) -> np.ndarray:
+    return np.asarray(
+        [
+            np.linalg.norm(
+                np.asarray(hand[end], dtype=np.float64)
+                - np.asarray(hand[start], dtype=np.float64)
+            )
+            for start, end in HAND_SEGMENTS
+        ],
+        dtype=np.float64,
+    )
+
+
+def audit_hand_tracking(
+    frames: list[list[list[float]]], side: str
+) -> HandTrackingQuality:
+    """Detect impossible temporal changes without rewriting captured points.
+
+    A real LSC sign may intentionally rotate its palm, so only an abrupt 3D
+    reversal between consecutive frames is reported. Palm collapse and several
+    simultaneous phalanx-length jumps identify the MediaPipe failures visible
+    in AYUDAR when one hand occludes the other.
+    """
+    start = LEFT_HAND_START if side == "left" else RIGHT_HAND_START
+    hands = [frame[start : start + HAND_COUNT] for frame in frames]
+    valid = [
+        len(hand) == HAND_COUNT and all(tracked(point) for point in hand)
+        for hand in hands
+    ]
+    spans = [
+        float(
+            np.linalg.norm(
+                np.asarray(hand[5], dtype=np.float64)
+                - np.asarray(hand[17], dtype=np.float64)
+            )
+        )
+        if valid[index]
+        else 0.0
+        for index, hand in enumerate(hands)
+    ]
+    valid_spans = [span for span in spans if span > 1e-8]
+    median_span = float(np.median(valid_spans)) if valid_spans else 0.0
+    normals = [
+        _palm_normal(hand) if valid[index] else None
+        for index, hand in enumerate(hands)
+    ]
+    palm_orientation_flip_frames = [
+        index
+        for index in range(1, len(normals))
+        if normals[index] is not None
+        and normals[index - 1] is not None
+        and float(np.dot(normals[index], normals[index - 1])) < -0.25
+    ]
+    palm_collapse_frames = [
+        index
+        for index, span in enumerate(spans)
+        if valid[index] and median_span > 1e-8 and span < median_span * 0.55
+    ]
+    segment_lengths = [
+        _hand_segment_lengths(hand) if valid[index] else None
+        for index, hand in enumerate(hands)
+    ]
+    phalanx_outlier_frames: list[int] = []
+    for index in range(1, len(segment_lengths)):
+        current = segment_lengths[index]
+        previous = segment_lengths[index - 1]
+        if current is None or previous is None:
+            continue
+        ratios = np.divide(
+            current,
+            previous,
+            out=np.ones_like(current),
+            where=previous > 1e-8,
+        )
+        if int(np.count_nonzero((ratios < 0.45) | (ratios > 2.2))) >= 3:
+            phalanx_outlier_frames.append(index)
+    unstable_frames = sorted(
+        set(
+            palm_orientation_flip_frames
+            + palm_collapse_frames
+            + phalanx_outlier_frames
+        )
+    )
+    return HandTrackingQuality(
+        frame_count=len(frames),
+        valid_frame_count=sum(valid),
+        palm_orientation_flip_frames=palm_orientation_flip_frames,
+        palm_collapse_frames=palm_collapse_frames,
+        phalanx_outlier_frames=phalanx_outlier_frames,
+        unstable_frames=unstable_frames,
+    )
 
 
 def hand_motion_score(frames: list[list[list[float]]], wrist_index: int) -> float:
@@ -601,9 +722,11 @@ def import_video(
     frame_index = 0
     with mp.solutions.holistic.Holistic(
         static_image_mode=False,
-        model_complexity=1,
+        model_complexity=2,
         smooth_landmarks=True,
-        refine_face_landmarks=False,
+        refine_face_landmarks=True,
+        min_detection_confidence=0.55,
+        min_tracking_confidence=0.55,
     ) as holistic:
         while capture.isOpened():
             ok, image = capture.read()
@@ -627,6 +750,10 @@ def import_video(
             f"{reasons}. Keep the upper body and complete signing hand visible."
         )
     source_frames = frames
+    source_hand_tracking_quality = {
+        side: asdict(audit_hand_tracking(source_frames, side))
+        for side in ("left", "right")
+    }
     source_frame_count = len(source_frames)
     source_duration_seconds = timestamps[-1] if len(timestamps) > 1 else 0.0
     output_fps = max(1, round(source_fps))
@@ -678,6 +805,13 @@ def import_video(
         "timestamps": timestamps,
         "handPresence": [has_hand(frame) for frame in frames],
         "quality": asdict(quality),
+        "handTrackingQuality": {
+            "source": source_hand_tracking_quality,
+            "published": {
+                side: asdict(audit_hand_tracking(frames, side))
+                for side in ("left", "right")
+            },
+        },
         "rawFrames": frames,
         "normalizedFrames": [normalize_frame(frame) for frame in frames],
     }

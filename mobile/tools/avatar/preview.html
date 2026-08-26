@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <title>VOZUAL · Simulación móvil</title>
+    <style>
+      :root { color-scheme: dark; font-family: Arial, sans-serif; }
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        padding: 24px;
+        display: grid;
+        grid-template-columns: minmax(320px, 880px) minmax(420px, 820px);
+        justify-content: center;
+        gap: 24px;
+        background: #07111f;
+        color: #f5f8fc;
+      }
+      .visual-comparison {
+        display: grid;
+        grid-template-columns: minmax(320px, 430px);
+        justify-content: end;
+        align-content: start;
+        gap: 14px;
+      }
+      .visual-comparison.has-source-video { grid-template-columns: repeat(2, minmax(280px, 430px)); }
+      .phone {
+        position: relative;
+        width: 100%;
+        height: min(76vh, 760px);
+        min-height: 560px;
+        overflow: hidden;
+        border: 10px solid #111e2e;
+        border-radius: 30px;
+        background: #202a38;
+        box-shadow: 0 24px 70px #0008;
+      }
+      #avatar { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; background: #343936; }
+      #avatar canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; }
+      .source-video-panel { border-color: #204557; background: #101923; }
+      #source-video { width: 100%; height: 100%; display: block; object-fit: contain; background: #05080d; }
+      .visual-label {
+        position: absolute;
+        z-index: 2;
+        top: 14px;
+        left: 14px;
+        padding: 8px 10px;
+        border-radius: 9px;
+        background: #07111fe8;
+        color: #20d6ce;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.7px;
+      }
+      .copy { align-self: center; padding: 8px; }
+      .eyebrow { color: #20d6ce; font-size: 12px; font-weight: 900; letter-spacing: 1px; }
+      h1 { margin: 8px 0 10px; font-size: 28px; }
+      #status { min-height: 42px; color: #9fb0c4; line-height: 1.45; }
+      .library { margin: 16px 0 10px; padding: 14px; border-radius: 12px; background: #111e2e; }
+      .library-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 9px; color: #c9d5e3; font-size: 12px; font-weight: 900; }
+      .search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+      .search-row input {
+        min-width: 0;
+        border: 1px solid #456079;
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #07111f;
+        color: #f5f8fc;
+        font-size: 15px;
+        font-weight: 900;
+      }
+      .library-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+      .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 18px 0; }
+      .controls .wide { grid-column: 1 / -1; }
+      .zoom-control {
+        position: absolute;
+        z-index: 10;
+        top: 14px;
+        right: 14px;
+        left: 14px;
+        padding: 14px;
+        border-radius: 12px;
+        background: #07111fe8;
+        box-shadow: 0 8px 24px #0008;
+        backdrop-filter: blur(8px);
+      }
+      .zoom-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+        color: #c9d5e3;
+        font-size: 13px;
+        font-weight: 900;
+      }
+      #avatar-zoom { width: 100%; accent-color: #20d6ce; cursor: pointer; }
+      .zoom-slider-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) 42px; align-items: center; gap: 10px; }
+      .zoom-step { min-height: 38px; padding: 4px; font-size: 24px; line-height: 1; }
+      .zoom-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+      .zoom-actions button { min-height: 38px; }
+      .timeline { margin: 0 0 18px; padding: 14px; border-radius: 12px; background: #111e2e; }
+      .timeline-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #c9d5e3; font-size: 13px; font-weight: 900; }
+      #seek { width: 100%; accent-color: #20d6ce; cursor: pointer; }
+      .seek-row { display: grid; grid-template-columns: minmax(0, 1fr) 1.3fr; gap: 8px; margin-top: 10px; }
+      .seek-row input {
+        min-width: 0;
+        border: 1px solid #456079;
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #07111f;
+        color: #f5f8fc;
+        font-size: 16px;
+        font-weight: 900;
+      }
+      button, select {
+        min-height: 44px;
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #26384e;
+        color: #f5f8fc;
+        font-weight: 900;
+        cursor: pointer;
+      }
+      button.primary { background: #20d6ce; color: #07111f; }
+      .diagnosis { display: grid; gap: 10px; }
+      .diagnosis div { padding: 13px; border-radius: 12px; background: #111e2e; color: #c9d5e3; line-height: 1.4; }
+      .diagnosis strong { color: #20d6ce; }
+      .truth { margin-top: 14px; color: #ffc857; font-size: 12px; line-height: 1.45; }
+      @media (max-width: 1200px) {
+        body { grid-template-columns: minmax(300px, 880px); }
+        .visual-comparison { justify-content: center; }
+      }
+      @media (max-width: 800px) {
+        body { grid-template-columns: minmax(300px, 430px); padding: 12px; }
+        .visual-comparison.has-source-video { grid-template-columns: minmax(300px, 430px); }
+        .phone { height: 68vh; min-height: 500px; }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="visual-comparison" id="visual-comparison" aria-label="Comparación visual de la seña">
+      <main class="phone" aria-label="Vista móvil de VOZUAL">
+        <div id="avatar"></div>
+        <section class="zoom-control" aria-label="Tamaño del personaje">
+          <div class="zoom-heading">
+            <span>ZOOM DEL PERSONAJE</span>
+            <output id="avatar-zoom-value" for="avatar-zoom">100%</output>
+          </div>
+          <div class="zoom-slider-row">
+            <button class="zoom-step" id="zoom-out" type="button" aria-label="Alejar personaje">−</button>
+            <input id="avatar-zoom" type="range" min="55" max="130" step="5" value="100" aria-label="Zoom del personaje" />
+            <button class="zoom-step" id="zoom-in" type="button" aria-label="Acercar personaje">+</button>
+          </div>
+          <div class="zoom-actions">
+            <button id="show-full-avatar" type="button">VER PERSONAJE COMPLETO</button>
+          </div>
+        </section>
+      </main>
+      <section class="phone source-video-panel" id="source-video-panel" aria-label="Video real de la seña" hidden>
+        <div class="visual-label">VIDEO REAL · TOMA ORIGINAL</div>
+        <video id="source-video" muted playsinline preload="metadata"></video>
+      </section>
+    </section>
+    <aside class="copy">
+      <div class="eyebrow">SIMULACIÓN FIEL DE LA APP</div>
+      <h1 id="title">Preparando seña…</h1>
+      <div id="status">Cargando exactamente el archivo, el personaje y el algoritmo usados por Android.</div>
+      <section class="library" aria-label="Buscar en la biblioteca de señas">
+        <div class="library-heading">
+          <span>BUSCAR O CAMBIAR SEÑA</span>
+          <span id="library-count">CARGANDO…</span>
+        </div>
+        <div class="search-row">
+          <input id="sign-search" type="search" list="sign-options" autocomplete="off" placeholder="Escribe una palabra" aria-label="Nombre de la seña" />
+          <datalist id="sign-options"></datalist>
+          <button class="primary" id="show-sign" type="button">VER SEÑA</button>
+        </div>
+        <div class="library-nav">
+          <button id="previous-sign" type="button">← ANTERIOR</button>
+          <button id="next-sign" type="button">SIGUIENTE →</button>
+        </div>
+      </section>
+      <div class="controls">
+        <button class="primary" id="replay" type="button">REPRODUCIR OTRA VEZ</button>
+        <button id="pause" type="button">PAUSAR</button>
+        <select id="mode" aria-label="Modo de avatar">
+          <option value="rigged">PERSONAJE</option>
+          <option value="hybrid">PERSONAJE + ESQUELETO</option>
+          <option value="points">PUNTOS</option>
+        </select>
+        <select id="speed" aria-label="Velocidad">
+          <option value="1">VELOCIDAD 1×</option>
+          <option value="2">VELOCIDAD 2×</option>
+          <option value="3">VELOCIDAD 3×</option>
+          <option value="4">VELOCIDAD 4×</option>
+        </select>
+        <button class="wide" id="toggle-skeleton" type="button" aria-pressed="true">OCULTAR PUNTOS Y ESQUELETO</button>
+        <button class="wide" id="idle" type="button">VOLVER A REPOSO</button>
+      </div>
+      <section class="timeline" aria-label="Control de tiempo exacto">
+        <div class="timeline-heading">
+          <span>TIEMPO EXACTO</span>
+          <span id="time-label">0 ms / 0 ms</span>
+        </div>
+        <input id="seek" type="range" min="0" max="1" step="1" value="0" aria-label="Posición en milisegundos" />
+        <div class="seek-row">
+          <input id="milliseconds" type="number" min="0" step="1" value="0" inputmode="numeric" aria-label="Milisegundo exacto" />
+          <button id="go-to-time" type="button">IR AL MILISEGUNDO</button>
+        </div>
+      </section>
+      <section class="diagnosis">
+        <div><strong>PERSONAJE + ESQUELETO:</strong> superpone en cian y blanco la captura original para comparar cada articulación con el avatar.</div>
+        <div><strong>Si PUNTOS se ve mal:</strong> la captura perdió manos, brazos o trayectoria. Vuelve a grabar.</div>
+        <div><strong>Si PUNTOS se ve bien y PERSONAJE se ve mal:</strong> no vuelvas a grabar; hay que corregir el perfil o el retargeting del avatar.</div>
+      </section>
+      <p class="truth">Esta vista no usa Blender. Carga el movimiento compacto, el GLB, los perfiles y el runtime que entrarán en la próxima compilación móvil.</p>
+    </aside>
+    <script>
+      const parameters = new URLSearchParams(window.location.search);
+      let gloss = (parameters.get('gloss') || '').trim().toUpperCase();
+      const status = document.getElementById('status');
+      const mode = document.getElementById('mode');
+      const toggleSkeleton = document.getElementById('toggle-skeleton');
+      const speed = document.getElementById('speed');
+      const avatarZoom = document.getElementById('avatar-zoom');
+      const avatarZoomValue = document.getElementById('avatar-zoom-value');
+      const pause = document.getElementById('pause');
+      const seek = document.getElementById('seek');
+      const milliseconds = document.getElementById('milliseconds');
+      const timeLabel = document.getElementById('time-label');
+      const signSearch = document.getElementById('sign-search');
+      const signOptions = document.getElementById('sign-options');
+      const libraryCount = document.getElementById('library-count');
+      const visualComparison = document.getElementById('visual-comparison');
+      const sourceVideoPanel = document.getElementById('source-video-panel');
+      const sourceVideo = document.getElementById('source-video');
+      let playbackId = 1000;
+      let paused = false;
+      let editingTime = false;
+      let availableGlosses = [];
+      let recordingUrls = {};
+
+      const recordingsReady = fetch('./recordings.json')
+        .then(response => response.ok ? response.json() : {})
+        .then(recordings => { recordingUrls = recordings || {}; })
+        .catch(() => { recordingUrls = {}; });
+
+      const requestedZoom = Number(parameters.get('zoom'));
+      avatarZoom.value = String(parameters.has('zoom') && Number.isFinite(requestedZoom)
+        ? Math.min(130, Math.max(55, requestedZoom))
+        : 100);
+      const requestedMode = parameters.get('mode');
+      if (requestedMode === 'rigged' || requestedMode === 'hybrid' || requestedMode === 'points') {
+        mode.value = requestedMode;
+      }
+
+      function persistRenderMode() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('mode', mode.value);
+        window.history.replaceState({}, '', url);
+      }
+
+      function updateSkeletonToggle() {
+        const skeletonVisible = mode.value !== 'rigged';
+        toggleSkeleton.textContent = skeletonVisible
+          ? 'OCULTAR PUNTOS Y ESQUELETO'
+          : 'MOSTRAR PUNTOS Y ESQUELETO';
+        toggleSkeleton.setAttribute('aria-pressed', String(skeletonVisible));
+      }
+
+      updateSkeletonToggle();
+
+      function applyAvatarZoom() {
+        const percentage = Number(avatarZoom.value);
+        avatarZoomValue.value = `${percentage}%`;
+        window.setVozualAvatarZoom?.(percentage / 100);
+        const url = new URL(window.location.href);
+        url.searchParams.set('zoom', String(percentage));
+        window.history.replaceState({}, '', url);
+      }
+
+      function changeAvatarZoom(delta) {
+        const nextZoom = Math.min(
+          Number(avatarZoom.max),
+          Math.max(Number(avatarZoom.min), Number(avatarZoom.value) + delta),
+        );
+        avatarZoom.value = String(nextZoom);
+        applyAvatarZoom();
+      }
+
+      document.getElementById('title').textContent = gloss || 'Seña sin nombre';
+      signSearch.value = gloss;
+
+      function folded(value) {
+        return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim()
+          .toUpperCase();
+      }
+
+      function matchingGloss(query) {
+        const target = folded(query);
+        if (!target) return undefined;
+        return availableGlosses.find(value => folded(value) === target)
+          || availableGlosses.find(value => folded(value).startsWith(target))
+          || availableGlosses.find(value => folded(value).includes(target));
+      }
+
+      function selectSourceVideoForGloss() {
+        const recordingUrl = recordingUrls[gloss];
+        if (!recordingUrl) {
+          sourceVideo.pause();
+          sourceVideo.removeAttribute('src');
+          sourceVideo.load();
+          sourceVideoPanel.hidden = true;
+          visualComparison.classList.remove('has-source-video');
+          return false;
+        }
+        const resolvedUrl = new URL(recordingUrl, window.location.href).href;
+        if (sourceVideo.src !== resolvedUrl) {
+          sourceVideo.src = resolvedUrl;
+          sourceVideo.load();
+        }
+        sourceVideoPanel.hidden = false;
+        visualComparison.classList.add('has-source-video');
+        return true;
+      }
+
+      function replaySourceVideo() {
+        if (!selectSourceVideoForGloss()) return;
+        sourceVideo.playbackRate = Number(speed.value);
+        sourceVideo.currentTime = 0;
+        sourceVideo.play().catch(() => undefined);
+      }
+
+      function selectGloss(nextGloss) {
+        const selected = matchingGloss(nextGloss);
+        if (!selected) {
+          status.textContent = `NO SE ENCONTRÓ “${String(nextGloss || '').trim()}” EN ESTA BIBLIOTECA.`;
+          return;
+        }
+        gloss = selected;
+        signSearch.value = gloss;
+        document.getElementById('title').textContent = gloss;
+        const url = new URL(window.location.href);
+        url.searchParams.set('gloss', gloss);
+        window.history.replaceState({}, '', url);
+        selectSourceVideoForGloss();
+        replay();
+      }
+
+      function selectRelativeGloss(offset) {
+        if (availableGlosses.length === 0) return;
+        const currentIndex = Math.max(0, availableGlosses.indexOf(gloss));
+        const nextIndex = (currentIndex + offset + availableGlosses.length) % availableGlosses.length;
+        selectGloss(availableGlosses[nextIndex]);
+      }
+
+      function renderModeLabel() {
+        if (mode.value === 'points') return 'PUNTOS';
+        if (mode.value === 'hybrid') return 'PERSONAJE + ESQUELETO';
+        return 'PERSONAJE';
+      }
+
+      function populateLibrary(clips) {
+        availableGlosses = clips
+          .map(value => String(value).trim().toUpperCase())
+          .filter(value => value && value !== 'IDLE');
+        signOptions.replaceChildren(...availableGlosses.map(value => {
+          const option = document.createElement('option');
+          option.value = value;
+          return option;
+        }));
+        libraryCount.textContent = `${availableGlosses.length} SEÑAS`;
+        const selected = matchingGloss(gloss) || availableGlosses[0];
+        if (selected) {
+          gloss = selected;
+          signSearch.value = gloss;
+          document.getElementById('title').textContent = gloss;
+        }
+      }
+
+      function replay() {
+        if (!gloss || typeof window.playVozualClip !== 'function') return;
+        paused = false;
+        window.setVozualPlaybackPaused?.(false);
+        pause.textContent = 'PAUSAR';
+        playbackId += 1;
+        window.setVozualRenderMode(mode.value);
+        window.playVozualClip(gloss, playbackId, Number(speed.value), false);
+        replaySourceVideo();
+        status.textContent = `REPRODUCIENDO ${gloss} · ${renderModeLabel()} · ${speed.value}×`;
+      }
+
+      function seekTo(positionMs) {
+        const state = window.seekVozualPlayback?.(Number(positionMs));
+        if (!state?.active) return;
+        paused = true;
+        pause.textContent = 'CONTINUAR';
+        const exactMs = Math.round(state.positionMs);
+        seek.value = String(exactMs);
+        milliseconds.value = String(exactMs);
+        if (!sourceVideoPanel.hidden) {
+          sourceVideo.pause();
+          sourceVideo.currentTime = Math.min(
+            Number.isFinite(sourceVideo.duration) ? sourceVideo.duration : exactMs / 1000,
+            exactMs / 1000,
+          );
+        }
+        status.textContent = `${gloss} pausada exactamente en ${exactMs} ms · cuadro ${state.frameIndex}.`;
+      }
+
+      function updateTimeline() {
+        const state = window.getVozualPlaybackState?.();
+        if (state?.active) {
+          const positionMs = Math.round(state.positionMs);
+          const durationMs = Math.max(1, Math.round(state.durationMs));
+          seek.max = String(durationMs);
+          milliseconds.max = String(durationMs);
+          if (!editingTime) {
+            seek.value = String(positionMs);
+            milliseconds.value = String(positionMs);
+          }
+          timeLabel.textContent = `${positionMs} ms / ${durationMs} ms`;
+        }
+        requestAnimationFrame(updateTimeline);
+      }
+
+      window.ReactNativeWebView = {
+        postMessage(rawMessage) {
+          let message;
+          try { message = JSON.parse(rawMessage); } catch { return; }
+          if (message.type === 'ready') {
+            populateLibrary(Array.isArray(message.clips) ? message.clips : []);
+            recordingsReady.then(() => {
+              selectSourceVideoForGloss();
+              applyAvatarZoom();
+              replay();
+            });
+          }
+          if (message.type === 'ended' && message.playbackId === playbackId) {
+            status.textContent = `${gloss} terminó. Cambia entre PUNTOS, PERSONAJE o la superposición y reprodúcela otra vez.`;
+          }
+          if (message.type === 'error') status.textContent = `ERROR: ${message.message || 'No se pudo cargar la seña.'}`;
+        },
+      };
+
+      document.getElementById('show-sign').addEventListener('click', () => selectGloss(signSearch.value));
+      document.getElementById('previous-sign').addEventListener('click', () => selectRelativeGloss(-1));
+      document.getElementById('next-sign').addEventListener('click', () => selectRelativeGloss(1));
+      signSearch.addEventListener('keydown', event => {
+        if (event.key === 'Enter') selectGloss(signSearch.value);
+      });
+      document.getElementById('replay').addEventListener('click', replay);
+      avatarZoom.addEventListener('input', applyAvatarZoom);
+      document.getElementById('zoom-out').addEventListener('click', () => changeAvatarZoom(-5));
+      document.getElementById('zoom-in').addEventListener('click', () => changeAvatarZoom(5));
+      document.getElementById('show-full-avatar').addEventListener('click', () => {
+        avatarZoom.value = '65';
+        applyAvatarZoom();
+      });
+      pause.addEventListener('click', () => {
+        paused = window.setVozualPlaybackPaused?.(!paused) ?? false;
+        if (!sourceVideoPanel.hidden) {
+          if (paused) sourceVideo.pause();
+          else sourceVideo.play().catch(() => undefined);
+        }
+        pause.textContent = paused ? 'CONTINUAR' : 'PAUSAR';
+        status.textContent = paused
+          ? `${gloss} está pausada en el cuadro actual.`
+          : `CONTINUANDO ${gloss} · ${renderModeLabel()} · ${speed.value}×`;
+      });
+      seek.addEventListener('pointerdown', () => { editingTime = true; });
+      seek.addEventListener('input', () => {
+        milliseconds.value = seek.value;
+        seekTo(seek.value);
+      });
+      seek.addEventListener('pointerup', () => { editingTime = false; });
+      milliseconds.addEventListener('focus', () => { editingTime = true; });
+      milliseconds.addEventListener('blur', () => { editingTime = false; });
+      milliseconds.addEventListener('keydown', event => {
+        if (event.key === 'Enter') seekTo(milliseconds.value);
+      });
+      document.getElementById('go-to-time').addEventListener('click', () => seekTo(milliseconds.value));
+      toggleSkeleton.addEventListener('click', () => {
+        mode.value = mode.value === 'rigged' ? 'hybrid' : 'rigged';
+        persistRenderMode();
+        updateSkeletonToggle();
+        window.setVozualRenderMode?.(mode.value);
+        status.textContent = mode.value === 'rigged'
+          ? `${gloss} · PERSONAJE SIN PUNTOS. La reproducción conserva el mismo instante.`
+          : `${gloss} · PERSONAJE + ESQUELETO. La reproducción conserva el mismo instante.`;
+      });
+      document.getElementById('idle').addEventListener('click', () => {
+        paused = false;
+        window.setVozualPlaybackPaused?.(false);
+        sourceVideo.pause();
+        if (sourceVideo.currentSrc) sourceVideo.currentTime = 0;
+        pause.textContent = 'PAUSAR';
+        window.playVozualClip?.('IDLE', ++playbackId, 1, false);
+        status.textContent = 'PERSONAJE EN REPOSO.';
+      });
+      mode.addEventListener('change', () => {
+        persistRenderMode();
+        updateSkeletonToggle();
+        replay();
+      });
+      speed.addEventListener('change', replay);
+      sourceVideo.addEventListener('error', () => {
+        sourceVideoPanel.hidden = true;
+        visualComparison.classList.remove('has-source-video');
+      });
+      requestAnimationFrame(updateTimeline);
+    </script>
+    <script>
+      const runtimeScript = document.createElement('script');
+      runtimeScript.src = `./runtime.js?preview-build=${Date.now()}`;
+      document.body.appendChild(runtimeScript);
+    </script>
+  </body>
+</html>

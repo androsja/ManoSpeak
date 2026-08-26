@@ -1,0 +1,5032 @@
+{
+  "version": 1,
+  "language": "LSC",
+  "grammar": {
+    "subjectMarkers": {
+      "first_singular": "YO",
+      "second_singular": "TÚ",
+      "third_singular": "EL",
+      "first_plural": "NOSOTROS",
+      "second_plural": "USTEDES",
+      "third_plural": "ELLOS"
+    },
+    "spanishVerbForms": {
+      "hago": "first_singular",
+      "haces": "second_singular",
+      "hace": "third_singular",
+      "hacemos": "first_plural",
+      "hacen": "third_plural",
+      "voy": "first_singular",
+      "vas": "second_singular",
+      "va": "third_singular",
+      "vamos": "first_plural",
+      "van": "third_plural",
+      "necesito": "first_singular",
+      "necesitas": "second_singular",
+      "necesita": "third_singular",
+      "necesitamos": "first_plural",
+      "necesitan": "third_plural",
+      "requiero": "first_singular",
+      "requiere": "third_singular",
+      "como": "first_singular",
+      "comes": "second_singular",
+      "come": "third_singular",
+      "comemos": "first_plural",
+      "comen": "third_plural",
+      "alimentas": "second_singular",
+      "alimenta": "third_singular",
+      "alimentamos": "first_plural",
+      "alimentan": "third_plural",
+      "quiero": "first_singular",
+      "quieres": "second_singular",
+      "quiere": "third_singular",
+      "queremos": "first_plural",
+      "quieren": "third_plural",
+      "sé": "first_singular",
+      "sabes": "second_singular",
+      "sabe": "third_singular",
+      "sabemos": "first_plural",
+      "saben": "third_plural",
+      "tengo": "first_singular",
+      "tienes": "second_singular",
+      "tiene": "third_singular",
+      "tenemos": "first_plural",
+      "tienen": "third_plural",
+      "vengo": "first_singular",
+      "vienes": "second_singular",
+      "viene": "third_singular",
+      "venimos": "first_plural",
+      "vienen": "third_plural",
+      "veo": "first_singular",
+      "ves": "second_singular",
+      "ve": "third_singular",
+      "vemos": "first_plural",
+      "ven": "third_plural"
+    },
+    "temporalMarkers": {
+      "ayer": "AYER",
+      "hoy": "HOY",
+      "mañana": "MAÑANA"
+    }
+  },
+  "entries": [
+    {
+      "id": "adios",
+      "gloss": "ADIÓS",
+      "categories": [
+        "saludos_cortesia"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [
+          "adiós"
+        ],
+        "synonyms": [
+          "chao",
+          "hasta luego"
+        ],
+        "forms": [
+          {
+            "text": "adiós"
+          },
+          {
+            "text": "chao"
+          },
+          {
+            "text": "hasta luego"
+          },
+          {
+            "text": "adios"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "ADIÓS",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "buenas_noches",
+      "gloss": "BUENAS NOCHES",
+      "categories": [
+        "saludos_cortesia"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [
+          "buenas noches"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "buenas noches"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "BUENAS NOCHES",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "buenas_tardes",
+      "gloss": "BUENAS TARDES",
+      "categories": [
+        "saludos_cortesia"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [
+          "buenas tardes"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "buenas tardes"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "BUENAS TARDES",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "buenos_dias",
+      "gloss": "BUENOS DÍAS",
+      "categories": [
+        "saludos_cortesia"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [
+          "buenos días"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "buenos días"
+          },
+          {
+            "text": "buenos dias"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "BUENOS DÍAS",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "gracias",
+      "gloss": "GRACIAS",
+      "categories": [
+        "saludos_cortesia"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [
+          "gracias"
+        ],
+        "synonyms": [
+          "te agradezco"
+        ],
+        "forms": [
+          {
+            "text": "gracias"
+          },
+          {
+            "text": "te agradezco"
+          },
+          {
+            "text": "muchas gracias"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "GRACIAS",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "hola",
+      "gloss": "HOLA",
+      "categories": [
+        "saludos_cortesia"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [
+          "hola"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "hola"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "HOLA",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "perdon",
+      "gloss": "PERDÓN",
+      "categories": [
+        "saludos_cortesia"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [
+          "perdón"
+        ],
+        "synonyms": [
+          "disculpa",
+          "disculpe"
+        ],
+        "forms": [
+          {
+            "text": "perdón"
+          },
+          {
+            "text": "disculpa"
+          },
+          {
+            "text": "disculpe"
+          },
+          {
+            "text": "perdon"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "PERDÓN",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "por_favor",
+      "gloss": "POR FAVOR",
+      "categories": [
+        "saludos_cortesia"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [
+          "por favor"
+        ],
+        "synonyms": [
+          "porfa"
+        ],
+        "forms": [
+          {
+            "text": "por favor"
+          },
+          {
+            "text": "porfa"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "POR FAVOR",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "yo",
+      "gloss": "YO",
+      "categories": [
+        "personas_pronombres"
+      ],
+      "lexicalClass": "pronoun",
+      "spanish": {
+        "lemmas": [
+          "yo"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "yo"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "YO",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "tu",
+      "gloss": "TÚ",
+      "categories": [
+        "personas_pronombres"
+      ],
+      "lexicalClass": "pronoun",
+      "spanish": {
+        "lemmas": [
+          "tú"
+        ],
+        "synonyms": [
+          "usted"
+        ],
+        "forms": [
+          {
+            "text": "tú"
+          },
+          {
+            "text": "usted"
+          },
+          {
+            "text": "tu"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "TÚ",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "mama",
+      "gloss": "MAMA",
+      "categories": [
+        "personas_familia"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [
+          "mamá"
+        ],
+        "synonyms": [
+          "mama",
+          "madre"
+        ],
+        "forms": [
+          {
+            "text": "mamá"
+          },
+          {
+            "text": "mama"
+          },
+          {
+            "text": "madre"
+          },
+          {
+            "text": "madres"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "MAMA",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "papa",
+      "gloss": "PAPA",
+      "categories": [
+        "personas_familia"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [
+          "papá"
+        ],
+        "synonyms": [
+          "papa",
+          "padre"
+        ],
+        "forms": [
+          {
+            "text": "papá"
+          },
+          {
+            "text": "papa"
+          },
+          {
+            "text": "padre"
+          },
+          {
+            "text": "padres"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "PAPA",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "no",
+      "gloss": "NO",
+      "categories": [
+        "gramatica"
+      ],
+      "lexicalClass": "negation",
+      "spanish": {
+        "lemmas": [
+          "no"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "no"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "NO",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "que",
+      "gloss": "QUÉ",
+      "categories": [
+        "preguntas"
+      ],
+      "lexicalClass": "question",
+      "spanish": {
+        "lemmas": [
+          "qué"
+        ],
+        "synonyms": [
+          "que"
+        ],
+        "forms": [
+          {
+            "text": "qué"
+          },
+          {
+            "text": "que"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "QUÉ",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "si",
+      "gloss": "SÍ",
+      "categories": [
+        "respuestas"
+      ],
+      "lexicalClass": "affirmation",
+      "spanish": {
+        "lemmas": [
+          "sí"
+        ],
+        "synonyms": [
+          "si"
+        ],
+        "forms": [
+          {
+            "text": "sí"
+          },
+          {
+            "text": "si"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "SÍ",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "caballo",
+      "gloss": "CABALLO",
+      "categories": [
+        "animales"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [
+          "caballo"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "caballo"
+          },
+          {
+            "text": "caballos"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "CABALLO",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "gato",
+      "gloss": "GATO",
+      "categories": [
+        "animales"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [
+          "gato"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "gato"
+          },
+          {
+            "text": "gata"
+          },
+          {
+            "text": "gatos"
+          },
+          {
+            "text": "gatas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "GATO",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "perro",
+      "gloss": "PERRO",
+      "categories": [
+        "animales"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [
+          "perro"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "perro"
+          },
+          {
+            "text": "perra"
+          },
+          {
+            "text": "perros"
+          },
+          {
+            "text": "perras"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "PERRO",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "pez",
+      "gloss": "PEZ",
+      "categories": [
+        "animales"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [
+          "pez"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "pez"
+          },
+          {
+            "text": "peces"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "PEZ",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "pajaro",
+      "gloss": "PÁJARO",
+      "categories": [
+        "animales"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [
+          "pájaro"
+        ],
+        "synonyms": [
+          "ave"
+        ],
+        "forms": [
+          {
+            "text": "pájaro"
+          },
+          {
+            "text": "ave"
+          },
+          {
+            "text": "pájaros"
+          },
+          {
+            "text": "aves"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "PÁJARO",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "vaca",
+      "gloss": "VACA",
+      "categories": [
+        "animales"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [
+          "vaca"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "vaca"
+          },
+          {
+            "text": "vacas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "VACA",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "feliz",
+      "gloss": "FELIZ",
+      "categories": [
+        "emociones"
+      ],
+      "lexicalClass": "adjective",
+      "spanish": {
+        "lemmas": [
+          "feliz"
+        ],
+        "synonyms": [
+          "contento",
+          "contenta"
+        ],
+        "forms": [
+          {
+            "text": "feliz"
+          },
+          {
+            "text": "contento"
+          },
+          {
+            "text": "contenta"
+          },
+          {
+            "text": "felices"
+          },
+          {
+            "text": "contentos"
+          },
+          {
+            "text": "contentas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "FELIZ",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "hacer",
+      "gloss": "HACER",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [
+          "hacer"
+        ],
+        "synonyms": [
+          "realizar"
+        ],
+        "forms": [
+          {
+            "text": "hacer"
+          },
+          {
+            "text": "realizar"
+          },
+          {
+            "text": "hago"
+          },
+          {
+            "text": "haces"
+          },
+          {
+            "text": "hace"
+          },
+          {
+            "text": "hacemos"
+          },
+          {
+            "text": "hacen"
+          },
+          {
+            "text": "hice"
+          },
+          {
+            "text": "haré"
+          },
+          {
+            "text": "hacéis"
+          },
+          {
+            "text": "hiciste"
+          },
+          {
+            "text": "hizo"
+          },
+          {
+            "text": "hicimos"
+          },
+          {
+            "text": "hicisteis"
+          },
+          {
+            "text": "hicieron"
+          },
+          {
+            "text": "hacía"
+          },
+          {
+            "text": "hacías"
+          },
+          {
+            "text": "hacíamos"
+          },
+          {
+            "text": "hacíais"
+          },
+          {
+            "text": "hacían"
+          },
+          {
+            "text": "harás"
+          },
+          {
+            "text": "hará"
+          },
+          {
+            "text": "haremos"
+          },
+          {
+            "text": "haréis"
+          },
+          {
+            "text": "harán"
+          },
+          {
+            "text": "haría"
+          },
+          {
+            "text": "harías"
+          },
+          {
+            "text": "haríamos"
+          },
+          {
+            "text": "haríais"
+          },
+          {
+            "text": "harían"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "HACER",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "ir",
+      "gloss": "IR",
+      "categories": [
+        "verbos_movimiento"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [
+          "ir"
+        ],
+        "synonyms": [
+          "dirigirse"
+        ],
+        "forms": [
+          {
+            "text": "ir"
+          },
+          {
+            "text": "dirigirse"
+          },
+          {
+            "text": "voy"
+          },
+          {
+            "text": "vas"
+          },
+          {
+            "text": "va"
+          },
+          {
+            "text": "vamos"
+          },
+          {
+            "text": "van"
+          },
+          {
+            "text": "fui"
+          },
+          {
+            "text": "iremos"
+          },
+          {
+            "text": "vais"
+          },
+          {
+            "text": "fuiste"
+          },
+          {
+            "text": "fue"
+          },
+          {
+            "text": "fuimos"
+          },
+          {
+            "text": "fuisteis"
+          },
+          {
+            "text": "fueron"
+          },
+          {
+            "text": "iba"
+          },
+          {
+            "text": "ibas"
+          },
+          {
+            "text": "íbamos"
+          },
+          {
+            "text": "ibais"
+          },
+          {
+            "text": "iban"
+          },
+          {
+            "text": "iré"
+          },
+          {
+            "text": "irás"
+          },
+          {
+            "text": "irá"
+          },
+          {
+            "text": "iréis"
+          },
+          {
+            "text": "irán"
+          },
+          {
+            "text": "iría"
+          },
+          {
+            "text": "irías"
+          },
+          {
+            "text": "iríamos"
+          },
+          {
+            "text": "iríais"
+          },
+          {
+            "text": "irían"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "directional_review_required",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "IR",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "necesitar",
+      "gloss": "NECESITAR",
+      "categories": [
+        "necesidades",
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [
+          "necesitar"
+        ],
+        "synonyms": [
+          "requerir"
+        ],
+        "forms": [
+          {
+            "text": "necesitar"
+          },
+          {
+            "text": "requerir"
+          },
+          {
+            "text": "necesito"
+          },
+          {
+            "text": "necesitas"
+          },
+          {
+            "text": "necesita"
+          },
+          {
+            "text": "necesitamos"
+          },
+          {
+            "text": "necesitáis"
+          },
+          {
+            "text": "necesitan"
+          },
+          {
+            "text": "necesité"
+          },
+          {
+            "text": "necesitaba"
+          },
+          {
+            "text": "necesitaré"
+          },
+          {
+            "text": "requiero"
+          },
+          {
+            "text": "requiere"
+          },
+          {
+            "text": "necesitaste"
+          },
+          {
+            "text": "necesitó"
+          },
+          {
+            "text": "necesitasteis"
+          },
+          {
+            "text": "necesitaron"
+          },
+          {
+            "text": "necesitabas"
+          },
+          {
+            "text": "necesitábamos"
+          },
+          {
+            "text": "necesitabais"
+          },
+          {
+            "text": "necesitaban"
+          },
+          {
+            "text": "necesitarás"
+          },
+          {
+            "text": "necesitará"
+          },
+          {
+            "text": "necesitaremos"
+          },
+          {
+            "text": "necesitaréis"
+          },
+          {
+            "text": "necesitarán"
+          },
+          {
+            "text": "necesitaría"
+          },
+          {
+            "text": "necesitarías"
+          },
+          {
+            "text": "necesitaríamos"
+          },
+          {
+            "text": "necesitaríais"
+          },
+          {
+            "text": "necesitarían"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "NECESITAR",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "querer",
+      "gloss": "QUERER",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [
+          "querer"
+        ],
+        "synonyms": [
+          "desear"
+        ],
+        "forms": [
+          {
+            "text": "querer"
+          },
+          {
+            "text": "desear"
+          },
+          {
+            "text": "quiero"
+          },
+          {
+            "text": "quieres"
+          },
+          {
+            "text": "quiere"
+          },
+          {
+            "text": "queremos"
+          },
+          {
+            "text": "quieren"
+          },
+          {
+            "text": "quise"
+          },
+          {
+            "text": "quería"
+          },
+          {
+            "text": "querré"
+          },
+          {
+            "text": "queréis"
+          },
+          {
+            "text": "quisiste"
+          },
+          {
+            "text": "quiso"
+          },
+          {
+            "text": "quisimos"
+          },
+          {
+            "text": "quisisteis"
+          },
+          {
+            "text": "quisieron"
+          },
+          {
+            "text": "querías"
+          },
+          {
+            "text": "queríamos"
+          },
+          {
+            "text": "queríais"
+          },
+          {
+            "text": "querían"
+          },
+          {
+            "text": "querrás"
+          },
+          {
+            "text": "querrá"
+          },
+          {
+            "text": "querremos"
+          },
+          {
+            "text": "querréis"
+          },
+          {
+            "text": "querrán"
+          },
+          {
+            "text": "querría"
+          },
+          {
+            "text": "querrías"
+          },
+          {
+            "text": "querríamos"
+          },
+          {
+            "text": "querríais"
+          },
+          {
+            "text": "querrían"
+          },
+          {
+            "text": "deseo"
+          },
+          {
+            "text": "desea"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "QUERER",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "saber",
+      "gloss": "SABER",
+      "categories": [
+        "verbos_cognicion"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [
+          "saber"
+        ],
+        "synonyms": [
+          "conocer"
+        ],
+        "forms": [
+          {
+            "text": "saber"
+          },
+          {
+            "text": "conocer"
+          },
+          {
+            "text": "sé"
+          },
+          {
+            "text": "sabes"
+          },
+          {
+            "text": "sabe"
+          },
+          {
+            "text": "sabemos"
+          },
+          {
+            "text": "saben"
+          },
+          {
+            "text": "supe"
+          },
+          {
+            "text": "sabía"
+          },
+          {
+            "text": "sabré"
+          },
+          {
+            "text": "sabéis"
+          },
+          {
+            "text": "supiste"
+          },
+          {
+            "text": "supo"
+          },
+          {
+            "text": "supimos"
+          },
+          {
+            "text": "supisteis"
+          },
+          {
+            "text": "supieron"
+          },
+          {
+            "text": "sabías"
+          },
+          {
+            "text": "sabíamos"
+          },
+          {
+            "text": "sabíais"
+          },
+          {
+            "text": "sabían"
+          },
+          {
+            "text": "sabrás"
+          },
+          {
+            "text": "sabrá"
+          },
+          {
+            "text": "sabremos"
+          },
+          {
+            "text": "sabréis"
+          },
+          {
+            "text": "sabrán"
+          },
+          {
+            "text": "sabría"
+          },
+          {
+            "text": "sabrías"
+          },
+          {
+            "text": "sabríamos"
+          },
+          {
+            "text": "sabríais"
+          },
+          {
+            "text": "sabrían"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "SABER",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "tener",
+      "gloss": "TENER",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [
+          "tener"
+        ],
+        "synonyms": [
+          "poseer"
+        ],
+        "forms": [
+          {
+            "text": "tener"
+          },
+          {
+            "text": "poseer"
+          },
+          {
+            "text": "tengo"
+          },
+          {
+            "text": "tienes"
+          },
+          {
+            "text": "tiene"
+          },
+          {
+            "text": "tenemos"
+          },
+          {
+            "text": "tienen"
+          },
+          {
+            "text": "tuve"
+          },
+          {
+            "text": "tenía"
+          },
+          {
+            "text": "tendré"
+          },
+          {
+            "text": "tenéis"
+          },
+          {
+            "text": "tuviste"
+          },
+          {
+            "text": "tuvo"
+          },
+          {
+            "text": "tuvimos"
+          },
+          {
+            "text": "tuvisteis"
+          },
+          {
+            "text": "tuvieron"
+          },
+          {
+            "text": "tenías"
+          },
+          {
+            "text": "teníamos"
+          },
+          {
+            "text": "teníais"
+          },
+          {
+            "text": "tenían"
+          },
+          {
+            "text": "tendrás"
+          },
+          {
+            "text": "tendrá"
+          },
+          {
+            "text": "tendremos"
+          },
+          {
+            "text": "tendréis"
+          },
+          {
+            "text": "tendrán"
+          },
+          {
+            "text": "tendría"
+          },
+          {
+            "text": "tendrías"
+          },
+          {
+            "text": "tendríamos"
+          },
+          {
+            "text": "tendríais"
+          },
+          {
+            "text": "tendrían"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "TENER",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "venir",
+      "gloss": "VENIR",
+      "categories": [
+        "verbos_movimiento"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [
+          "venir"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "venir"
+          },
+          {
+            "text": "vengo"
+          },
+          {
+            "text": "vienes"
+          },
+          {
+            "text": "viene"
+          },
+          {
+            "text": "venimos"
+          },
+          {
+            "text": "vienen"
+          },
+          {
+            "text": "vine"
+          },
+          {
+            "text": "venía"
+          },
+          {
+            "text": "vendré"
+          },
+          {
+            "text": "venís"
+          },
+          {
+            "text": "viniste"
+          },
+          {
+            "text": "vino"
+          },
+          {
+            "text": "vinimos"
+          },
+          {
+            "text": "vinisteis"
+          },
+          {
+            "text": "vinieron"
+          },
+          {
+            "text": "venías"
+          },
+          {
+            "text": "veníamos"
+          },
+          {
+            "text": "veníais"
+          },
+          {
+            "text": "venían"
+          },
+          {
+            "text": "vendrás"
+          },
+          {
+            "text": "vendrá"
+          },
+          {
+            "text": "vendremos"
+          },
+          {
+            "text": "vendréis"
+          },
+          {
+            "text": "vendrán"
+          },
+          {
+            "text": "vendría"
+          },
+          {
+            "text": "vendrías"
+          },
+          {
+            "text": "vendríamos"
+          },
+          {
+            "text": "vendríais"
+          },
+          {
+            "text": "vendrían"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "directional_review_required",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "VENIR",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "ver",
+      "gloss": "VER",
+      "categories": [
+        "verbos_percepcion"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [
+          "ver"
+        ],
+        "synonyms": [
+          "mirar"
+        ],
+        "forms": [
+          {
+            "text": "ver"
+          },
+          {
+            "text": "mirar"
+          },
+          {
+            "text": "veo"
+          },
+          {
+            "text": "ves"
+          },
+          {
+            "text": "ve"
+          },
+          {
+            "text": "vemos"
+          },
+          {
+            "text": "ven"
+          },
+          {
+            "text": "vi"
+          },
+          {
+            "text": "veía"
+          },
+          {
+            "text": "veré"
+          },
+          {
+            "text": "veis"
+          },
+          {
+            "text": "viste"
+          },
+          {
+            "text": "vio"
+          },
+          {
+            "text": "vimos"
+          },
+          {
+            "text": "visteis"
+          },
+          {
+            "text": "vieron"
+          },
+          {
+            "text": "veías"
+          },
+          {
+            "text": "veíamos"
+          },
+          {
+            "text": "veíais"
+          },
+          {
+            "text": "veían"
+          },
+          {
+            "text": "verás"
+          },
+          {
+            "text": "verá"
+          },
+          {
+            "text": "veremos"
+          },
+          {
+            "text": "veréis"
+          },
+          {
+            "text": "verán"
+          },
+          {
+            "text": "vería"
+          },
+          {
+            "text": "verías"
+          },
+          {
+            "text": "veríamos"
+          },
+          {
+            "text": "veríais"
+          },
+          {
+            "text": "verían"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "VER",
+        "published": true
+      },
+      "review": {
+        "status": "legacy_approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "comer",
+      "gloss": "COMER",
+      "categories": [
+        "necesidades"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [
+          "comer"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "comer"
+          },
+          {
+            "text": "como"
+          },
+          {
+            "text": "comes"
+          },
+          {
+            "text": "come"
+          },
+          {
+            "text": "comemos"
+          },
+          {
+            "text": "coméis"
+          },
+          {
+            "text": "comen"
+          },
+          {
+            "text": "comí"
+          },
+          {
+            "text": "comiste"
+          },
+          {
+            "text": "comió"
+          },
+          {
+            "text": "comimos"
+          },
+          {
+            "text": "comisteis"
+          },
+          {
+            "text": "comieron"
+          },
+          {
+            "text": "comía"
+          },
+          {
+            "text": "comías"
+          },
+          {
+            "text": "comíamos"
+          },
+          {
+            "text": "comíais"
+          },
+          {
+            "text": "comían"
+          },
+          {
+            "text": "comeré"
+          },
+          {
+            "text": "comerás"
+          },
+          {
+            "text": "comerá"
+          },
+          {
+            "text": "comeremos"
+          },
+          {
+            "text": "comeréis"
+          },
+          {
+            "text": "comerán"
+          },
+          {
+            "text": "comería"
+          },
+          {
+            "text": "comerías"
+          },
+          {
+            "text": "comeríamos"
+          },
+          {
+            "text": "comeríais"
+          },
+          {
+            "text": "comerían"
+          },
+          {
+            "text": "comida"
+          },
+          {
+            "text": "alimento"
+          },
+          {
+            "text": "alimentar"
+          },
+          {
+            "text": "alimentas"
+          },
+          {
+            "text": "alimenta"
+          },
+          {
+            "text": "alimentamos"
+          },
+          {
+            "text": "alimentáis"
+          },
+          {
+            "text": "alimentan"
+          },
+          {
+            "text": "alimenté"
+          },
+          {
+            "text": "alimentaste"
+          },
+          {
+            "text": "alimentó"
+          },
+          {
+            "text": "alimentasteis"
+          },
+          {
+            "text": "alimentaron"
+          },
+          {
+            "text": "alimentaba"
+          },
+          {
+            "text": "alimentabas"
+          },
+          {
+            "text": "alimentábamos"
+          },
+          {
+            "text": "alimentabais"
+          },
+          {
+            "text": "alimentaban"
+          },
+          {
+            "text": "alimentaré"
+          },
+          {
+            "text": "alimentarás"
+          },
+          {
+            "text": "alimentará"
+          },
+          {
+            "text": "alimentaremos"
+          },
+          {
+            "text": "alimentaréis"
+          },
+          {
+            "text": "alimentarán"
+          },
+          {
+            "text": "alimentaría"
+          },
+          {
+            "text": "alimentarías"
+          },
+          {
+            "text": "alimentaríamos"
+          },
+          {
+            "text": "alimentaríais"
+          },
+          {
+            "text": "alimentarían"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "COMER",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "el",
+      "gloss": "ÉL",
+      "categories": [
+        "personas_pronombres"
+      ],
+      "lexicalClass": "pronoun",
+      "spanish": {
+        "lemmas": [
+          "él"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "él"
+          },
+          {
+            "text": "el"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "EL",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "mucho",
+      "gloss": "MUCHO",
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "adjective",
+      "spanish": {
+        "lemmas": [
+          "mucho"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "mucho"
+          },
+          {
+            "text": "mucha"
+          },
+          {
+            "text": "muchos"
+          },
+          {
+            "text": "muchas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "MUCHO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "médico",
+      "gloss": "MÉDICO",
+      "categories": [
+        "necesidades"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [
+          "médico",
+          "médica"
+        ],
+        "synonyms": [
+          "doctor",
+          "doctora"
+        ],
+        "forms": [
+          {
+            "text": "médico"
+          },
+          {
+            "text": "médica"
+          },
+          {
+            "text": "doctor"
+          },
+          {
+            "text": "doctora"
+          },
+          {
+            "text": "médicos"
+          },
+          {
+            "text": "médicas"
+          },
+          {
+            "text": "doctores"
+          },
+          {
+            "text": "doctoras"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "MÉDICO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "colores",
+      "gloss": "COLORES",
+      "categories": [
+        "colores"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "COLOR"
+          },
+          {
+            "text": "colores"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "COLORES",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "el",
+      "gloss": "EL",
+      "categories": [
+        "gramatica"
+      ],
+      "lexicalClass": "article",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "el"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "EL",
+        "published": false
+      },
+      "review": {
+        "status": "blocked",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "blanco",
+      "gloss": "BLANCO",
+      "categories": [
+        "colores"
+      ],
+      "lexicalClass": "adjective",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "blanco"
+          },
+          {
+            "text": "blanca"
+          },
+          {
+            "text": "blancos"
+          },
+          {
+            "text": "blancas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "BLANCO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "rojo",
+      "gloss": "ROJO",
+      "categories": [
+        "colores"
+      ],
+      "lexicalClass": "adjective",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "rojo"
+          },
+          {
+            "text": "roja"
+          },
+          {
+            "text": "rojos"
+          },
+          {
+            "text": "rojas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "ROJO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "ayer",
+      "gloss": "AYER",
+      "categories": [
+        "tiempo_lugares"
+      ],
+      "lexicalClass": "temporal_adverb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "ayer"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "AYER",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "cuándo",
+      "gloss": "CUÁNDO",
+      "categories": [
+        "preguntas_respuestas"
+      ],
+      "lexicalClass": "question",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "cuándo"
+          },
+          {
+            "text": "cuando"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "CUÁNDO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "cuánto",
+      "gloss": "CUÁNTO",
+      "categories": [
+        "preguntas_respuestas"
+      ],
+      "lexicalClass": "question",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "cuánto"
+          },
+          {
+            "text": "cuánta"
+          },
+          {
+            "text": "cuántos"
+          },
+          {
+            "text": "cuántas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "CUÁNTO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "ella",
+      "gloss": "ELLA",
+      "categories": [
+        "personas_familia"
+      ],
+      "lexicalClass": "pronoun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "ella"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "ELLA",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "gustar",
+      "gloss": "GUSTAR",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "gustar"
+          },
+          {
+            "text": "gusto"
+          },
+          {
+            "text": "gustas"
+          },
+          {
+            "text": "gusta"
+          },
+          {
+            "text": "gustamos"
+          },
+          {
+            "text": "gustáis"
+          },
+          {
+            "text": "gustan"
+          },
+          {
+            "text": "gusté"
+          },
+          {
+            "text": "gustaste"
+          },
+          {
+            "text": "gustó"
+          },
+          {
+            "text": "gustasteis"
+          },
+          {
+            "text": "gustaron"
+          },
+          {
+            "text": "gustaba"
+          },
+          {
+            "text": "gustabas"
+          },
+          {
+            "text": "gustábamos"
+          },
+          {
+            "text": "gustabais"
+          },
+          {
+            "text": "gustaban"
+          },
+          {
+            "text": "gustaré"
+          },
+          {
+            "text": "gustarás"
+          },
+          {
+            "text": "gustará"
+          },
+          {
+            "text": "gustaremos"
+          },
+          {
+            "text": "gustaréis"
+          },
+          {
+            "text": "gustarán"
+          },
+          {
+            "text": "gustaría"
+          },
+          {
+            "text": "gustarías"
+          },
+          {
+            "text": "gustaríamos"
+          },
+          {
+            "text": "gustaríais"
+          },
+          {
+            "text": "gustarían"
+          },
+          {
+            "text": "me gusta"
+          },
+          {
+            "text": "te gusta"
+          },
+          {
+            "text": "le gusta"
+          },
+          {
+            "text": "nos gusta"
+          },
+          {
+            "text": "les gusta"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "GUSTAR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "hoy",
+      "gloss": "HOY",
+      "categories": [
+        "tiempo_lugares"
+      ],
+      "lexicalClass": "temporal_adverb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "hoy"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "HOY",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "tres",
+      "gloss": "TRES",
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "tres"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "TRES",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "¿cómo_estás?",
+      "gloss": "¿CÓMO ESTÁS?",
+      "categories": [
+        "saludos_cortesia"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "¿cómo estás?"
+          },
+          {
+            "text": "cómo estás"
+          },
+          {
+            "text": "como estas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "¿CÓMO ESTÁS?",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "dinero",
+      "gloss": "DINERO",
+      "categories": [
+        "vida_diaria"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "dinero"
+          },
+          {
+            "text": "plata"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "DINERO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "no_entiendo",
+      "gloss": "NO ENTIENDO",
+      "categories": [
+        "necesidades"
+      ],
+      "lexicalClass": "fixed_expression",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "no entender"
+          },
+          {
+            "text": "no entiendo"
+          },
+          {
+            "text": "no entiendes"
+          },
+          {
+            "text": "no entiende"
+          },
+          {
+            "text": "no entendemos"
+          },
+          {
+            "text": "no entendéis"
+          },
+          {
+            "text": "no entienden"
+          },
+          {
+            "text": "no entendí"
+          },
+          {
+            "text": "no entendiste"
+          },
+          {
+            "text": "no entendió"
+          },
+          {
+            "text": "no entendimos"
+          },
+          {
+            "text": "no entendisteis"
+          },
+          {
+            "text": "no entendieron"
+          },
+          {
+            "text": "no entendía"
+          },
+          {
+            "text": "no entendías"
+          },
+          {
+            "text": "no entendíamos"
+          },
+          {
+            "text": "no entendíais"
+          },
+          {
+            "text": "no entendían"
+          },
+          {
+            "text": "no entenderé"
+          },
+          {
+            "text": "no entenderás"
+          },
+          {
+            "text": "no entenderá"
+          },
+          {
+            "text": "no entenderemos"
+          },
+          {
+            "text": "no entenderéis"
+          },
+          {
+            "text": "no entenderán"
+          },
+          {
+            "text": "no entendería"
+          },
+          {
+            "text": "no entenderías"
+          },
+          {
+            "text": "no entenderíamos"
+          },
+          {
+            "text": "no entenderíais"
+          },
+          {
+            "text": "no entenderían"
+          },
+          {
+            "text": "no comprender"
+          },
+          {
+            "text": "no comprendo"
+          },
+          {
+            "text": "no comprendes"
+          },
+          {
+            "text": "no comprende"
+          },
+          {
+            "text": "no comprendemos"
+          },
+          {
+            "text": "no comprendéis"
+          },
+          {
+            "text": "no comprenden"
+          },
+          {
+            "text": "no comprendí"
+          },
+          {
+            "text": "no comprendiste"
+          },
+          {
+            "text": "no comprendió"
+          },
+          {
+            "text": "no comprendimos"
+          },
+          {
+            "text": "no comprendisteis"
+          },
+          {
+            "text": "no comprendieron"
+          },
+          {
+            "text": "no comprendía"
+          },
+          {
+            "text": "no comprendías"
+          },
+          {
+            "text": "no comprendíamos"
+          },
+          {
+            "text": "no comprendíais"
+          },
+          {
+            "text": "no comprendían"
+          },
+          {
+            "text": "no comprenderé"
+          },
+          {
+            "text": "no comprenderás"
+          },
+          {
+            "text": "no comprenderá"
+          },
+          {
+            "text": "no comprenderemos"
+          },
+          {
+            "text": "no comprenderéis"
+          },
+          {
+            "text": "no comprenderán"
+          },
+          {
+            "text": "no comprendería"
+          },
+          {
+            "text": "no comprenderías"
+          },
+          {
+            "text": "no comprenderíamos"
+          },
+          {
+            "text": "no comprenderíais"
+          },
+          {
+            "text": "no comprenderían"
+          },
+          {
+            "text": "no lo entiendo"
+          },
+          {
+            "text": "no te entiendo"
+          },
+          {
+            "text": "no le entiendo"
+          },
+          {
+            "text": "no los entiendo"
+          },
+          {
+            "text": "no las entiendo"
+          },
+          {
+            "text": "no entiendo nada"
+          },
+          {
+            "text": "no entiendo bien"
+          },
+          {
+            "text": "no entendí nada"
+          },
+          {
+            "text": "no comprendí nada"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "NO ENTIENDO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "carne",
+      "gloss": "CARNE",
+      "categories": [
+        "alimentos_bebidas"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "carne"
+          },
+          {
+            "text": "carnes"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "CARNE",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "mañana",
+      "gloss": "MAÑANA",
+      "categories": [
+        "tiempo_lugares"
+      ],
+      "lexicalClass": "temporal_adverb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "mañana"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "MAÑANA",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "tranquilo",
+      "gloss": "TRANQUILO",
+      "categories": [
+        "emociones_cualidades"
+      ],
+      "lexicalClass": "adjective",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "tranquilo"
+          },
+          {
+            "text": "tranquila"
+          },
+          {
+            "text": "tranquilos"
+          },
+          {
+            "text": "tranquilas"
+          },
+          {
+            "text": "calmado"
+          },
+          {
+            "text": "calmada"
+          },
+          {
+            "text": "calmados"
+          },
+          {
+            "text": "calmadas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "TRANQUILO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "hambre",
+      "gloss": "HAMBRE",
+      "categories": [
+        "emociones_cualidades"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "hambre"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "HAMBRE",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "agua",
+      "gloss": "AGUA",
+      "categories": [
+        "necesidades"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "agua"
+          },
+          {
+            "text": "aguas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "AGUA",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "amigo",
+      "gloss": "AMIGO",
+      "categories": [
+        "personas_familia"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "amiga"
+          },
+          {
+            "text": "amigos"
+          },
+          {
+            "text": "amigas"
+          },
+          {
+            "text": "amigo"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "AMIGO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "baño",
+      "gloss": "BAÑO",
+      "categories": [
+        "necesidades"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "baño"
+          },
+          {
+            "text": "baños"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "BAÑO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "enojado",
+      "gloss": "ENOJADO",
+      "categories": [
+        "emociones_cualidades"
+      ],
+      "lexicalClass": "adjective",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "enojado"
+          },
+          {
+            "text": "enojada"
+          },
+          {
+            "text": "enojados"
+          },
+          {
+            "text": "enojadas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "ENOJADO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "esperar",
+      "gloss": "ESPERAR",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "espero"
+          },
+          {
+            "text": "esperas"
+          },
+          {
+            "text": "espera"
+          },
+          {
+            "text": "esperamos"
+          },
+          {
+            "text": "esperáis"
+          },
+          {
+            "text": "esperan"
+          },
+          {
+            "text": "esperé"
+          },
+          {
+            "text": "esperaste"
+          },
+          {
+            "text": "esperó"
+          },
+          {
+            "text": "esperasteis"
+          },
+          {
+            "text": "esperaron"
+          },
+          {
+            "text": "esperaba"
+          },
+          {
+            "text": "esperabas"
+          },
+          {
+            "text": "esperábamos"
+          },
+          {
+            "text": "esperabais"
+          },
+          {
+            "text": "esperaban"
+          },
+          {
+            "text": "esperaré"
+          },
+          {
+            "text": "esperarás"
+          },
+          {
+            "text": "esperará"
+          },
+          {
+            "text": "esperaremos"
+          },
+          {
+            "text": "esperaréis"
+          },
+          {
+            "text": "esperarán"
+          },
+          {
+            "text": "esperaría"
+          },
+          {
+            "text": "esperarías"
+          },
+          {
+            "text": "esperaríamos"
+          },
+          {
+            "text": "esperaríais"
+          },
+          {
+            "text": "esperarían"
+          },
+          {
+            "text": "esperar"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "ESPERAR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "hospital",
+      "gloss": "HOSPITAL",
+      "categories": [
+        "tiempo_lugares"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "hospital"
+          },
+          {
+            "text": "hospitales"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "HOSPITAL",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "niño",
+      "gloss": "NIÑO",
+      "categories": [
+        "personas_familia"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "niño"
+          },
+          {
+            "text": "niña"
+          },
+          {
+            "text": "niños"
+          },
+          {
+            "text": "niñas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "NIÑO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "nombre",
+      "gloss": "NOMBRE",
+      "categories": [
+        "conversacion_cotidiana"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "nombre"
+          },
+          {
+            "text": "nombres"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "NOMBRE",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "pensar",
+      "gloss": "PENSAR",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "pienso"
+          },
+          {
+            "text": "piensas"
+          },
+          {
+            "text": "piensa"
+          },
+          {
+            "text": "pensamos"
+          },
+          {
+            "text": "pensáis"
+          },
+          {
+            "text": "piensan"
+          },
+          {
+            "text": "pensé"
+          },
+          {
+            "text": "pensaste"
+          },
+          {
+            "text": "pensó"
+          },
+          {
+            "text": "pensasteis"
+          },
+          {
+            "text": "pensaron"
+          },
+          {
+            "text": "pensaba"
+          },
+          {
+            "text": "pensabas"
+          },
+          {
+            "text": "pensábamos"
+          },
+          {
+            "text": "pensabais"
+          },
+          {
+            "text": "pensaban"
+          },
+          {
+            "text": "pensaré"
+          },
+          {
+            "text": "pensarás"
+          },
+          {
+            "text": "pensará"
+          },
+          {
+            "text": "pensaremos"
+          },
+          {
+            "text": "pensaréis"
+          },
+          {
+            "text": "pensarán"
+          },
+          {
+            "text": "pensaría"
+          },
+          {
+            "text": "pensarías"
+          },
+          {
+            "text": "pensaríamos"
+          },
+          {
+            "text": "pensaríais"
+          },
+          {
+            "text": "pensarían"
+          },
+          {
+            "text": "pensar"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "PENSAR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "poder",
+      "gloss": "PODER",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "puedo"
+          },
+          {
+            "text": "puedes"
+          },
+          {
+            "text": "puede"
+          },
+          {
+            "text": "podemos"
+          },
+          {
+            "text": "podéis"
+          },
+          {
+            "text": "pueden"
+          },
+          {
+            "text": "pude"
+          },
+          {
+            "text": "pudiste"
+          },
+          {
+            "text": "pudo"
+          },
+          {
+            "text": "pudimos"
+          },
+          {
+            "text": "pudisteis"
+          },
+          {
+            "text": "pudieron"
+          },
+          {
+            "text": "podía"
+          },
+          {
+            "text": "podías"
+          },
+          {
+            "text": "podíamos"
+          },
+          {
+            "text": "podíais"
+          },
+          {
+            "text": "podían"
+          },
+          {
+            "text": "podré"
+          },
+          {
+            "text": "podrás"
+          },
+          {
+            "text": "podrá"
+          },
+          {
+            "text": "podremos"
+          },
+          {
+            "text": "podréis"
+          },
+          {
+            "text": "podrán"
+          },
+          {
+            "text": "podría"
+          },
+          {
+            "text": "podrías"
+          },
+          {
+            "text": "podríamos"
+          },
+          {
+            "text": "podríais"
+          },
+          {
+            "text": "podrían"
+          },
+          {
+            "text": "poder"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "PODER",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "por_qué",
+      "gloss": "POR QUÉ",
+      "categories": [
+        "preguntas_respuestas"
+      ],
+      "lexicalClass": "question",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "por qué"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "POR QUÉ",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "preguntar",
+      "gloss": "PREGUNTAR",
+      "categories": [
+        "conversacion_cotidiana"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "pregunto"
+          },
+          {
+            "text": "preguntas"
+          },
+          {
+            "text": "pregunta"
+          },
+          {
+            "text": "preguntamos"
+          },
+          {
+            "text": "preguntáis"
+          },
+          {
+            "text": "preguntan"
+          },
+          {
+            "text": "pregunté"
+          },
+          {
+            "text": "preguntaste"
+          },
+          {
+            "text": "preguntó"
+          },
+          {
+            "text": "preguntasteis"
+          },
+          {
+            "text": "preguntaron"
+          },
+          {
+            "text": "preguntaba"
+          },
+          {
+            "text": "preguntabas"
+          },
+          {
+            "text": "preguntábamos"
+          },
+          {
+            "text": "preguntabais"
+          },
+          {
+            "text": "preguntaban"
+          },
+          {
+            "text": "preguntaré"
+          },
+          {
+            "text": "preguntarás"
+          },
+          {
+            "text": "preguntará"
+          },
+          {
+            "text": "preguntaremos"
+          },
+          {
+            "text": "preguntaréis"
+          },
+          {
+            "text": "preguntarán"
+          },
+          {
+            "text": "preguntaría"
+          },
+          {
+            "text": "preguntarías"
+          },
+          {
+            "text": "preguntaríamos"
+          },
+          {
+            "text": "preguntaríais"
+          },
+          {
+            "text": "preguntarían"
+          },
+          {
+            "text": "preguntar"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "PREGUNTAR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "repetir",
+      "gloss": "REPETIR",
+      "categories": [
+        "conversacion_cotidiana"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "repito"
+          },
+          {
+            "text": "repites"
+          },
+          {
+            "text": "repite"
+          },
+          {
+            "text": "repetimos"
+          },
+          {
+            "text": "repetís"
+          },
+          {
+            "text": "repiten"
+          },
+          {
+            "text": "repetí"
+          },
+          {
+            "text": "repetiste"
+          },
+          {
+            "text": "repitió"
+          },
+          {
+            "text": "repetisteis"
+          },
+          {
+            "text": "repitieron"
+          },
+          {
+            "text": "repetía"
+          },
+          {
+            "text": "repetías"
+          },
+          {
+            "text": "repetíamos"
+          },
+          {
+            "text": "repetíais"
+          },
+          {
+            "text": "repetían"
+          },
+          {
+            "text": "repetiré"
+          },
+          {
+            "text": "repetirás"
+          },
+          {
+            "text": "repetirá"
+          },
+          {
+            "text": "repetiremos"
+          },
+          {
+            "text": "repetiréis"
+          },
+          {
+            "text": "repetirán"
+          },
+          {
+            "text": "repetiría"
+          },
+          {
+            "text": "repetirías"
+          },
+          {
+            "text": "repetiríamos"
+          },
+          {
+            "text": "repetiríais"
+          },
+          {
+            "text": "repetirían"
+          },
+          {
+            "text": "repita"
+          },
+          {
+            "text": "repitas"
+          },
+          {
+            "text": "repitamos"
+          },
+          {
+            "text": "repitáis"
+          },
+          {
+            "text": "repitan"
+          },
+          {
+            "text": "repetir"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "REPETIR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "trabajar",
+      "gloss": "TRABAJAR",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "trabajo"
+          },
+          {
+            "text": "trabajas"
+          },
+          {
+            "text": "trabaja"
+          },
+          {
+            "text": "trabajamos"
+          },
+          {
+            "text": "trabajáis"
+          },
+          {
+            "text": "trabajan"
+          },
+          {
+            "text": "trabajé"
+          },
+          {
+            "text": "trabajaste"
+          },
+          {
+            "text": "trabajó"
+          },
+          {
+            "text": "trabajasteis"
+          },
+          {
+            "text": "trabajaron"
+          },
+          {
+            "text": "trabajaba"
+          },
+          {
+            "text": "trabajabas"
+          },
+          {
+            "text": "trabajábamos"
+          },
+          {
+            "text": "trabajabais"
+          },
+          {
+            "text": "trabajaban"
+          },
+          {
+            "text": "trabajaré"
+          },
+          {
+            "text": "trabajarás"
+          },
+          {
+            "text": "trabajará"
+          },
+          {
+            "text": "trabajaremos"
+          },
+          {
+            "text": "trabajaréis"
+          },
+          {
+            "text": "trabajarán"
+          },
+          {
+            "text": "trabajaría"
+          },
+          {
+            "text": "trabajarías"
+          },
+          {
+            "text": "trabajaríamos"
+          },
+          {
+            "text": "trabajaríais"
+          },
+          {
+            "text": "trabajarían"
+          },
+          {
+            "text": "emplear"
+          },
+          {
+            "text": "empleo"
+          },
+          {
+            "text": "empleas"
+          },
+          {
+            "text": "emplea"
+          },
+          {
+            "text": "empleamos"
+          },
+          {
+            "text": "empleáis"
+          },
+          {
+            "text": "emplean"
+          },
+          {
+            "text": "empleé"
+          },
+          {
+            "text": "empleaste"
+          },
+          {
+            "text": "empleó"
+          },
+          {
+            "text": "empleasteis"
+          },
+          {
+            "text": "emplearon"
+          },
+          {
+            "text": "empleaba"
+          },
+          {
+            "text": "empleabas"
+          },
+          {
+            "text": "empleábamos"
+          },
+          {
+            "text": "empleabais"
+          },
+          {
+            "text": "empleaban"
+          },
+          {
+            "text": "emplearé"
+          },
+          {
+            "text": "emplearás"
+          },
+          {
+            "text": "empleará"
+          },
+          {
+            "text": "emplearemos"
+          },
+          {
+            "text": "emplearéis"
+          },
+          {
+            "text": "emplearán"
+          },
+          {
+            "text": "emplearía"
+          },
+          {
+            "text": "emplearías"
+          },
+          {
+            "text": "emplearíamos"
+          },
+          {
+            "text": "emplearíais"
+          },
+          {
+            "text": "emplearían"
+          },
+          {
+            "text": "trabajar"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "TRABAJAR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "bien",
+      "gloss": "BIEN",
+      "categories": [
+        "emociones_cualidades"
+      ],
+      "lexicalClass": "adverb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "bien"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "BIEN",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "dolor",
+      "gloss": "DOLOR",
+      "categories": [
+        "necesidades"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "dolor"
+          },
+          {
+            "text": "dolores"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "DOLOR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "llegar",
+      "gloss": "LLEGAR",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "llego"
+          },
+          {
+            "text": "llegas"
+          },
+          {
+            "text": "llega"
+          },
+          {
+            "text": "llegamos"
+          },
+          {
+            "text": "llegáis"
+          },
+          {
+            "text": "llegan"
+          },
+          {
+            "text": "llegué"
+          },
+          {
+            "text": "llegaste"
+          },
+          {
+            "text": "llegó"
+          },
+          {
+            "text": "llegasteis"
+          },
+          {
+            "text": "llegaron"
+          },
+          {
+            "text": "llegaba"
+          },
+          {
+            "text": "llegabas"
+          },
+          {
+            "text": "llegábamos"
+          },
+          {
+            "text": "llegabais"
+          },
+          {
+            "text": "llegaban"
+          },
+          {
+            "text": "llegaré"
+          },
+          {
+            "text": "llegarás"
+          },
+          {
+            "text": "llegará"
+          },
+          {
+            "text": "llegaremos"
+          },
+          {
+            "text": "llegaréis"
+          },
+          {
+            "text": "llegarán"
+          },
+          {
+            "text": "llegaría"
+          },
+          {
+            "text": "llegarías"
+          },
+          {
+            "text": "llegaríamos"
+          },
+          {
+            "text": "llegaríais"
+          },
+          {
+            "text": "llegarían"
+          },
+          {
+            "text": "llegar"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "LLEGAR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "preocupado",
+      "gloss": "PREOCUPADO",
+      "categories": [
+        "emociones_cualidades"
+      ],
+      "lexicalClass": "adjective",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "preocupado"
+          },
+          {
+            "text": "preocupada"
+          },
+          {
+            "text": "preocupados"
+          },
+          {
+            "text": "preocupadas"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "PREOCUPADO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "hermano",
+      "gloss": "HERMANO",
+      "categories": [
+        "personas_familia"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "hermanos"
+          }
+        ],
+        "overrideDefaults": true
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "HERMANO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "oyente",
+      "gloss": "OYENTE",
+      "categories": [
+        "accesibilidad_comunicacion"
+      ],
+      "lexicalClass": "adjective",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "oyentes"
+          },
+          {
+            "text": "oyente"
+          }
+        ],
+        "overrideDefaults": false
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "OYENTE",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "salir",
+      "gloss": "SALIR",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "salo"
+          },
+          {
+            "text": "sales"
+          },
+          {
+            "text": "sale"
+          },
+          {
+            "text": "salimos"
+          },
+          {
+            "text": "salís"
+          },
+          {
+            "text": "salen"
+          },
+          {
+            "text": "salí"
+          },
+          {
+            "text": "saliste"
+          },
+          {
+            "text": "salió"
+          },
+          {
+            "text": "salisteis"
+          },
+          {
+            "text": "salieron"
+          },
+          {
+            "text": "salía"
+          },
+          {
+            "text": "salías"
+          },
+          {
+            "text": "salíamos"
+          },
+          {
+            "text": "salíais"
+          },
+          {
+            "text": "salían"
+          },
+          {
+            "text": "saliré"
+          },
+          {
+            "text": "salirás"
+          },
+          {
+            "text": "salirá"
+          },
+          {
+            "text": "saliremos"
+          },
+          {
+            "text": "saliréis"
+          },
+          {
+            "text": "salirán"
+          },
+          {
+            "text": "saliría"
+          },
+          {
+            "text": "salirías"
+          },
+          {
+            "text": "saliríamos"
+          },
+          {
+            "text": "saliríais"
+          },
+          {
+            "text": "salirían"
+          },
+          {
+            "text": "salgo"
+          },
+          {
+            "text": "saldré"
+          },
+          {
+            "text": "saldrás"
+          },
+          {
+            "text": "saldrá"
+          },
+          {
+            "text": "saldremos"
+          },
+          {
+            "text": "saldréis"
+          },
+          {
+            "text": "saldrán"
+          },
+          {
+            "text": "salir"
+          }
+        ],
+        "overrideDefaults": false
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "SALIR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "sordo",
+      "gloss": "SORDO",
+      "categories": [
+        "accesibilidad_comunicacion"
+      ],
+      "lexicalClass": "adjective",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "sorda"
+          },
+          {
+            "text": "sordos"
+          },
+          {
+            "text": "sordas"
+          },
+          {
+            "text": "sordo"
+          }
+        ],
+        "overrideDefaults": false
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "SORDO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "tomar",
+      "gloss": "TOMAR",
+      "categories": [
+        "verbos_acciones"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "tomo"
+          },
+          {
+            "text": "tomas"
+          },
+          {
+            "text": "toma"
+          },
+          {
+            "text": "tomamos"
+          },
+          {
+            "text": "tomáis"
+          },
+          {
+            "text": "toman"
+          },
+          {
+            "text": "tomé"
+          },
+          {
+            "text": "tomaste"
+          },
+          {
+            "text": "tomó"
+          },
+          {
+            "text": "tomasteis"
+          },
+          {
+            "text": "tomaron"
+          },
+          {
+            "text": "tomaba"
+          },
+          {
+            "text": "tomabas"
+          },
+          {
+            "text": "tomábamos"
+          },
+          {
+            "text": "tomabais"
+          },
+          {
+            "text": "tomaban"
+          },
+          {
+            "text": "tomaré"
+          },
+          {
+            "text": "tomarás"
+          },
+          {
+            "text": "tomará"
+          },
+          {
+            "text": "tomaremos"
+          },
+          {
+            "text": "tomaréis"
+          },
+          {
+            "text": "tomarán"
+          },
+          {
+            "text": "tomaría"
+          },
+          {
+            "text": "tomarías"
+          },
+          {
+            "text": "tomaríamos"
+          },
+          {
+            "text": "tomaríais"
+          },
+          {
+            "text": "tomarían"
+          },
+          {
+            "text": "tomar"
+          }
+        ],
+        "overrideDefaults": false
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "TOMAR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "despacio",
+      "gloss": "DESPACIO",
+      "categories": [
+        "accesibilidad_comunicacion"
+      ],
+      "lexicalClass": "adverb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "lentamente"
+          },
+          {
+            "text": "despacio"
+          }
+        ],
+        "overrideDefaults": false
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "DESPACIO",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "intérprete",
+      "gloss": "INTÉRPRETE",
+      "categories": [
+        "accesibilidad_comunicacion"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "intérpretes"
+          },
+          {
+            "text": "intérprete"
+          }
+        ],
+        "overrideDefaults": false
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "INTÉRPRETE",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "lengua_de_señas",
+      "gloss": "LENGUA DE SEÑAS",
+      "categories": [
+        "accesibilidad_comunicacion"
+      ],
+      "lexicalClass": "noun",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "lenguaje de señas"
+          },
+          {
+            "text": "lengua de señas colombiana"
+          },
+          {
+            "text": "lsc"
+          },
+          {
+            "text": "lengua de señas"
+          }
+        ],
+        "overrideDefaults": false
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "LENGUA DE SEÑAS",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "ayudar",
+      "gloss": "AYUDAR",
+      "categories": [
+        "necesidades"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "ayudo"
+          },
+          {
+            "text": "ayudas"
+          },
+          {
+            "text": "ayuda"
+          },
+          {
+            "text": "ayudamos"
+          },
+          {
+            "text": "ayudáis"
+          },
+          {
+            "text": "ayudan"
+          },
+          {
+            "text": "ayudé"
+          },
+          {
+            "text": "ayudaste"
+          },
+          {
+            "text": "ayudó"
+          },
+          {
+            "text": "ayudasteis"
+          },
+          {
+            "text": "ayudaron"
+          },
+          {
+            "text": "ayudaba"
+          },
+          {
+            "text": "ayudabas"
+          },
+          {
+            "text": "ayudábamos"
+          },
+          {
+            "text": "ayudabais"
+          },
+          {
+            "text": "ayudaban"
+          },
+          {
+            "text": "ayudaré"
+          },
+          {
+            "text": "ayudarás"
+          },
+          {
+            "text": "ayudará"
+          },
+          {
+            "text": "ayudaremos"
+          },
+          {
+            "text": "ayudaréis"
+          },
+          {
+            "text": "ayudarán"
+          },
+          {
+            "text": "ayudaría"
+          },
+          {
+            "text": "ayudarías"
+          },
+          {
+            "text": "ayudaríamos"
+          },
+          {
+            "text": "ayudaríais"
+          },
+          {
+            "text": "ayudarían"
+          },
+          {
+            "text": "ayúdame"
+          },
+          {
+            "text": "ayúdeme"
+          },
+          {
+            "text": "ayudando"
+          },
+          {
+            "text": "ayudado"
+          },
+          {
+            "text": "ayudada"
+          },
+          {
+            "text": "ayudar"
+          }
+        ],
+        "overrideDefaults": false
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "AYUDAR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    },
+    {
+      "id": "escribir",
+      "gloss": "ESCRIBIR",
+      "categories": [
+        "accesibilidad_comunicacion"
+      ],
+      "lexicalClass": "verb",
+      "spanish": {
+        "lemmas": [],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "escribo"
+          },
+          {
+            "text": "escribes"
+          },
+          {
+            "text": "escribe"
+          },
+          {
+            "text": "escribimos"
+          },
+          {
+            "text": "escribís"
+          },
+          {
+            "text": "escriben"
+          },
+          {
+            "text": "escribí"
+          },
+          {
+            "text": "escribiste"
+          },
+          {
+            "text": "escribió"
+          },
+          {
+            "text": "escribisteis"
+          },
+          {
+            "text": "escribieron"
+          },
+          {
+            "text": "escribía"
+          },
+          {
+            "text": "escribías"
+          },
+          {
+            "text": "escribíamos"
+          },
+          {
+            "text": "escribíais"
+          },
+          {
+            "text": "escribían"
+          },
+          {
+            "text": "escribiré"
+          },
+          {
+            "text": "escribirás"
+          },
+          {
+            "text": "escribirá"
+          },
+          {
+            "text": "escribiremos"
+          },
+          {
+            "text": "escribiréis"
+          },
+          {
+            "text": "escribirán"
+          },
+          {
+            "text": "escribiría"
+          },
+          {
+            "text": "escribirías"
+          },
+          {
+            "text": "escribiríamos"
+          },
+          {
+            "text": "escribiríais"
+          },
+          {
+            "text": "escribirían"
+          },
+          {
+            "text": "escriba"
+          },
+          {
+            "text": "escribas"
+          },
+          {
+            "text": "escribamos"
+          },
+          {
+            "text": "escribáis"
+          },
+          {
+            "text": "escriban"
+          },
+          {
+            "text": "escríbeme"
+          },
+          {
+            "text": "escríbame"
+          },
+          {
+            "text": "escribiendo"
+          },
+          {
+            "text": "escrito"
+          },
+          {
+            "text": "escrita"
+          },
+          {
+            "text": "escribir"
+          }
+        ],
+        "overrideDefaults": false
+      },
+      "lsc": {
+        "verbType": "plain",
+        "requiresSubjectMarker": true
+      },
+      "motion": {
+        "clip": "ESCRIBIR",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": []
+      }
+    }
+  ]
+}

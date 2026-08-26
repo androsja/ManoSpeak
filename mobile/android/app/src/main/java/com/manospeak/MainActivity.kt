@@ -1,7 +1,11 @@
 package com.manospeak
 
+import android.app.PendingIntent
 import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.util.Rational
 import android.view.ViewGroup
@@ -14,6 +18,8 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 class MainActivity : ReactActivity() {
   private var nativePipAvatar: NativePipAvatarView? = null
+  private var pipListeningMode = "continuous"
+  private var pipMicrophoneActive = false
 
   override fun onResume() {
     super.onResume()
@@ -53,16 +59,49 @@ class MainActivity : ReactActivity() {
 
   fun enterVozualPictureInPicture(): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+    return enterPictureInPictureMode(buildVozualPictureInPictureParams())
+  }
+
+  fun updateVozualPipAction(mode: String, microphoneActive: Boolean) {
+    pipListeningMode = if (mode == "phrase") "phrase" else "continuous"
+    pipMicrophoneActive = microphoneActive
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) {
+      setPictureInPictureParams(buildVozualPictureInPictureParams())
+    }
+  }
+
+  private fun buildVozualPictureInPictureParams(): PictureInPictureParams {
+    val actionTitle = when {
+      pipListeningMode == "phrase" && pipMicrophoneActive -> "Terminar frase"
+      pipListeningMode == "phrase" -> "Hablar"
+      pipMicrophoneActive -> "Detener escucha"
+      else -> "Activar escucha"
+    }
+    val actionIntent = Intent(this, PipActionReceiver::class.java).apply {
+      action = PipActionReceiver.ACTION_PRIMARY
+    }
+    val pendingIntent = PendingIntent.getBroadcast(
+      this,
+      PIP_ACTION_REQUEST_CODE,
+      actionIntent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+    val action = RemoteAction(
+      Icon.createWithResource(this, android.R.drawable.ic_btn_speak_now),
+      actionTitle,
+      actionTitle,
+      pendingIntent,
+    )
     val builder = PictureInPictureParams.Builder()
       .setAspectRatio(Rational(9, 16))
+      .setActions(listOf(action))
     // WebView/Canvas content can briefly disappear during a seamless resize
     // on some Android emulator/device builds. A regular PiP transition keeps
     // the rendered surface visible instead of presenting a black placeholder.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       builder.setSeamlessResizeEnabled(false)
     }
-    val params = builder.build()
-    return enterPictureInPictureMode(params)
+    return builder.build()
   }
 
   override fun onPictureInPictureModeChanged(
@@ -93,6 +132,7 @@ class MainActivity : ReactActivity() {
     nativePipAvatar?.let { avatar ->
       NativePipAvatarController.detach(avatar)
       (avatar.parent as? ViewGroup)?.removeView(avatar)
+      avatar.destroy()
     }
     nativePipAvatar = null
   }
@@ -109,4 +149,8 @@ class MainActivity : ReactActivity() {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+  companion object {
+    private const val PIP_ACTION_REQUEST_CODE = 2702
+  }
 }

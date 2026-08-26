@@ -1,5 +1,10 @@
 export type MotionPoint = [number, number, number];
-export type MotionFrame = {bodyHands: MotionPoint[]; face: MotionPoint[]};
+export type MotionHeadOrientation = {yaw: number; pitch: number; roll: number};
+export type MotionFrame = {
+  bodyHands: MotionPoint[];
+  face: MotionPoint[];
+  headOrientation?: MotionHeadOrientation;
+};
 export type SignMotion = {fps: number; frames: MotionFrame[]};
 
 const HEADER_SIZE = 16;

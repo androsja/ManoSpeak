@@ -41,9 +41,13 @@ Esta es la ruta más confiable para ampliar el vocabulario de la app.
    - hombro, codo y muñeca coherentes;
    - no hay saltos, manos duplicadas ni desapariciones largas.
 8. Abra **Ver esqueleto capturado**. Debe seguir el mismo gesto que la persona, no el avatar 3D anterior.
-9. Si es necesario, corrija parámetros y regenere; si la captura base es mala, grábela de nuevo.
-10. Cuando esté aprobada, seleccione la seña en **Biblioteca de señas** y pulse **Publicar en app móvil**. El editor la incluirá en el catálogo publicado.
-11. Elija compilar e instalar Android cuando VOZUAL lo pregunte. Solo después de esa instalación la nueva palabra estará disponible en el teléfono.
+9. Pulse **Simular app móvil**. Esta es la revisión obligatoria: usa el mismo movimiento compacto, personaje, perfiles, transiciones y algoritmo de renderizado que entrarán en Android.
+10. Compare los modos de la simulación:
+    - si **Puntos** se ve mal, la captura base es incorrecta y debe grabarse de nuevo;
+    - si **Puntos** se ve bien pero **Personaje** se ve mal, conserve la captura y corrija el perfil o el retargeting del avatar;
+    - la vista de Blender es opcional y no sirve como aprobación móvil.
+11. Cuando ambos modos sean claros, pulse **Publicar en app móvil** y confirme la revisión. VOZUAL bloqueará la publicación si la captura, la receta o el motor cambiaron desde la última simulación.
+12. Elija compilar e instalar Android cuando VOZUAL lo pregunte. Solo después de esa instalación la nueva palabra estará disponible en el teléfono.
 
 ### Cuántos ejemplos capturar
 
@@ -146,6 +150,8 @@ Ejemplo de manifestación mínima:
 - Una sola seña por clip.
 - Hombros, codos, muñecas y la mano activa detectados durante el gesto.
 - Cara completa si la expresión facial es lingüísticamente relevante.
+- En PERSONAJE, el giro, la inclinación y la rotación de cabeza deben seguir el video.
+- Ojos, cejas y boca deben conservar la expresión capturada; durante una seña no se aceptan sonrisas o guiños inventados.
 - Inicio y final sin salto de muñeca entre lados.
 - El esqueleto reproduce la trayectoria observada.
 - La glosa no sobrescribe otra publicada por accidente.

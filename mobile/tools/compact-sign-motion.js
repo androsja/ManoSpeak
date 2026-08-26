@@ -7,6 +7,18 @@ const HEADER_SIZE = 16;
 const FORMAT_VERSION = 2;
 const DEFAULT_SCALE = 10000;
 
+// Android AssetManager and file:// WebView URLs do not consistently decode
+// Unicode punctuation (for example ¿CÓMO ESTÁS?). Keep the catalog gloss
+// unchanged, but compile every runtime filename to a stable ASCII key. Each
+// Unicode code point is retained, so EL and ÉL cannot collide.
+function motionAssetName(gloss) {
+  const normalized = String(gloss).trim().toLowerCase();
+  if (!normalized) throw new Error(`Cannot create an asset filename for ${gloss}.`);
+  return `m_${Array.from(normalized, character =>
+    character.codePointAt(0).toString(16).padStart(6, '0'),
+  ).join('')}`;
+}
+
 function validateMotion(motion, sourceName = 'motion') {
   if (!Number.isInteger(motion.fps) || motion.fps <= 0 || motion.fps > 65535) {
     throw new Error(`${sourceName} has an invalid FPS value.`);
@@ -67,6 +79,10 @@ function compactPublishedMotions(sourceDirectory, outputDirectory) {
   const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
   const glosses = Array.isArray(catalog.publishedGlosses) ? catalog.publishedGlosses : [];
   if (glosses.length === 0) throw new Error('The published sign catalog is empty.');
+  const profileOverridesPath = path.join(sourceDirectory, 'avatar_profile_overrides.json');
+  const profileOverrides = fs.existsSync(profileOverridesPath)
+    ? JSON.parse(fs.readFileSync(profileOverridesPath, 'utf8'))
+    : {};
 
   fs.mkdirSync(outputDirectory, {recursive: true});
   for (const filename of fs.readdirSync(outputDirectory)) {
@@ -77,17 +93,25 @@ function compactPublishedMotions(sourceDirectory, outputDirectory) {
 
   let sourceBytes = 0;
   let compactBytes = 0;
+  const avatarProfiles = {};
   for (const rawGloss of glosses) {
     const gloss = String(rawGloss).trim();
     const sourcePath = path.join(sourceDirectory, `${gloss.toLowerCase()}.motion.json`);
-    const outputPath = path.join(outputDirectory, `${gloss.toLowerCase()}.motion.bin`);
+    const outputPath = path.join(outputDirectory, `${motionAssetName(gloss)}.motion.bin`);
     const source = fs.readFileSync(sourcePath);
-    const compact = compileMotion(JSON.parse(source.toString('utf8')), DEFAULT_SCALE, sourcePath);
+    const sourceMotion = JSON.parse(source.toString('utf8'));
+    const profileOverride = profileOverrides[gloss.toUpperCase()];
+    const profile = (sourceMotion.avatarProfile || profileOverride)
+      ? {...(sourceMotion.avatarProfile || {}), ...(profileOverride || {})}
+      : undefined;
+    if (profile && typeof profile === 'object') avatarProfiles[gloss.toUpperCase()] = profile;
+    const compact = compileMotion(sourceMotion, DEFAULT_SCALE, sourcePath);
     fs.writeFileSync(outputPath, compact);
     sourceBytes += source.byteLength;
     compactBytes += compact.byteLength;
   }
   fs.copyFileSync(catalogPath, path.join(outputDirectory, 'published_signs.json'));
+  fs.writeFileSync(path.join(outputDirectory, 'avatar_profiles.json'), JSON.stringify(avatarProfiles));
   return {signCount: glosses.length, sourceBytes, compactBytes};
 }
 
@@ -104,4 +128,4 @@ if (require.main === module) {
   );
 }
 
-module.exports = {compileMotion, compactPublishedMotions};
+module.exports = {compileMotion, compactPublishedMotions, motionAssetName};

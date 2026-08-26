@@ -9,6 +9,7 @@ build/
 .env.*
 venv/
 .venv/
+.venv-*/
 ENV/
 
 # OS/IDE files
@@ -17,10 +18,25 @@ ENV/
 
 # Deep Work Plan databases and logs
 .dwp/
+.agents/skills/
 
 # Ephemeral scratch directory contents
 tmp/*
 !tmp/.gitkeep
+
+# Local credentials and purchased avatar source packages
+GoogleService-Info.plist
+google-services.json
+Personaje/
+
+# Superseded/source avatar exports; the mobile runtime packages hands_v4 only
+mobile/assets/models/rp_eric_rigged_001_FBX/
+mobile/assets/models/rp_eric_rigged_001_FBX.zip
+mobile/assets/models/eric_avatar.glb
+mobile/assets/models/vozual_avatar.glb
+mobile/assets/models/vozual_woman_avatar.glb
+mobile/assets/models/vozual_woman_avatar_hands_v2.glb
+mobile/assets/models/vozual_woman_avatar_hands_v3.glb
 
 # Local datasets and model parameters
 LSC70/
@@ -34,4 +50,3 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 *.egg-info/
-

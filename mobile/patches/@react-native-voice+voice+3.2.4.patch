@@ -1,0 +1,237 @@
+diff --git a/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java b/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
+index f22833e..e7da670 100644
+--- a/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
++++ b/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
+@@ -40,10 +40,41 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+   private SpeechRecognizer speech = null;
+   private boolean isRecognizing = false;
+   private String locale = null;
++  private final Handler mainHandler;
++  private ReadableMap lastOptions = null;
++  private boolean continuousRecognition = false;
++  private boolean stopRequested = false;
++  private int recognitionSession = 0;
++  private static final long CONTINUOUS_RESTART_DELAY_MS = 1500L;
++  private static final long BUSY_RESTART_DELAY_MS = 2200L;
++  private final Runnable restartRecognition = new Runnable() {
++    @Override
++    public void run() {
++      if (!continuousRecognition || stopRequested || lastOptions == null) {
++        return;
++      }
++      try {
++        startListening(lastOptions);
++        isRecognizing = true;
++      } catch (Exception error) {
++        scheduleContinuousRestart(BUSY_RESTART_DELAY_MS);
++      }
++    }
++  };
+
+   public VoiceModule(ReactApplicationContext reactContext) {
+     super(reactContext);
+     this.reactContext = reactContext;
++    this.mainHandler = new Handler(reactContext.getMainLooper());
++  }
++
++  private void scheduleContinuousRestart(long delayMillis) {
++    if (!continuousRecognition || stopRequested || lastOptions == null) {
++      return;
++    }
++    mainHandler.removeCallbacks(restartRecognition);
++    Log.d("VOZUAL_ASR", "schedule restart in " + delayMillis + " ms");
++    mainHandler.postDelayed(restartRecognition, delayMillis);
+   }
+
+   private String getLocale(String locale) {
+@@ -55,7 +86,10 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+   }
+
+   private void startListening(ReadableMap opts) {
++    recognitionSession += 1;
++    final int session = recognitionSession;
+     if (speech != null) {
++      speech.cancel();
+       speech.destroy();
+       speech = null;
+     }
+@@ -73,7 +107,76 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+       speech = SpeechRecognizer.createSpeechRecognizer(this.reactContext);
+     }
+
+-    speech.setRecognitionListener(this);
++    speech.setRecognitionListener(new RecognitionListener() {
++      private boolean isCurrentSession() {
++        return session == recognitionSession && !stopRequested;
++      }
++
++      private boolean completeCurrentSession() {
++        if (!isCurrentSession()) {
++          return false;
++        }
++        // Android can emit callbacks such as ERROR_CLIENT or READY after a
++        // terminal result/error. Invalidate this listener before scheduling
++        // the next recognition cycle so those late callbacks cannot create a
++        // second concurrent recognizer.
++        recognitionSession += 1;
++        // Release the Android recognition service as soon as this session
++        // reaches a terminal callback. The restart delay must happen after
++        // destroy(), otherwise the next recognizer is created immediately
++        // after releasing the old one and Android reports ERROR_CLIENT.
++        if (speech != null) {
++          speech.destroy();
++          speech = null;
++        }
++        return true;
++      }
++
++      @Override
++      public void onReadyForSpeech(Bundle params) {
++        if (isCurrentSession()) VoiceModule.this.onReadyForSpeech(params);
++      }
++
++      @Override
++      public void onBeginningOfSpeech() {
++        if (isCurrentSession()) VoiceModule.this.onBeginningOfSpeech();
++      }
++
++      @Override
++      public void onRmsChanged(float rmsdB) {
++        if (isCurrentSession()) VoiceModule.this.onRmsChanged(rmsdB);
++      }
++
++      @Override
++      public void onBufferReceived(byte[] buffer) {
++        if (isCurrentSession()) VoiceModule.this.onBufferReceived(buffer);
++      }
++
++      @Override
++      public void onEndOfSpeech() {
++        if (isCurrentSession()) VoiceModule.this.onEndOfSpeech();
++      }
++
++      @Override
++      public void onError(int error) {
++        if (completeCurrentSession()) VoiceModule.this.onError(error);
++      }
++
++      @Override
++      public void onResults(Bundle results) {
++        if (completeCurrentSession()) VoiceModule.this.onResults(results);
++      }
++
++      @Override
++      public void onPartialResults(Bundle partialResults) {
++        if (isCurrentSession()) VoiceModule.this.onPartialResults(partialResults);
++      }
++
++      @Override
++      public void onEvent(int eventType, Bundle params) {
++        if (isCurrentSession()) VoiceModule.this.onEvent(eventType, params);
++      }
++    });
+
+     final Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+
+@@ -128,12 +231,16 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+
+   private void startSpeechWithPermissions(final String locale, final ReadableMap opts, final Callback callback) {
+     this.locale = locale;
++    this.lastOptions = opts;
++    this.continuousRecognition = opts.hasKey("VOZUAL_CONTINUOUS") && opts.getBoolean("VOZUAL_CONTINUOUS");
++    this.stopRequested = false;
++    this.mainHandler.removeCallbacks(restartRecognition);
+
+-    Handler mainHandler = new Handler(this.reactContext.getMainLooper());
+     mainHandler.post(new Runnable() {
+       @Override
+       public void run() {
+         try {
++          Log.d("VOZUAL_ASR", "initial recognition start");
+           startListening(opts);
+           isRecognizing = true;
+           callback.invoke(false);
+@@ -175,7 +282,9 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+
+   @ReactMethod
+   public void stopSpeech(final Callback callback) {
+-    Handler mainHandler = new Handler(this.reactContext.getMainLooper());
++    stopRequested = true;
++    recognitionSession += 1;
++    mainHandler.removeCallbacks(restartRecognition);
+     mainHandler.post(new Runnable() {
+       @Override
+       public void run() {
+@@ -194,7 +303,9 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+
+   @ReactMethod
+   public void cancelSpeech(final Callback callback) {
+-    Handler mainHandler = new Handler(this.reactContext.getMainLooper());
++    stopRequested = true;
++    recognitionSession += 1;
++    mainHandler.removeCallbacks(restartRecognition);
+     mainHandler.post(new Runnable() {
+       @Override
+       public void run() {
+@@ -213,7 +324,11 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+
+   @ReactMethod
+   public void destroySpeech(final Callback callback) {
+-    Handler mainHandler = new Handler(this.reactContext.getMainLooper());
++    stopRequested = true;
++    recognitionSession += 1;
++    continuousRecognition = false;
++    lastOptions = null;
++    mainHandler.removeCallbacks(restartRecognition);
+     mainHandler.post(new Runnable() {
+       @Override
+       public void run() {
+@@ -312,6 +427,14 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+     event.putMap("error", error);
+     sendEvent("onSpeechError", event);
+     Log.d("ASR", "onError() - " + errorMessage);
++    isRecognizing = false;
++    if (errorCode != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
++      scheduleContinuousRestart(
++        errorCode == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
++          ? BUSY_RESTART_DELAY_MS
++          : CONTINUOUS_RESTART_DELAY_MS
++      );
++    }
+   }
+
+   @Override
+@@ -353,6 +476,8 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+     event.putArray("value", arr);
+     sendEvent("onSpeechResults", event);
+     Log.d("ASR", "onResults()");
++    isRecognizing = false;
++    scheduleContinuousRestart(CONTINUOUS_RESTART_DELAY_MS);
+   }
+
+   @Override
+diff --git a/node_modules/@react-native-voice/voice/ios/Voice/Voice.m b/node_modules/@react-native-voice/voice/ios/Voice/Voice.m
+index fd9dad8..b76f80d 100644
+--- a/node_modules/@react-native-voice/voice/ios/Voice/Voice.m
++++ b/node_modules/@react-native-voice/voice/ios/Voice/Voice.m
+@@ -179,8 +179,8 @@ - (void) setupAndStartRecognizing:(NSString*)localeStr {
+     NSString *taskSessionId = self.sessionId;
+     self.recognitionTask = [self.speechRecognizer recognitionTaskWithRequest:self.recognitionRequest resultHandler:^(SFSpeechRecognitionResult * _Nullable result, NSError * _Nullable error) {
+         if (![taskSessionId isEqualToString:self.sessionId]) {
+-            // session ID has changed, so ignore any capture results and error
+-            [self teardown];
++            // The callback belongs to an older task. Never tear down here:
++            // doing so would destroy the newer recognition session.
+             return;
+         }
+         if (error != nil) {
+@@ -370,7 +370,9 @@ - (void)speechRecognizer:(SFSpeechRecognizer *)speechRecognizer availabilityDidC
+
+ RCT_EXPORT_METHOD(startSpeech:(NSString*)localeStr callback:(RCTResponseSenderBlock)callback) {
+     if (self.recognitionTask != nil) {
+-        [self sendResult:RCTMakeError(@"Speech recognition already started!", nil, nil) :nil :nil :nil];
++        NSString *message = @"Speech recognition already started!";
++        [self sendResult:RCTMakeError(message, nil, nil) :nil :nil :nil];
++        callback(@[message]);
+         return;
+     }

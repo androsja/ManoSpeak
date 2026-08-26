@@ -1,0 +1,78 @@
+{
+  "conditions": [],
+  "parameters": {
+    "activation_required": {
+      "defaultValue": { "value": "false" },
+      "description": "Requires an authenticated account before opening the translator.",
+      "valueType": "BOOLEAN"
+    },
+    "auth_google_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Shows Google activation after the provider and OAuth clients are configured.",
+      "valueType": "BOOLEAN"
+    },
+    "auth_apple_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Shows Apple activation on iOS after the Apple capability and provider are configured.",
+      "valueType": "BOOLEAN"
+    },
+    "monetization_enabled": {
+      "defaultValue": { "value": "false" },
+      "description": "Shows paid plans after store products and receipt validation are production ready.",
+      "valueType": "BOOLEAN"
+    },
+    "quota_enforcement_enabled": {
+      "defaultValue": { "value": "false" },
+      "description": "Enforces the monthly free allowance. Keep disabled until server-side usage accounting is ready.",
+      "valueType": "BOOLEAN"
+    },
+    "free_trial_days": {
+      "defaultValue": { "value": "90" },
+      "description": "Full-access introductory period for a newly activated account.",
+      "valueType": "NUMBER"
+    },
+    "free_monthly_minutes": {
+      "defaultValue": { "value": "60" },
+      "description": "Monthly active translation allowance after the introductory period.",
+      "valueType": "NUMBER"
+    },
+    "free_all_signs": {
+      "defaultValue": { "value": "true" },
+      "description": "Keeps the entire installed LSC vocabulary available to free accounts.",
+      "valueType": "BOOLEAN"
+    },
+    "pip_requires_plus": {
+      "defaultValue": { "value": "true" },
+      "description": "Makes Picture-in-Picture a Plus feature once monetization is enabled.",
+      "valueType": "BOOLEAN"
+    },
+    "phrase_mode_requires_plus": {
+      "defaultValue": { "value": "true" },
+      "description": "Makes phrase translation a Plus feature once monetization is enabled.",
+      "valueType": "BOOLEAN"
+    },
+    "free_usage_measurement": {
+      "defaultValue": { "value": "active_translation_seconds" },
+      "description": "Defines usage as speech processing plus avatar playback, excluding silence.",
+      "valueType": "STRING"
+    },
+    "usage_warning_minutes": {
+      "defaultValue": { "value": "[15,5,1]" },
+      "description": "Remaining-minute thresholds shown before the free allowance runs out.",
+      "valueType": "JSON"
+    },
+    "google_web_client_id": {
+      "defaultValue": { "value": "542813718733-ui3veq2qgcnvc510jqvdsrjuai2ktngn.apps.googleusercontent.com" },
+      "description": "Public OAuth web client identifier used to exchange Google ID tokens with Firebase.",
+      "valueType": "STRING"
+    },
+    "support_email": {
+      "defaultValue": { "value": "androsjapps@gmail.com" },
+      "description": "Support contact displayed during activation and in settings.",
+      "valueType": "STRING"
+    }
+  },
+  "version": {
+    "description": "Initial VOZUAL activation and access configuration."
+  }
+}

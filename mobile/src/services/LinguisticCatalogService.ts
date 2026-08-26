@@ -1,0 +1,223 @@
+import catalogJson from '../../assets/data/lsc_linguistic_catalog.json';
+import {normalizeSpeech, type SpeechSign} from './VoiceCommandService';
+
+export type LscVerbType =
+  | 'none'
+  | 'plain'
+  | 'directional_review_required'
+  | 'spatial_review_required';
+
+export type LinguisticEntry = {
+  id: string;
+  gloss: string;
+  categories: string[];
+  lexicalClass: string;
+  spanish: {
+    lemmas: string[];
+    synonyms: string[];
+    forms: Array<{text: string}>;
+    overrideDefaults?: boolean;
+  };
+  lsc: {
+    verbType: LscVerbType;
+    requiresSubjectMarker: boolean;
+  };
+  motion: {
+    clip: string;
+    published: boolean;
+  };
+  review: {
+    status: string;
+    regionalVariants: string[];
+  };
+};
+
+export type LscPlanToken = {
+  gloss: string;
+  source: 'lexical';
+  categories: string[];
+  verbType: LscVerbType;
+  requiresSubjectMarker: boolean;
+};
+
+export type PublishedLscPlan = {
+  tokens: LscPlanToken[];
+  unavailableMarkers: string[];
+};
+
+type LinguisticCatalog = {
+  version: number;
+  language: 'LSC';
+  grammar?: {
+    subjectMarkers?: Record<string, string>;
+    spanishVerbForms?: Record<string, string>;
+    temporalMarkers?: Record<string, string>;
+  };
+  entries: LinguisticEntry[];
+};
+
+const CATALOG = catalogJson as LinguisticCatalog;
+const GRAMMAR = CATALOG.grammar ?? {};
+
+function uniquePhrases(entry: LinguisticEntry): string[] {
+  return Array.from(new Set([
+    entry.gloss,
+    ...entry.spanish.lemmas,
+    ...entry.spanish.synonyms,
+    ...entry.spanish.forms.map((form) => form.text),
+  ].map((phrase) => phrase.trim()).filter(Boolean)));
+}
+
+const publishedClips = new Set<string>();
+export const PUBLISHED_LSC_ENTRIES = CATALOG.entries.filter((entry) => {
+  if (!entry.motion.published || entry.review.status === 'blocked') return false;
+  // One physical animation can have historical linguistic records with the
+  // same clip (for example ÉL and the non-sign article EL). The mobile
+  // library and its counter must represent playable animations, not rows.
+  if (publishedClips.has(entry.motion.clip)) return false;
+  publishedClips.add(entry.motion.clip);
+  return true;
+});
+
+export const PUBLISHED_LSC_SPEECH_VOCABULARY: SpeechSign[] = PUBLISHED_LSC_ENTRIES.map(
+  (entry) => ({
+    gloss: entry.motion.clip,
+    aliases: uniquePhrases(entry),
+  }),
+);
+
+export const PUBLISHED_LSC_SIGN_COUNT = PUBLISHED_LSC_ENTRIES.length;
+
+const ENTRY_BY_CLIP = new Map(
+  PUBLISHED_LSC_ENTRIES.map((entry) => [entry.motion.clip, entry]),
+);
+const SUBJECT_MARKER_GLOSSES = new Set(Object.values(GRAMMAR.subjectMarkers ?? {}));
+
+type SpeechCandidate = {
+  entry: LinguisticEntry;
+  normalized: string;
+};
+
+const SPEECH_CANDIDATES: SpeechCandidate[] = PUBLISHED_LSC_ENTRIES.flatMap((entry) =>
+  uniquePhrases(entry).map((phrase) => ({entry, normalized: normalizeSpeech(phrase)})),
+).filter((candidate) => candidate.normalized.length > 0).sort(
+  (first, second) => second.normalized.split(' ').length - first.normalized.split(' ').length,
+);
+
+function tokenFor(entry: LinguisticEntry): LscPlanToken {
+  return {
+    gloss: entry.motion.clip,
+    source: 'lexical',
+    categories: entry.categories,
+    verbType: entry.lsc.verbType,
+    requiresSubjectMarker: entry.lsc.requiresSubjectMarker,
+  };
+}
+
+function hasExplicitSubjectInCurrentClause(tokens: readonly LscPlanToken[]): boolean {
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    const token = tokens[index];
+    const entry = ENTRY_BY_CLIP.get(token.gloss);
+    if (entry?.lsc.requiresSubjectMarker) return false;
+    // A lexical noun in subject position ("médico come") already supplies
+    // the subject. Do not manufacture an additional pronoun sign from the
+    // Spanish verb ending. Negation and other non-verbal function signs can
+    // appear between the noun and verb, so inspect the current clause.
+    if (
+      SUBJECT_MARKER_GLOSSES.has(token.gloss)
+      || entry?.lexicalClass === 'pronoun'
+      || entry?.lexicalClass === 'noun'
+    ) return true;
+  }
+  return false;
+}
+
+function candidateAt(words: readonly string[], index: number): SpeechCandidate | undefined {
+  return SPEECH_CANDIDATES.find(({normalized}) => {
+    const phrase = normalized.split(' ');
+    return phrase.every((word, offset) => words[index + offset] === word);
+  });
+}
+
+const NON_SIGN_FUNCTION_WORDS = new Set([
+  'a', 'ante', 'bajo', 'cabe', 'con', 'contra', 'de', 'desde', 'durante',
+  'en', 'entre', 'hacia', 'hasta', 'para', 'por', 'segun', 'sin', 'sobre',
+  'tras', 'la', 'las', 'los', 'un', 'una', 'unos', 'unas', 'y', 'o',
+]);
+
+function isThirdPersonPronounEl(words: readonly string[], index: number): boolean {
+  if (words[index] !== 'el') return false;
+  const following = candidateAt(words, index + 1);
+  // Speech recognition normally removes accents. Keep EL only in the one
+  // context where it is a pronoun: immediately before a verb ("él come").
+  // In every other context it is the article "el" and has no LSC token.
+  return Boolean(following && following.entry.lexicalClass === 'verb');
+}
+
+/**
+ * Keeps speech matching separate from LSC rendering. The current avatar plays
+ * approved lexical clips only; verb direction and spatial agreement remain
+ * explicit metadata until a Deaf-led review approves their parameterization.
+ */
+export function planPublishedLscGlosses(glosses: readonly string[]): LscPlanToken[] {
+  return glosses.flatMap((gloss) => {
+    const entry = ENTRY_BY_CLIP.get(gloss);
+    if (!entry) return [];
+    return [{
+      gloss: entry.motion.clip,
+      source: 'lexical',
+      categories: entry.categories,
+      verbType: entry.lsc.verbType,
+      requiresSubjectMarker: entry.lsc.requiresSubjectMarker,
+    }];
+  });
+}
+
+/**
+ * Converts recognized Spanish into the currently renderable LSC plan. It only
+ * inserts a person or time marker when an approved clip exists; unavailable
+ * grammar is reported for authoring instead of being invented by the avatar.
+ */
+export function resolvePublishedLscPlan(text: string): PublishedLscPlan {
+  const words = normalizeSpeech(text).split(' ').filter(Boolean);
+  const tokens: LscPlanToken[] = [];
+  const unavailableMarkers: string[] = [];
+
+  for (let index = 0; index < words.length;) {
+    if (NON_SIGN_FUNCTION_WORDS.has(words[index])) {
+      index += 1;
+      continue;
+    }
+    if (words[index] === 'el' && !isThirdPersonPronounEl(words, index)) {
+      index += 1;
+      continue;
+    }
+    const candidate = candidateAt(words, index);
+    if (!candidate) {
+      const temporalGloss = GRAMMAR.temporalMarkers?.[words[index]];
+      if (temporalGloss && !ENTRY_BY_CLIP.has(temporalGloss)) {
+        unavailableMarkers.push(temporalGloss);
+      }
+      index += 1;
+      continue;
+    }
+
+    const subjectKey = GRAMMAR.spanishVerbForms?.[candidate.normalized];
+    const subjectGloss = subjectKey ? GRAMMAR.subjectMarkers?.[subjectKey] : undefined;
+    if (candidate.entry.lsc.requiresSubjectMarker && subjectGloss) {
+      const subjectEntry = ENTRY_BY_CLIP.get(subjectGloss);
+      if (subjectEntry && !hasExplicitSubjectInCurrentClause(tokens)) {
+        tokens.push(tokenFor(subjectEntry));
+      } else if (!subjectEntry) {
+        unavailableMarkers.push(subjectGloss);
+      }
+    }
+    tokens.push(tokenFor(candidate.entry));
+    index += candidate.normalized.split(' ').length;
+  }
+  return {tokens, unavailableMarkers: Array.from(new Set(unavailableMarkers))};
+}
+
+export function findPublishedLscEntry(gloss: string): LinguisticEntry | undefined {
+  return ENTRY_BY_CLIP.get(gloss);
+}

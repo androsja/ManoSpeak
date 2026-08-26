@@ -2,6 +2,7 @@ import {
   extractKnownSpeechWords,
   normalizeSpeech,
   selectKnownSpeechAlternative,
+  shouldDeferPartialSpeechMatch,
   speechContainsWord,
 } from '../VoiceCommandService';
 
@@ -36,11 +37,38 @@ describe('VoiceCommandService', () => {
     ]);
   });
 
+  it('prefers every published expression over its individual words', () => {
+    const vocabulary = [
+      {gloss: 'NO', aliases: ['no']},
+      {gloss: 'NO ENTIENDO', aliases: ['no entiendo']},
+    ];
+    expect(extractKnownSpeechWords('no entiendo', vocabulary)).toEqual(['NO ENTIENDO']);
+    expect(shouldDeferPartialSpeechMatch('no', vocabulary)).toBe(true);
+    expect(shouldDeferPartialSpeechMatch('no entiendo', vocabulary)).toBe(false);
+  });
+
+  it('maps verb conjugations to one canonical sign clip', () => {
+    expect(extractKnownSpeechWords('yo necesito ayuda y nosotros necesitamos agua', [{
+      gloss: 'NECESITAR',
+      aliases: ['necesito', 'necesitas', 'necesita', 'necesitamos'],
+    }])).toEqual(['NECESITAR', 'NECESITAR']);
+  });
+
   it('selects a later recognition alternative when it contains a published sign', () => {
     expect(selectKnownSpeechAlternative(
       ['ola', 'hola'],
       ['HOLA', 'GRACIAS'],
     )).toBe('hola');
+  });
+
+  it('selects the alternative with the most matched phrase words', () => {
+    expect(selectKnownSpeechAlternative(
+      ['no', 'no entiendo'],
+      [
+        {gloss: 'NO', aliases: ['no']},
+        {gloss: 'NO ENTIENDO', aliases: ['no entiendo']},
+      ],
+    )).toBe('no entiendo');
   });
 
   it('preserves recognizer order when alternatives have the same match count', () => {

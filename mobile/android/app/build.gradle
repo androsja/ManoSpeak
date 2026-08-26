@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "com.google.gms.google-services"
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -69,6 +70,7 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'org.webkit:android-jsc:+'
 def configuredArchitectures = (project.findProperty('reactNativeArchitectures') ?: 'armeabi-v7a,arm64-v8a,x86,x86_64').split(',')
+def enableAbiSplits = (project.findProperty('enableAbiSplits') ?: 'false').toBoolean()
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -82,9 +84,28 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
-        ndk {
-            abiFilters(*configuredArchitectures)
+        if (!enableAbiSplits) {
+            ndk {
+                abiFilters(*configuredArchitectures)
+            }
         }
+    }
+
+    // Keep the regular universal APK for local development. Production can pass
+    // -PenableAbiSplits=true so each device downloads only its native libraries.
+    splits {
+        abi {
+            reset()
+            enable enableAbiSplits
+            universalApk false
+            include(*configuredArchitectures)
+        }
+    }
+
+    androidResources {
+        // These legacy assets are not referenced by the current runtime. Keep
+        // their source copies available to tooling without shipping them.
+        ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:!phonssm.onnx:!vozual_interpreter_base_v1.png:!draco'
     }
 
     packagingOptions {

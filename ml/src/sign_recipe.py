@@ -1,10 +1,10 @@
-"""Reusable sign-animation recipes for the ManoSpeak avatar authoring flow."""
+"""Reusable sign-animation recipes for the VOZUAL avatar authoring flow."""
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import json
 import math
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -36,6 +36,12 @@ class SignRecipe:
     exit_lateral_cm: float = 0.0
     exit_depth_cm: float = 0.0
     motion_keyframes: list[dict[str, object]] = field(default_factory=list)
+    speech_aliases: list[str] = field(default_factory=list)
+    speech_aliases_overridden: bool = False
+    linguistic_categories: list[str] = field(default_factory=lambda: ["sin_clasificar"])
+    lexical_class: str = "noun"
+    lsc_verb_type: str = "none"
+    linguistic_review_status: str = "draft"
 
     def validate(self, frame_count: int) -> None:
         if self.version != 1:
@@ -74,6 +80,21 @@ class SignRecipe:
         )
         if any(not math.isfinite(value) or abs(value) > 30.0 for value in adjustments):
             raise ValueError("Motion adjustments must be between -30 and 30 cm.")
+        if any(not isinstance(alias, str) or not alias.strip() for alias in self.speech_aliases):
+            raise ValueError("Speech aliases must be non-empty text values.")
+        if not self.linguistic_categories or any(
+            not isinstance(category, str) or not category.strip()
+            for category in self.linguistic_categories
+        ):
+            raise ValueError("A sign requires at least one linguistic category.")
+        if self.lsc_verb_type not in {
+            "none", "plain", "directional_review_required", "spatial_review_required"
+        }:
+            raise ValueError("Unsupported LSC verb type.")
+        if self.linguistic_review_status not in {
+            "draft", "reviewed", "approved", "legacy_approved", "blocked"
+        }:
+            raise ValueError("Unsupported linguistic review status.")
         # A captured sequence with N samples at FPS represents N / FPS seconds
         # in the authoring timeline.  In particular, a 30-frame 30-fps take
         # must allow its closing keyframe at 1.0 s.
@@ -110,7 +131,13 @@ class SignRecipe:
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(asdict(self), indent=2), encoding="utf-8")
+        serialized = json.dumps(asdict(self), indent=2)
+        try:
+            if path.read_text(encoding="utf-8") == serialized:
+                return
+        except OSError:
+            pass
+        path.write_text(serialized, encoding="utf-8")
 
 
 def load_recipe(path: Path, frame_count: int) -> SignRecipe:
