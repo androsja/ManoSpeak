@@ -25,8 +25,9 @@ import type {InstalledSign} from '../services/SignLanguageService';
 import {
   playableLscPhraseSuggestions,
   playableLscPhraseVocabulary,
-  resolvePlayableLscPhrase,
 } from '../services/LscPhraseAssetCatalogService';
+import {resolveRuntimeLscPlayback} from '../services/LscRuntimePlaybackService';
+import {speechVocabularyForInstalledSigns} from '../services/LinguisticCatalogService';
 import {PHRASE_CONTINUATION_GRACE_MS} from '../services/SignPhraseContinuity';
 import {nextPhraseSuggestionIndex} from '../services/PhraseSuggestionService';
 import { AvatarClip, AvatarRenderMode, SkeletalAvatar } from './SkeletalAvatar';
@@ -185,6 +186,7 @@ export function ListenerScreen({
   const [playbackId, setPlaybackId] = useState(0);
   const [continuePhrase, setContinuePhrase] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [draftPreviewActive, setDraftPreviewActive] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [phraseSuggestionIndex, setPhraseSuggestionIndex] = useState(0);
   const [pictureInPictureMode, setPictureInPictureMode] = useState(false);
@@ -207,10 +209,12 @@ export function ListenerScreen({
   const phraseSuggestion = phraseSuggestions.length > 0
     ? phraseSuggestions[phraseSuggestionIndex % phraseSuggestions.length]
     : 'Aún no hay frases LSC revisadas disponibles';
-  const knownWords = useMemo(
-    () => playableLscPhraseVocabulary(installedSigns),
-    [installedSigns],
-  );
+  const knownWords = useMemo(() => {
+    const reviewed = playableLscPhraseVocabulary(installedSigns);
+    return __DEV__
+      ? [...reviewed, ...speechVocabularyForInstalledSigns(installedSigns)]
+      : reviewed;
+  }, [installedSigns]);
   const installedSignCount = installedSigns.length;
   // Development builds exercise the complete Plus flow without contacting a
   // store or charging a real payment method. Release builds always use the
@@ -457,12 +461,11 @@ export function ListenerScreen({
 
   const handleText = useCallback((text: string) => {
     setTranscript(text);
-    const resolution = resolvePlayableLscPhrase(text, installedSigns);
-    const words = resolution.status === 'matched'
-      ? resolution.entry.lsc.glossSequence as KnownWord[]
-      : [];
+    const resolution = resolveRuntimeLscPlayback(text, installedSigns, __DEV__);
+    const words = resolution.glosses as KnownWord[];
+    setDraftPreviewActive(resolution.status === 'draft');
     setPlannedLsc(words.join(' · '));
-    setErrorMessage(resolution.status === 'matched' ? '' : resolution.message);
+    setErrorMessage(resolution.message);
     const previous = recognizedWords.current;
     const extendsPrevious = previous.every((word, index) => words[index] === word);
     if (extendsPrevious && words.length > previous.length) {
@@ -486,10 +489,9 @@ export function ListenerScreen({
       if (bestText) {
         phrasePartialTextRef.current = bestText;
         setTranscript(bestText);
-        const previewResolution = resolvePlayableLscPhrase(bestText, installedSigns);
-        const preview = previewResolution.status === 'matched'
-          ? previewResolution.entry.lsc.glossSequence
-          : [];
+        const previewResolution = resolveRuntimeLscPlayback(bestText, installedSigns, __DEV__);
+        const preview = previewResolution.glosses;
+        setDraftPreviewActive(previewResolution.status === 'draft');
         setPlannedLsc(preview.length > 0 ? preview.join(' · ') : '');
       }
       return;
@@ -517,10 +519,8 @@ export function ListenerScreen({
       setTranscript(phraseText);
       return;
     }
-    const phraseResolution = resolvePlayableLscPhrase(phraseText, installedSigns);
-    const matches = phraseResolution.status === 'matched'
-      ? phraseResolution.entry.lsc.glossSequence
-      : [];
+    const phraseResolution = resolveRuntimeLscPlayback(phraseText, installedSigns, __DEV__);
+    const matches = phraseResolution.glosses;
     if (matches.length > 0) {
       pictureInPicture?.reportPlaybackEvent(
         'matched-speech',
@@ -1375,7 +1375,11 @@ export function ListenerScreen({
               : 'ESCUCHA CONTINUA ACTIVA'}
           </Text>
         )}
-        {!!errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
+        {!!errorMessage && (
+          <Text style={draftPreviewActive ? styles.draftWarning : styles.error}>
+            {errorMessage}
+          </Text>
+        )}
         <Pressable
           accessibilityRole={transcript ? undefined : 'button'}
           accessibilityLabel={transcript ? undefined : `Frase sugerida: ${phraseSuggestion}. Toca para ver otra.`}
@@ -1617,6 +1621,7 @@ const styles = StyleSheet.create({
   suggestionActionText: { color: '#F7F9FC', fontSize: 8, fontWeight: '900', letterSpacing: 0.25, lineHeight: 11 },
   suggestionText: { color: '#D8E1EC', textAlign: 'center', marginTop: 1, fontSize: 13, fontWeight: '700', lineHeight: 18 },
   error: { color: '#A9B8C9', textAlign: 'center', marginTop: 8, fontSize: 12 },
+  draftWarning: { color: '#FBBF24', textAlign: 'center', marginTop: 8, fontSize: 12, fontWeight: '700' },
   settingsOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#020812A6' },
   settingsSheet: { margin: 16, padding: 20, borderRadius: 22, backgroundColor: '#102337', borderWidth: 1, borderColor: '#31506A' },
   settingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
