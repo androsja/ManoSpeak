@@ -32,6 +32,23 @@ describe('native speech privacy contract', () => {
     expect(source).toContain('ContextCompat.checkSelfPermission');
   });
 
+  it('rejects a missing local recognizer before starting a foreground service', () => {
+    const moduleSource = mobileSource(
+      'android/app/src/main/java/com/androsja/vozual/PictureInPictureModule.kt',
+    );
+    const availabilityCheck = moduleSource.indexOf('if (!hasOnDeviceSpeechRecognizer())');
+    const foregroundStart = moduleSource.indexOf(
+      'ContextCompat.startForegroundService',
+      moduleSource.indexOf('fun startListeningService'),
+    );
+
+    expect(moduleSource).toContain('SpeechRecognizer.isOnDeviceRecognitionAvailable');
+    expect(moduleSource).toContain('VoiceListeningService.isActive()');
+    expect(moduleSource).toContain('Settings.ACTION_VOICE_INPUT_SETTINGS');
+    expect(availabilityCheck).toBeGreaterThan(-1);
+    expect(foregroundStart).toBeGreaterThan(availabilityCheck);
+  });
+
   it('exposes user-visible Android controls for an active microphone service', () => {
     const serviceSource = mobileSource(
       'android/app/src/main/java/com/androsja/vozual/VoiceListeningService.kt',

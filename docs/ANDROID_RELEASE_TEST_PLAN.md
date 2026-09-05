@@ -23,10 +23,10 @@ Every execution record must include the test ID, UTC timestamp, tester, artifact
 | Environment | Minimum purpose | Owner | Current state |
 | --- | --- | --- | --- |
 | Pixel 10a, Android 17/API 37, physical | Primary behavior, Google activation, permissions, PiP, lifecycle | Shared | Available; 4 KB page size |
-| Android 17/API 37, 16 KB emulator/device | Native loading and 16 KB runtime | Codex | NOT RUN |
-| Android API 24 or lowest dependency-supported API | Minimum-version compatibility | Codex | NOT RUN |
+| Android 17/API 37, 16 KB emulator/device | Native loading and 16 KB runtime | Codex | Covered on 16 KB ARM64 tablet AVD; physical-only cases remain |
+| Android API 24 or lowest dependency-supported API | Minimum-version compatibility | Codex | Covered on ARM64 phone AVD; physical-only cases remain |
 | Android 15/API 35 or Android 16/API 36 | Representative installed base and target behavior changes | Shared | NOT RUN |
-| Tablet or foldable, `sw >= 600dp`, API 37 | Adaptive layout; portrait lock is ignored when targeting API 37 | Codex/User | NOT RUN |
+| Tablet or foldable, `sw >= 600dp`, API 37 | Adaptive layout; portrait lock is ignored when targeting API 37 | Codex/User | Large-screen smoke covered at 1280 x 900 dp; manual accessibility remains |
 | Google Play Internal testing install | Play-generated split delivery, signing, update, authentication | User/Shared | BLOCKED until valid AAB |
 
 When a physical older device is unavailable, an emulator is acceptable for deterministic UI/install cases, but microphone quality, PiP usability, thermal behavior and Google account flows still require physical-device evidence.
@@ -55,7 +55,7 @@ The final implementation must expose one command, `npm run release:check:android
 | ART-002 | P0 | Auto / Codex | Verify final AAB certificate and compare with debug certificate. | Upload certificate is present and is not the Android debug certificate. | FAIL: release uses debug signing |
 | ART-003 | P0 | Auto / Codex | Remove upload properties and request `bundleRelease`. | Build fails with a clear missing-credentials message; it never falls back to debug signing. | NOT RUN |
 | ART-004 | P0 | Auto / Codex | Inspect every `arm64-v8a` native library and APK/AAB ZIP alignment. | Every library passes current 16 KB page-size packaging and ELF checks. | FAIL: device warning observed |
-| ART-005 | P0 | Device / Codex | Install final build on 16 KB API 37 environment and launch all native paths. | App, Firebase, voice, WebView/avatar, MediaPipe and ONNX native modules load without linker failure. | NOT RUN |
+| ART-005 | P0 | Device / Codex | Install final build on 16 KB API 37 environment and launch all native paths. | App, Firebase, voice, WebView/avatar, MediaPipe and ONNX native modules load without linker failure. | PASS: API 37 ARM64 16 KB AVD; release APK native paths loaded without linker failure |
 | ART-006 | P0 | Auto / Codex | Build from a clean checkout/dependency cache using the lockfile. | Build is reproducible without untracked source inputs. | NOT RUN |
 | ART-007 | P1 | Auto / Codex | Inspect AAB contents and Play-generated split set. | Only intended ABIs, production assets and locales are shipped; no redundant training/source assets. | NOT RUN |
 | ART-008 | P1 | Auto / Codex | Measure download/install sizes per ABI and compare with approved budget. | Size is recorded and within the agreed budget; unexpected growth fails the gate. | FAIL: previous universal release APK is 244 MB |
@@ -94,7 +94,7 @@ The final implementation must expose one command, `npm run release:check:android
 | MIC-003 | P0 | Device / Shared | Deny permanently, tap again, then grant from Settings and return. | App directs user to Settings and recovers without reinstall. | NOT RUN |
 | MIC-004 | P0 | Device / Shared | Revoke microphone permission while installed, relaunch and activate. | No crash/service loop; permission is requested or a recovery message is shown. | NOT RUN |
 | MIC-005 | P0 | Device / Shared | Enable airplane mode and disable Wi-Fi; activate microphone. | Recognition starts only if an on-device Spanish pack exists; no network request is required. | NOT RUN |
-| MIC-006 | P0 | Device / Shared | Remove/disable on-device Spanish recognition pack and activate. | App does not use network recognition; it explains how to install the local language. | NOT RUN |
+| MIC-006 | P0 | Device / Shared | Remove/disable on-device Spanish recognition pack and activate. | App does not use network recognition; it explains how to install the local language. | PASS: API 37 offline and API 24 reject before recognition/service start with local-language guidance |
 | MIC-007 | P1 | Device / Shared | Make `es-CO` unavailable while another supported local Spanish locale exists. | Documented local fallback is attempted in order and remains offline-only. | NOT RUN |
 | MIC-008 | P1 | Device / Shared | Stay silent through recognizer timeout in continuous mode. | Service recovers/rearms without accumulating visible errors or false animation. | NOT RUN |
 | MIC-009 | P0 | Device / Shared | Speak an unknown/non-catalogue phrase. | Transcript may show input, but no unrelated sign is forced or animated. | NOT RUN |

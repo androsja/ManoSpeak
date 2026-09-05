@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   FlatList,
   Pressable,
   ScrollView,
@@ -29,6 +30,27 @@ const CATALOG_PAGE_SIZE = 100;
 const LARGE_CATALOG_THRESHOLD = 100;
 const ALL_CATEGORIES = 'all';
 const INSTALLED_CATEGORY = 'installed';
+
+export function handleLibraryBack(
+  catalogLanguageId: string,
+  closeCatalog: () => void,
+  closeLibrary: () => void,
+): boolean {
+  if (catalogLanguageId) {
+    closeCatalog();
+  } else {
+    closeLibrary();
+  }
+  return true;
+}
+
+export function shouldShowLibraryRetry(
+  loading: boolean,
+  error: string,
+  languageCount: number,
+): boolean {
+  return !loading && (Boolean(error) || languageCount === 0);
+}
 
 function megabytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
@@ -91,6 +113,16 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
 
   useEffect(() => { void load(); }, []);
   useEffect(() => { setVisibleLimit(CATALOG_PAGE_SIZE); }, [category, search]);
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => (
+      handleLibraryBack(
+        catalogLanguageId,
+        () => setCatalogLanguageId(''),
+        () => onContinue(languages),
+      )
+    ));
+    return () => subscription.remove();
+  }, [catalogLanguageId, languages, onContinue]);
 
   const install = async (language: SignLanguageStatus) => {
     setActiveLanguageId(language.id);
@@ -274,7 +306,9 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
       {loading ? <ActivityIndicator color="#38BDF8" size="large" /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {!loading && !error && languages.length === 0 ? (
-        <Text style={styles.empty}>Todavía no hay lenguas publicadas.</Text>
+        <Text style={styles.empty}>
+          No pudimos consultar el catálogo. Conéctate a internet para descargar una lengua o continúa sin descargar.
+        </Text>
       ) : null}
 
       {languages.map(language => {
@@ -342,7 +376,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
         );
       })}
 
-      {error ? (
+      {shouldShowLibraryRetry(loading, error, languages.length) ? (
         <TouchableOpacity style={styles.secondary} onPress={() => void load()}>
           <Text style={styles.secondaryText}>REINTENTAR</Text>
         </TouchableOpacity>

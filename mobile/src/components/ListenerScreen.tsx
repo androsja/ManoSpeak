@@ -20,6 +20,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import RNFS from 'react-native-fs';
 import {
   mergeSpeechSegments,
+  resolvePictureInPictureTransition,
   selectKnownSpeechAlternative,
   shouldDeferPartialSpeechMatch,
 } from '../services/VoiceCommandService';
@@ -137,6 +138,7 @@ const pictureInPicture = NativeModules.VozualPictureInPicture as {
   enqueueSigns: (glosses: string[]) => void;
   resetPlayback: () => void;
   setListeningMode: (mode: ListeningMode, microphoneActive: boolean) => void;
+  openSpeechSettings?: () => Promise<boolean>;
   setAvatarPresentation: (renderMode: AvatarRenderMode, avatarZoom: number, playbackSpeed: number) => void;
   reportPlaybackEvent: (event: string, publishedGloss: string) => void;
 } | undefined;
@@ -178,6 +180,7 @@ export function ListenerScreen({
   const playingRef = useRef(false);
   const phraseInProgressRef = useRef(false);
   const pictureInPictureModeRef = useRef(false);
+  const nativePictureInPictureEventRef = useRef(false);
   const usageRemainderMillisRef = useRef(0);
   // One Android-owned foreground service owns the microphone in both Home
   // and PiP. React Native only renders state and forwards recognized text.
@@ -739,13 +742,17 @@ export function ListenerScreen({
       setListening(false);
       setErrorMessage('El micrófono no logró quedar listo. Toca ACTIVAR MICRÓFONO para intentarlo de nuevo.');
       await pictureInPicture.stopListeningService().catch(() => false);
-    } catch {
+    } catch (error) {
       nativePipSpeechActiveRef.current = false;
       nativeStartInFlight.current = false;
       if (listeningRef.current && generation === recognitionGeneration.current) {
         listeningRef.current = false;
         setListening(false);
-        setErrorMessage('No se pudo iniciar el escuchador nativo. Intenta activarlo nuevamente.');
+        setErrorMessage(
+          isOfflineSpeechUnavailable(error)
+            ? OFFLINE_SPEECH_MESSAGE
+            : 'No se pudo iniciar el escuchador nativo. Intenta activarlo nuevamente.',
+        );
       }
     }
   }, [markRecognitionUnavailable]);
@@ -1011,14 +1018,19 @@ export function ListenerScreen({
           return;
         }
         const compact = Boolean(isInPictureInPictureMode);
+        const transition = resolvePictureInPictureTransition(
+          nativePictureInPictureEventRef.current,
+          compact,
+        );
+        nativePictureInPictureEventRef.current = compact;
         applyPictureInPictureState(compact);
-        if (isInPictureInPictureMode) {
+        if (transition === 'entered') {
           nativePipSpeechActiveRef.current = true;
           if (!listeningRef.current) {
             if (listeningModeRef.current === 'phrase') void startPhraseListening();
             else void startListening();
           }
-        } else if (!isInPictureInPictureMode) {
+        } else if (transition === 'left') {
           void finishPictureInPictureSession('left-pip');
         }
       },
@@ -1502,6 +1514,25 @@ export function ListenerScreen({
           <Text style={draftPreviewActive ? styles.draftWarning : styles.error}>
             {errorMessage}
           </Text>
+        )}
+        {Platform.OS === 'android' && isOfflineSpeechUnavailable(errorMessage) && (
+          <View style={styles.permissionGuidance}>
+            <Text style={styles.permissionGuidanceText}>
+              La conexión se usa para descargar el idioma; después VOZUAL reconoce la voz sin enviar audio.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir ajustes de reconocimiento de voz sin conexión"
+              style={styles.permissionSettingsButton}
+              onPress={() => {
+                pictureInPicture?.openSpeechSettings?.().catch(() => {
+                  setErrorMessage('No fue posible abrir los ajustes de voz. Búscalos en la configuración de Android.');
+                });
+              }}
+            >
+              <Text style={styles.permissionSettingsButtonText}>CONFIGURAR VOZ SIN CONEXIÓN</Text>
+            </Pressable>
+          </View>
         )}
         {(microphonePermissionBlocked || notificationPermissionBlocked) && (
           <View style={styles.permissionGuidance}>

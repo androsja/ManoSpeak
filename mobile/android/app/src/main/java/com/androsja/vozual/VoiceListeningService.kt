@@ -435,6 +435,8 @@ class VoiceListeningService : Service() {
 
     fun hasReadyRecognition(): Boolean =
       activeService?.get()?.hasReachedReadyState == true
+
+    fun isActive(): Boolean = activeService?.get()?.destroyed == false
     const val ACTION_SPEECH_EVENT = "com.androsja.vozual.VOZUAL_SPEECH_EVENT"
     const val EXTRA_EVENT = "event"
     const val EXTRA_VALUES = "values"

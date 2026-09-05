@@ -4,6 +4,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.speech.SpeechRecognizer
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
@@ -37,14 +39,20 @@ class PictureInPictureModule(context: ReactApplicationContext) :
       promise.reject("NO_ACTIVITY", "VOZUAL no tiene una ventana activa.")
       return
     }
+    if (!VoiceListeningService.isActive() && !hasOnDeviceSpeechRecognizer()) {
+      rejectUnavailableLocalRecognition(promise)
+      return
+    }
     try {
       // Start the microphone foreground service while the activity is still
       // visible. Android does not deliver microphone input to an
       // activity-owned recognizer after the activity enters PiP.
-      ContextCompat.startForegroundService(
-        reactApplicationContext,
-        Intent(reactApplicationContext, VoiceListeningService::class.java),
-      )
+      if (!VoiceListeningService.isActive()) {
+        ContextCompat.startForegroundService(
+          reactApplicationContext,
+          Intent(reactApplicationContext, VoiceListeningService::class.java),
+        )
+      }
       val entered = activity.enterVozualPictureInPicture()
       if (!entered) stopVoiceListeningService()
       promise.resolve(entered)
@@ -56,6 +64,14 @@ class PictureInPictureModule(context: ReactApplicationContext) :
 
   @ReactMethod
   fun startListeningService(promise: Promise) {
+    if (VoiceListeningService.isActive()) {
+      promise.resolve(true)
+      return
+    }
+    if (!hasOnDeviceSpeechRecognizer()) {
+      rejectUnavailableLocalRecognition(promise)
+      return
+    }
     try {
       ContextCompat.startForegroundService(
         reactApplicationContext,
@@ -68,6 +84,17 @@ class PictureInPictureModule(context: ReactApplicationContext) :
         "No se pudo iniciar el escuchador nativo.",
         error,
       )
+    }
+  }
+
+  @ReactMethod
+  fun openSpeechSettings(promise: Promise) {
+    try {
+      val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      reactApplicationContext.startActivity(intent)
+      promise.resolve(true)
+    } catch (error: Exception) {
+      promise.reject("SPEECH_SETTINGS_UNAVAILABLE", "No fue posible abrir los ajustes de voz.", error)
     }
   }
 
@@ -145,6 +172,17 @@ class PictureInPictureModule(context: ReactApplicationContext) :
     reactApplicationContext.stopService(
       Intent(reactApplicationContext, VoiceListeningService::class.java),
     )
+
+  private fun hasOnDeviceSpeechRecognizer(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+      SpeechRecognizer.isOnDeviceRecognitionAvailable(reactApplicationContext)
+
+  private fun rejectUnavailableLocalRecognition(promise: Promise) {
+    promise.reject(
+      "OFFLINE_SPEECH_UNAVAILABLE",
+      "El reconocimiento local no está disponible. Instala un idioma de voz sin conexión.",
+    )
+  }
 
   // React Native pauses JS timers in PiP on some Android builds. The native
   // foreground path remains active, so it supplies a short-lived frame clock

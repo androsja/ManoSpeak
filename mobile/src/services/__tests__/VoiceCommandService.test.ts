@@ -2,6 +2,7 @@ import {
   extractKnownSpeechWords,
   mergeSpeechSegments,
   normalizeSpeech,
+  resolvePictureInPictureTransition,
   selectKnownSpeechAlternative,
   shouldDeferPartialSpeechMatch,
   speechContainsWord,
@@ -97,5 +98,15 @@ describe('VoiceCommandService', () => {
 
   it('returns an empty result when the recognizer supplies no alternatives', () => {
     expect(selectKnownSpeechAlternative(undefined, ['HOLA'])).toBe('');
+  });
+
+  it('ignores duplicate Android picture-in-picture lifecycle events', () => {
+    expect(resolvePictureInPictureTransition(false, false)).toBe('unchanged');
+    expect(resolvePictureInPictureTransition(true, true)).toBe('unchanged');
+  });
+
+  it('detects only real Android picture-in-picture transitions', () => {
+    expect(resolvePictureInPictureTransition(false, true)).toBe('entered');
+    expect(resolvePictureInPictureTransition(true, false)).toBe('left');
   });
 });

@@ -8,6 +8,18 @@ export function normalizeSpeech(text: string): string {
     .trim();
 }
 
+export type PictureInPictureTransition = 'entered' | 'left' | 'unchanged';
+
+/** Distinguishes real PiP transitions from duplicate Android lifecycle events. */
+export function resolvePictureInPictureTransition(
+  wasActive: boolean,
+  isActive: boolean,
+): PictureInPictureTransition {
+  if (!wasActive && isActive) return 'entered';
+  if (wasActive && !isActive) return 'left';
+  return 'unchanged';
+}
+
 /** Joins consecutive recognizer segments without duplicating a repeated prefix. */
 export function mergeSpeechSegments(prefix: string, next: string): string {
   const normalizedPrefix = normalizeSpeech(prefix);
