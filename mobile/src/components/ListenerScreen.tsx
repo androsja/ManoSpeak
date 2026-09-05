@@ -226,7 +226,7 @@ export function ListenerScreen({
   );
   const phraseSuggestion = phraseSuggestions.length > 0
     ? phraseSuggestions[phraseSuggestionIndex % phraseSuggestions.length]
-    : 'Aún no hay frases LSC revisadas disponibles';
+    : 'Di una frase para comenzar';
   const knownWords = useMemo(() => {
     const reviewed = playableLscPhraseVocabulary(installedSigns);
     return __DEV__
