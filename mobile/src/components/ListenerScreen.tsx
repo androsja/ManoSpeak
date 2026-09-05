@@ -11,12 +11,10 @@ import {
   Pressable,
   PermissionsAndroid,
   Platform,
-  StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import RNFS from 'react-native-fs';
 import {
   mergeSpeechSegments,
@@ -1368,7 +1366,7 @@ export function ListenerScreen({
   }, [clearPhraseContinuationTimer, finishPhrase, startSign]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       {!compactMode && <View style={styles.header}>
         <View style={styles.headerRow}>
           <Text style={styles.logo}>VOZUAL</Text>
@@ -1781,13 +1779,15 @@ export function ListenerScreen({
           onReset={resetBillingSandbox}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#07111F' },
-  header: { paddingHorizontal: 24, paddingTop: (StatusBar.currentHeight ?? 0) + 14, paddingBottom: 8 },
+  // App.tsx owns the system inset. Keeping a second SafeAreaView and adding
+  // StatusBar.currentHeight here stacked the top inset on Android phones.
+  header: { paddingHorizontal: 24, paddingTop: 14, paddingBottom: 8 },
   headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 },
   logo: { color: '#F7F9FC', fontSize: 26, fontWeight: '800', letterSpacing: 1 },
   subtitle: { color: '#16D9D1', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: 5 },
