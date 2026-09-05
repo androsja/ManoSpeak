@@ -3,6 +3,47 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
+def releaseCredential = { String name ->
+    providers.gradleProperty(name)
+        .orElse(providers.environmentVariable(name))
+        .orNull
+}
+def uploadStorePath = releaseCredential("VOZUAL_UPLOAD_STORE_FILE")
+def uploadStorePassword = releaseCredential("VOZUAL_UPLOAD_STORE_PASSWORD")
+def uploadKeyAlias = releaseCredential("VOZUAL_UPLOAD_KEY_ALIAS")
+def uploadKeyPassword = releaseCredential("VOZUAL_UPLOAD_KEY_PASSWORD")
+def uploadCredentialValues = [
+    uploadStorePath,
+    uploadStorePassword,
+    uploadKeyAlias,
+    uploadKeyPassword,
+]
+def hasAnyUploadCredential = uploadCredentialValues.any { it != null && !it.isBlank() }
+def hasCompleteUploadCredentials = uploadCredentialValues.every { it != null && !it.isBlank() }
+def requestedReleaseArtifact = gradle.startParameter.taskNames.any { taskName ->
+    def normalized = taskName.toLowerCase()
+    normalized.endsWith("bundlerelease") ||
+        normalized.endsWith("assemblerelease") ||
+        normalized.endsWith("packagereleasebundle") ||
+        normalized.endsWith("signreleasebundle")
+}
+
+if (hasAnyUploadCredential && !hasCompleteUploadCredentials) {
+    throw new GradleException("VOZUAL upload signing credentials are incomplete.")
+}
+if (requestedReleaseArtifact && !hasCompleteUploadCredentials) {
+    throw new GradleException(
+        "Release artifacts require VOZUAL_UPLOAD_STORE_FILE, " +
+            "VOZUAL_UPLOAD_STORE_PASSWORD, VOZUAL_UPLOAD_KEY_ALIAS and " +
+            "VOZUAL_UPLOAD_KEY_PASSWORD. Debug signing is never used for release."
+    )
+}
+if (hasCompleteUploadCredentials &&
+        (uploadKeyAlias.equalsIgnoreCase("androiddebugkey") ||
+            new File(uploadStorePath).name.equalsIgnoreCase("debug.keystore"))) {
+    throw new GradleException("Android debug signing identities are forbidden for release.")
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -53,11 +94,6 @@ react {
 }
 
 /**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
- */
-def enableProguardInReleaseBuilds = false
-
-/**
  * The preferred build flavor of JavaScriptCore (JSC)
  *
  * For example, to use the international variant, you can use:
@@ -69,7 +105,7 @@ def enableProguardInReleaseBuilds = false
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
-def configuredArchitectures = (project.findProperty('reactNativeArchitectures') ?: 'armeabi-v7a,arm64-v8a,x86,x86_64').split(',')
+def configuredArchitectures = (project.findProperty('reactNativeArchitectures') ?: 'armeabi-v7a,arm64-v8a').split(',')
 def enableAbiSplits = (project.findProperty('enableAbiSplits') ?: 'false').toBoolean()
 
 android {
@@ -84,11 +120,6 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
-        if (!enableAbiSplits) {
-            ndk {
-                abiFilters(*configuredArchitectures)
-            }
-        }
     }
 
     // Keep the regular universal APK for local development. Production can pass
@@ -122,18 +153,101 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasCompleteUploadCredentials) {
+            upload {
+                storeFile file(uploadStorePath)
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+            if (!enableAbiSplits) {
+                ndk {
+                    abiFilters(*configuredArchitectures)
+                }
+            }
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
-            minifyEnabled enableProguardInReleaseBuilds
+            signingConfig hasCompleteUploadCredentials ? signingConfigs.upload : null
+            ndk {
+                abiFilters(*configuredArchitectures)
+                debugSymbolLevel "SYMBOL_TABLE"
+            }
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+tasks.register("verifyUploadSigningIdentity") {
+    group = "verification"
+    description = "Rejects missing or Android debug upload signing identities."
+    doLast {
+        if (!hasCompleteUploadCredentials) {
+            throw new GradleException("VOZUAL upload signing credentials are required.")
+        }
+
+        def uploadStore = file(uploadStorePath)
+        if (!uploadStore.isFile()) {
+            throw new GradleException("VOZUAL upload keystore does not exist: ${uploadStore}")
+        }
+
+        def certificate = null
+        def keyStoreLoadError = null
+        ["JKS", "PKCS12"].find { storeType ->
+            try {
+                def keyStore = java.security.KeyStore.getInstance(storeType)
+                uploadStore.withInputStream { stream ->
+                    keyStore.load(stream, uploadStorePassword.toCharArray())
+                }
+                certificate = keyStore.getCertificate(uploadKeyAlias)
+                return certificate != null
+            } catch (Exception error) {
+                keyStoreLoadError = error
+                return false
+            }
+        }
+        if (certificate == null) {
+            throw new GradleException(
+                "VOZUAL upload alias was not found in a JKS or PKCS12 keystore.",
+                keyStoreLoadError,
+            )
+        }
+        if (certificate instanceof java.security.cert.X509Certificate &&
+                certificate.subjectX500Principal.name.contains("CN=Android Debug")) {
+            throw new GradleException("Android debug certificates are forbidden for release.")
+        }
+    }
+}
+
+// AGP does not create a release JVM-test variant for this React Native app.
+// Keep the conventional gate name and validate the release variant directly.
+tasks.register("testReleaseUnitTest") {
+    group = "verification"
+    description = "Validates security-critical release build-type invariants."
+    doLast {
+        def releaseBuild = android.buildTypes.getByName("release")
+        if (releaseBuild.debuggable) {
+            throw new GradleException("Release must not be debuggable.")
+        }
+        if (!releaseBuild.minifyEnabled || !releaseBuild.shrinkResources) {
+            throw new GradleException("Release code and resource shrinking must remain enabled.")
+        }
+        if (releaseBuild.signingConfig?.name == "debug") {
+            throw new GradleException("Release must never use the debug signing config.")
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name in ["bundleRelease", "assembleRelease", "signReleaseBundle"]) {
+        task.dependsOn("verifyUploadSigningIdentity")
     }
 }
 

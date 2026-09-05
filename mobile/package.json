@@ -11,6 +11,7 @@
     "status:published-signs": "node tools/firebase-sign-status.js",
     "publish:approved-signs": "node tools/publish-approved-signs.js",
     "verify:published-signs": "node tools/verify-published-signs.js",
+    "verify:release:android": "bash tools/verify-android-release.sh",
     "ios": "react-native run-ios",
     "start": "react-native start",
     "test": "jest",
