@@ -11,7 +11,9 @@ import RNFS from 'react-native-fs';
 
 const LIBRARY_ROOT = `${RNFS.DocumentDirectoryPath}/vozual-sign-languages`;
 const LIBRARY_STATE_PATH = `${LIBRARY_ROOT}/library.json`;
+const LIBRARY_STATE_BACKUP_PATH = `${LIBRARY_STATE_PATH}.backup`;
 const SETUP_COMPLETE_PATH = `${LIBRARY_ROOT}/setup-complete`;
+const SAFE_PATH_SEGMENT = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/;
 
 export type SignLanguage = {
   id: string;
@@ -130,6 +132,7 @@ function verbType(value: unknown): PublishedSign['verbType'] {
 
 export function parseSignLanguage(id: string, data: unknown): SignLanguage {
   if (!isRecord(data)) throw new Error(`Sign language ${id} is not an object.`);
+  if (!SAFE_PATH_SEGMENT.test(id)) throw new Error(`Sign language ${id} has an invalid ID.`);
   return {
     id,
     code: requiredString(data.code, 'code'),
@@ -141,6 +144,7 @@ export function parseSignLanguage(id: string, data: unknown): SignLanguage {
 
 export function parsePublishedSign(id: string, data: unknown): PublishedSign {
   if (!isRecord(data)) throw new Error(`Sign ${id} is not an object.`);
+  if (!SAFE_PATH_SEGMENT.test(id)) throw new Error(`Sign ${id} has an invalid ID.`);
   const assetDocumentPath = requiredString(data.assetDocumentPath, 'assetDocumentPath');
   if (!assetDocumentPath.startsWith(`signs/${id}/versions/`)) {
     throw new Error(`Sign ${id} has an invalid asset document path.`);
@@ -156,12 +160,16 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
   if (data.approved !== true || data.compiled !== true || data.published !== true) {
     throw new Error(`Sign ${id} is not approved, compiled, and published.`);
   }
+  const assetName = requiredString(data.assetName, 'assetName');
+  if (!SAFE_PATH_SEGMENT.test(assetName)) {
+    throw new Error(`Sign ${id} has an invalid asset name.`);
+  }
   return {
     id,
     languageId: requiredString(data.languageId, 'languageId'),
     gloss: requiredString(data.gloss, 'gloss').toUpperCase(),
     version: positiveInteger(data.version, 'version'),
-    assetName: requiredString(data.assetName, 'assetName'),
+    assetName,
     sizeBytes: positiveInteger(data.sizeBytes, 'sizeBytes'),
     assetDocumentPath,
     sha256,
@@ -197,19 +205,57 @@ function normalizeState(value: unknown): SignLibraryState {
 }
 
 async function readLibraryState(): Promise<SignLibraryState> {
-  try {
-    return normalizeState(JSON.parse(await RNFS.readFile(LIBRARY_STATE_PATH, 'utf8')) as unknown);
-  } catch {
-    return {...EMPTY_LIBRARY_STATE};
+  for (const path of [LIBRARY_STATE_PATH, LIBRARY_STATE_BACKUP_PATH]) {
+    try {
+      return normalizeState(JSON.parse(await RNFS.readFile(path, 'utf8')) as unknown);
+    } catch {
+      // Try the recoverable backup before treating the library as empty.
+    }
   }
+  return {...EMPTY_LIBRARY_STATE};
 }
 
 async function writeLibraryState(state: SignLibraryState): Promise<void> {
   await RNFS.mkdir(LIBRARY_ROOT);
   const temporaryPath = `${LIBRARY_STATE_PATH}.download`;
   await RNFS.writeFile(temporaryPath, JSON.stringify(state), 'utf8');
-  if (await RNFS.exists(LIBRARY_STATE_PATH)) await RNFS.unlink(LIBRARY_STATE_PATH);
-  await RNFS.moveFile(temporaryPath, LIBRARY_STATE_PATH);
+  let backedUpCurrentState = false;
+  try {
+    if (await RNFS.exists(LIBRARY_STATE_BACKUP_PATH)) {
+      await RNFS.unlink(LIBRARY_STATE_BACKUP_PATH);
+    }
+    if (await RNFS.exists(LIBRARY_STATE_PATH)) {
+      await RNFS.moveFile(LIBRARY_STATE_PATH, LIBRARY_STATE_BACKUP_PATH);
+      backedUpCurrentState = true;
+    }
+    await RNFS.moveFile(temporaryPath, LIBRARY_STATE_PATH);
+    if (backedUpCurrentState && await RNFS.exists(LIBRARY_STATE_BACKUP_PATH)) {
+      await RNFS.unlink(LIBRARY_STATE_BACKUP_PATH);
+    }
+  } catch (error) {
+    if (
+      backedUpCurrentState
+      && !await RNFS.exists(LIBRARY_STATE_PATH)
+      && await RNFS.exists(LIBRARY_STATE_BACKUP_PATH)
+    ) {
+      await RNFS.moveFile(LIBRARY_STATE_BACKUP_PATH, LIBRARY_STATE_PATH);
+    }
+    if (await RNFS.exists(temporaryPath)) await RNFS.unlink(temporaryPath);
+    throw error;
+  }
+}
+
+async function bestEffortDelete(path: string): Promise<void> {
+  try {
+    if (await RNFS.exists(path)) await RNFS.unlink(path);
+  } catch {
+    // Orphan cleanup must not roll back an already committed library state.
+  }
+}
+
+function immutableAssetPath(languageDirectory: string, sign: PublishedSign): string {
+  return `${languageDirectory}/${sign.version}-${sign.sha256.slice(0, 16)}-`
+    + `${sign.profileSha256.slice(0, 16)}-${sign.assetName}`;
 }
 
 function signRevision(signs: readonly PublishedSign[]): string {
@@ -397,15 +443,29 @@ export async function installSignLanguageChanges(
   if (status.pendingSigns.length === 0 && status.removedSigns.length === 0) return 0;
   const languageDirectory = `${LIBRARY_ROOT}/${status.id}`;
   await RNFS.mkdir(languageDirectory);
-  const state = await readLibraryState();
+  const currentState = await readLibraryState();
+  const nextState: SignLibraryState = {
+    installedSigns: {...currentState.installedSigns},
+    followedLanguageIds: [...currentState.followedLanguageIds],
+    dismissedRevisions: {...currentState.dismissedRevisions},
+    selectedLanguageId: currentState.selectedLanguageId,
+  };
   let completedBytes = 0;
   const totalBytes = Math.max(1, status.pendingSizeBytes);
+  const staged: Array<{
+    sign: PublishedSign;
+    avatarProfile: Record<string, unknown>;
+    temporaryPath: string;
+    finalPath: string;
+  }> = [];
+  const temporaryPaths: string[] = [];
 
-  for (const sign of status.pendingSigns) {
-    const finalPath = `${languageDirectory}/${sign.assetName}`;
-    const temporaryPath = `${finalPath}.download`;
-    if (await RNFS.exists(temporaryPath)) await RNFS.unlink(temporaryPath);
-    try {
+  try {
+    for (const sign of status.pendingSigns) {
+      const finalPath = immutableAssetPath(languageDirectory, sign);
+      const temporaryPath = `${finalPath}.download`;
+      if (await RNFS.exists(temporaryPath)) await RNFS.unlink(temporaryPath);
+      temporaryPaths.push(temporaryPath);
       const assetSnapshot = await getDoc(doc(getFirestore(), sign.assetDocumentPath));
       if (!assetSnapshot.exists()) throw new Error(`Sign ${sign.gloss} has no published asset.`);
       const asset = assetSnapshot.data();
@@ -423,42 +483,58 @@ export async function installSignLanguageChanges(
       onProgress?.(Math.min(1, (completedBytes + sign.sizeBytes) / totalBytes));
       const digest = (await RNFS.hash(temporaryPath, 'sha256')).toLowerCase();
       if (digest !== sign.sha256) throw new Error(`Sign ${sign.gloss} failed its integrity check.`);
-      if (await RNFS.exists(finalPath)) await RNFS.unlink(finalPath);
-      await RNFS.moveFile(temporaryPath, finalPath);
-      state.installedSigns[sign.id] = {
-        id: sign.id,
-        languageId: sign.languageId,
-        gloss: sign.gloss,
-        version: sign.version,
-        assetName: sign.assetName,
-        sizeBytes: sign.sizeBytes,
-        sha256: sign.sha256,
-        profileSha256: sign.profileSha256,
-        avatarProfile: asset.avatarProfile,
-        speechAliases: sign.speechAliases,
-        categories: sign.categories,
-        lexicalClass: sign.lexicalClass,
-        verbType: sign.verbType,
-        requiresSubjectMarker: sign.requiresSubjectMarker,
-        installedAt: new Date().toISOString(),
-        localPath: finalPath,
-      };
+      staged.push({sign, avatarProfile: asset.avatarProfile, temporaryPath, finalPath});
       completedBytes += sign.sizeBytes;
       onProgress?.(Math.min(1, completedBytes / totalBytes));
-    } catch (error) {
-      if (await RNFS.exists(temporaryPath)) await RNFS.unlink(temporaryPath);
-      throw error;
     }
+
+    for (const item of staged) {
+      if (await RNFS.exists(item.finalPath)) await RNFS.unlink(item.finalPath);
+      await RNFS.moveFile(item.temporaryPath, item.finalPath);
+      nextState.installedSigns[item.sign.id] = {
+        id: item.sign.id,
+        languageId: item.sign.languageId,
+        gloss: item.sign.gloss,
+        version: item.sign.version,
+        assetName: item.sign.assetName,
+        sizeBytes: item.sign.sizeBytes,
+        sha256: item.sign.sha256,
+        profileSha256: item.sign.profileSha256,
+        avatarProfile: item.avatarProfile,
+        speechAliases: item.sign.speechAliases,
+        categories: item.sign.categories,
+        lexicalClass: item.sign.lexicalClass,
+        verbType: item.sign.verbType,
+        requiresSubjectMarker: item.sign.requiresSubjectMarker,
+        installedAt: new Date().toISOString(),
+        localPath: item.finalPath,
+      };
+    }
+
+    for (const sign of status.removedSigns) delete nextState.installedSigns[sign.id];
+    if (!nextState.followedLanguageIds.includes(status.id)) {
+      nextState.followedLanguageIds.push(status.id);
+    }
+    nextState.selectedLanguageId = status.id;
+    nextState.dismissedRevisions[status.id] = status.revision;
+    await writeLibraryState(nextState);
+  } catch (error) {
+    for (const temporaryPath of temporaryPaths) await bestEffortDelete(temporaryPath);
+    for (const item of staged) {
+      if (item.finalPath !== currentState.installedSigns[item.sign.id]?.localPath) {
+        await bestEffortDelete(item.finalPath);
+      }
+    }
+    throw error;
   }
 
-  for (const sign of status.removedSigns) {
-    if (await RNFS.exists(sign.localPath)) await RNFS.unlink(sign.localPath);
-    delete state.installedSigns[sign.id];
-  }
-  if (!state.followedLanguageIds.includes(status.id)) state.followedLanguageIds.push(status.id);
-  state.selectedLanguageId = status.id;
-  state.dismissedRevisions[status.id] = status.revision;
-  await writeLibraryState(state);
+  const obsoletePaths = [
+    ...staged.map(item => currentState.installedSigns[item.sign.id]?.localPath),
+    ...status.removedSigns.map(sign => sign.localPath),
+  ].filter((path): path is string => Boolean(path) && !Object.values(nextState.installedSigns).some(
+    sign => sign.localPath === path,
+  ));
+  for (const path of obsoletePaths) await bestEffortDelete(path);
   await completeSignLanguageSetup();
   return status.changeCount;
 }
@@ -475,17 +551,20 @@ export async function selectSignLanguage(languageId: string): Promise<void> {
 }
 
 export async function removeSignLanguage(languageId: string): Promise<void> {
-  const state = await readLibraryState();
-  const installed = Object.values(state.installedSigns)
+  const currentState = await readLibraryState();
+  const nextState: SignLibraryState = {
+    installedSigns: {...currentState.installedSigns},
+    followedLanguageIds: currentState.followedLanguageIds.filter(id => id !== languageId),
+    dismissedRevisions: {...currentState.dismissedRevisions},
+    selectedLanguageId: currentState.selectedLanguageId,
+  };
+  const installed = Object.values(currentState.installedSigns)
     .filter(sign => sign.languageId === languageId);
-  for (const sign of installed) {
-    if (await RNFS.exists(sign.localPath)) await RNFS.unlink(sign.localPath);
-    delete state.installedSigns[sign.id];
+  for (const sign of installed) delete nextState.installedSigns[sign.id];
+  delete nextState.dismissedRevisions[languageId];
+  if (nextState.selectedLanguageId === languageId) {
+    nextState.selectedLanguageId = Object.values(nextState.installedSigns)[0]?.languageId;
   }
-  state.followedLanguageIds = state.followedLanguageIds.filter(id => id !== languageId);
-  delete state.dismissedRevisions[languageId];
-  if (state.selectedLanguageId === languageId) {
-    state.selectedLanguageId = Object.values(state.installedSigns)[0]?.languageId;
-  }
-  await writeLibraryState(state);
+  await writeLibraryState(nextState);
+  for (const sign of installed) await bestEffortDelete(sign.localPath);
 }

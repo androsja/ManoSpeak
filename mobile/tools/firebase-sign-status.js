@@ -11,13 +11,7 @@ function configuration() {
   const firebase = JSON.parse(
     fs.readFileSync(path.join(REPOSITORY_ROOT, '.firebaserc'), 'utf8'),
   );
-  const services = JSON.parse(
-    fs.readFileSync(path.join(MOBILE_ROOT, 'android/app/google-services.json'), 'utf8'),
-  );
-  return {
-    project: firebase.projects.default,
-    apiKey: services.client[0].api_key[0].current_key,
-  };
+  return {project: firebase.projects.default};
 }
 
 function plainFirestoreValue(value) {
@@ -43,9 +37,9 @@ function plainFirestoreDocument(document) {
   ));
 }
 
-async function listPublishedSigns(project, apiKey) {
+async function listPublishedSigns(project) {
   const endpoint = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(project)}`
-    + `/databases/(default)/documents:runQuery?key=${encodeURIComponent(apiKey)}`;
+    + '/databases/(default)/documents:runQuery';
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -80,8 +74,8 @@ function classifyFirebaseState(local, remote) {
 async function firebaseSignStatuses() {
   const build = buildPublishedSigns();
   const seed = JSON.parse(fs.readFileSync(build.firestorePath, 'utf8'));
-  const {project, apiKey} = configuration();
-  const remoteSigns = await listPublishedSigns(project, apiKey);
+  const {project} = configuration();
+  const remoteSigns = await listPublishedSigns(project);
   const localByGloss = new Map((seed.signs ?? []).map(sign => [
     String(sign.data?.gloss ?? '').trim().toUpperCase(),
     sign.data,

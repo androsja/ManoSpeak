@@ -20,18 +20,12 @@ function configuration() {
   const firebase = JSON.parse(
     fs.readFileSync(path.join(REPOSITORY_ROOT, '.firebaserc'), 'utf8'),
   );
-  const services = JSON.parse(
-    fs.readFileSync(path.join(MOBILE_ROOT, 'android/app/google-services.json'), 'utf8'),
-  );
-  return {
-    project: firebase.projects.default,
-    apiKey: services.client[0].api_key[0].current_key,
-  };
+  return {project: firebase.projects.default};
 }
 
-async function publicDocument(project, apiKey, documentPath) {
+async function publicDocument(project, documentPath) {
   const endpoint = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(project)}`
-    + `/databases/(default)/documents/${documentPath}?key=${encodeURIComponent(apiKey)}`;
+    + `/databases/(default)/documents/${documentPath}`;
   const response = await fetch(endpoint);
   if (!response.ok) {
     throw new Error(`Public read failed for ${documentPath}: ${response.status} ${await response.text()}`);
@@ -61,12 +55,12 @@ function plainFirestoreValue(value) {
 }
 
 async function verifyPublishedSigns(options = {}) {
-  const {project, apiKey} = configuration();
+  const {project} = configuration();
   const seed = JSON.parse(fs.readFileSync(SEED_PATH, 'utf8'));
   const selectedSigns = selectSignsForPublication(seed.signs, options.glosses ?? []);
   const verified = [];
   for (const sign of selectedSigns) {
-    const metadata = await publicDocument(project, apiKey, `signs/${sign.id}`);
+    const metadata = await publicDocument(project, `signs/${sign.id}`);
     if (metadata.fields?.published?.booleanValue !== true) {
       throw new Error(`${sign.id} is not publicly published.`);
     }
@@ -75,7 +69,7 @@ async function verifyPublishedSigns(options = {}) {
       || metadata.fields?.profileSha256?.stringValue !== sign.data.profileSha256
       || metadata.fields?.releaseSha256?.stringValue !== sign.data.releaseSha256
     ) throw new Error(`${sign.id} has stale public version metadata.`);
-    const asset = await publicDocument(project, apiKey, sign.data.assetDocumentPath);
+    const asset = await publicDocument(project, sign.data.assetDocumentPath);
     const content = Buffer.from(asset.fields?.contentBase64?.stringValue ?? '', 'base64');
     const avatarProfile = plainFirestoreValue(asset.fields?.avatarProfile);
     if (

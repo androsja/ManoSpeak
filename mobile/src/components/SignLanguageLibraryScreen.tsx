@@ -179,7 +179,10 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
         </Pressable>
         <Text style={styles.catalogTitle}>{catalogLanguage.name}</Text>
         <Text style={styles.catalogSummary}>
-          {catalogLanguage.signs.length} señas y frases aprobadas · {catalogLanguage.installedSignCount} instaladas
+          {catalogLanguage.signs.length} recursos publicados · {catalogLanguage.installedSignCount} instalados
+        </Text>
+        <Text style={styles.reviewNotice}>
+          Instalar un recurso no equivale a una aprobación lingüística. Vozual solo lo reproduce en producción cuando su interpretación en LSC ha sido revisada.
         </Text>
         <TextInput
           accessibilityLabel="Buscar una seña o frase"
@@ -239,7 +242,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
             <Text style={styles.noResults}>
               {requiresDiscoveryChoice
                 ? 'Para encontrar algo rápidamente, escribe una palabra o selecciona una categoría.'
-                : 'No encontramos una seña aprobada con esa búsqueda.'}
+                : 'No encontramos un recurso publicado con esa búsqueda.'}
             </Text>
           )}
           maxToRenderPerBatch={24}
@@ -265,7 +268,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
         {initialSetup ? 'Elige tus lenguas de señas' : 'Lenguas de señas'}
       </Text>
       <Text style={styles.description}>
-        Vozual se instala sin movimientos de señas. Elige una lengua y descarga únicamente sus señas aprobadas. Las nuevas señas se agregan de forma independiente.
+        Vozual se instala sin movimientos de señas. Elige una lengua y descarga sus recursos publicados. La reproducción en producción se habilita únicamente después de su revisión lingüística LSC.
       </Text>
 
       {loading ? <ActivityIndicator color="#38BDF8" size="large" /> : null}
@@ -380,6 +383,7 @@ const styles = StyleSheet.create({
   backButtonText: {color: '#7DD3FC', fontSize: 13, fontWeight: '900'},
   catalogTitle: {color: '#F8FAFC', fontSize: 26, fontWeight: '800'},
   catalogSummary: {color: '#94A3B8', fontSize: 14, lineHeight: 20, marginTop: 7},
+  reviewNotice: {color: '#FBBF24', fontSize: 12, lineHeight: 18, marginTop: 8},
   searchInput: {backgroundColor: '#1E293B', borderColor: '#334155', borderRadius: 12, borderWidth: 1, color: '#F8FAFC', fontSize: 16, marginTop: 20, paddingHorizontal: 15, paddingVertical: 13},
   filterScroller: {flexGrow: 0, marginTop: 10, maxHeight: 42},
   filters: {alignItems: 'center', gap: 8, paddingRight: 12},

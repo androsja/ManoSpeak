@@ -48,6 +48,17 @@ describe('VoiceCommandService', () => {
     expect(shouldDeferPartialSpeechMatch('no entiendo', vocabulary)).toBe(false);
   });
 
+  it('waits for and prefers CÓMO ESTÁS over the individual CÓMO sign', () => {
+    const vocabulary = [
+      {gloss: 'CÓMO', aliases: ['como']},
+      {gloss: '¿CÓMO ESTÁS?', aliases: ['como estas', 'cómo estás']},
+    ];
+
+    expect(shouldDeferPartialSpeechMatch('cómo', vocabulary)).toBe(true);
+    expect(extractKnownSpeechWords('¿cómo estás?', vocabulary)).toEqual(['¿CÓMO ESTÁS?']);
+    expect(shouldDeferPartialSpeechMatch('cómo estás', vocabulary)).toBe(false);
+  });
+
   it('joins consecutive recognizer segments for a longer expression', () => {
     expect(mergeSpeechSegments('cómo', 'estás')).toBe('como estas');
     expect(mergeSpeechSegments('cómo', 'cómo estás')).toBe('como estas');
