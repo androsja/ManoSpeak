@@ -2,33 +2,22 @@ diff --git a/node_modules/onnxruntime-react-native/android/build.gradle b/node_m
 index 41b4359..fa79fff 100644
 --- a/node_modules/onnxruntime-react-native/android/build.gradle
 +++ b/node_modules/onnxruntime-react-native/android/build.gradle
-@@ -247,7 +247,10 @@ dependencies {
-     extractLibs "com.microsoft.onnxruntime:onnxruntime-android:latest.integration@aar"
-   }
-
+@@ -250,1 +250,4 @@ dependencies {
 -  if (VersionNumber.parse(REACT_NATIVE_VERSION) < VersionNumber.parse("0.71")) {
 +  def reactNativeVersionComponents = REACT_NATIVE_VERSION.tokenize('.')
 +  def usesLegacyReactNativeHeaders = reactNativeVersionComponents[0].toInteger() == 0 &&
 +          reactNativeVersionComponents[1].toInteger() < 71
 +  if (usesLegacyReactNativeHeaders) {
-     extractLibs "com.facebook.fbjni:fbjni:+:headers"
-     extractLibs "com.facebook.fbjni:fbjni:+"
-   }
-
 diff --git a/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java b/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java
+index c362e6a..e4fe074 100644
 --- a/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java
 +++ b/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java
-@@ -8,8 +8,10 @@ import java.util.HashMap;
- import android.os.Build;
+@@ -9,1 +9,2 @@ import android.os.Build;
  import androidx.annotation.NonNull;
 +import androidx.annotation.OptIn;
- import androidx.annotation.RequiresApi;
- import com.facebook.react.bridge.JavaScriptContextHolder;
- import com.facebook.react.bridge.ReactMethod;
- import com.facebook.react.bridge.ReactApplicationContext;
+@@ -14,1 +15,2 @@ import com.facebook.react.bridge.ReactApplicationContext;
  import com.facebook.react.bridge.ReactContextBaseJavaModule;
 +import com.facebook.react.common.annotations.FrameworkAPI;
- import com.facebook.react.turbomodule.core.CallInvokerHolderImpl;
 @@ -17,2 +19,3 @@ import com.facebook.react.turbomodule.core.CallInvokerHolderImpl;
  @RequiresApi(api = Build.VERSION_CODES.N)
 +@OptIn(markerClass = FrameworkAPI.class)

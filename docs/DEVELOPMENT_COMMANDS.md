@@ -95,3 +95,14 @@ npm run typecheck
 ```bash
 npm test
 ```
+
+### Run the Complete Android Release Gate
+
+Use Node 24 LTS, JDK 17 and externally supplied upload-signing variables as described in `docs/ANDROID_RELEASE_BUILD.md`:
+
+```bash
+cd mobile
+npm run release:check:android
+```
+
+This command builds and verifies a local AAB. It does not publish to Firebase or upload to Google Play.

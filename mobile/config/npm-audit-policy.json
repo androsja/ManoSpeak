@@ -1,0 +1,18 @@
+{
+  "reviewAfter": "2026-12-01",
+  "allowedAdvisories": [
+    "GHSA-5p2g-fcmc-qvqq",
+    "GHSA-w3rx-r6r6-pgpr"
+  ],
+  "allowedPackages": [
+    "@react-native/community-cli-plugin",
+    "@react-native/metro-config",
+    "@react-native/virtualized-lists",
+    "image-size",
+    "metro",
+    "metro-config",
+    "metro-transform-worker",
+    "react-native"
+  ],
+  "rationale": "Both advisories affect image-size through Metro's build-time image parser. Metro and image-size are not packaged into the Android runtime, release inputs are repository-controlled, and npm published no fixed image-size release as of 2026-09-05. Any new advisory, critical severity, package, or expired review fails the gate."
+}

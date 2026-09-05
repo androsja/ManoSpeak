@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf 'Signer certificate: CN=%s\njar verified.\n' "${MOCK_CERT_CN:-VOZUAL Release}"

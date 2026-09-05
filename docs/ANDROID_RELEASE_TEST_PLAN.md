@@ -247,3 +247,13 @@ The first Android version may proceed from Internal to Closed testing only when:
 - There is no unresolved critical security issue, crash, ANR or failed P0/P1 case.
 
 Production additionally requires a successful Closed test when Play account rules demand it, resolved pre-launch findings, an explicit product-owner GO, and a documented staged-rollout/rollback decision.
+
+## 8. Automated release gate
+
+Run the complete noninteractive Android gate from `mobile/`:
+
+```bash
+npm run release:check:android
+```
+
+The command requires Node 24 LTS or Node 26, JDK 17 and external upload-signing credentials. It performs a clean dependency install, all Jest/type/lint checks, a fail-closed dependency-policy review, structural sign-resource verification, regression fixtures for wrong target/debug signing/4 KB ELF alignment, app-scoped Gradle release tests and lint, a signed AAB build, and final manifest/signature/ABI/size/16 KB inspection. It writes ignored evidence to `mobile/build/reports/android-release-check.txt` and never publishes or uploads.

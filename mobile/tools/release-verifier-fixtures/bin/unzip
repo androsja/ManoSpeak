@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == '-Z1' ]]; then
+  printf '%s\n' \
+    'base/lib/arm64-v8a/libfixture.so' \
+    'base/lib/armeabi-v7a/libfixture.so' \
+    'base/assets/index.android.bundle' \
+    'BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map' \
+    'BUNDLE-METADATA/com.android.tools.build.debugsymbols/arm64-v8a/libfixture.so.sym'
+  exit 0
+fi
+
+if [[ "${1:-}" == '-q' ]]; then
+  destination=''
+  while (($# > 0)); do
+    if [[ "$1" == '-d' ]]; then
+      destination="$2"
+      break
+    fi
+    shift
+  done
+  [[ -n "$destination" ]]
+  mkdir -p "$destination/base/lib/arm64-v8a"
+  printf 'fixture' > "$destination/base/lib/arm64-v8a/libfixture.so"
+  exit 0
+fi
+
+if [[ "${1:-}" == '-p' ]]; then
+  printf 'production bundle fixture'
+  exit 0
+fi
+
+printf 'Unexpected unzip fixture arguments.\n' >&2
+exit 2

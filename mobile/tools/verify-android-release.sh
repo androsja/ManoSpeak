@@ -1,79 +1,89 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-aab_path="${1:-android/app/build/outputs/bundle/release/app-release.aab}"
-if [[ ! -f "$aab_path" ]]; then
-  echo "Release AAB not found: $aab_path" >&2
+die() {
+  printf 'Android release verification failed: %s\n' "$1" >&2
   exit 1
-fi
+}
+
+aab_path="${1:-android/app/build/outputs/bundle/release/app-release.aab}"
+[[ -f "$aab_path" ]] || die "release AAB not found at $aab_path"
 
 for command_name in bundletool jarsigner unzip; do
-  if ! command -v "$command_name" >/dev/null 2>&1; then
-    echo "Required command is unavailable: $command_name" >&2
-    exit 1
-  fi
+  command -v "$command_name" >/dev/null 2>&1 \
+    || die "required command is unavailable: $command_name"
 done
 
+maximum_aab_bytes="${VOZUAL_MAX_AAB_BYTES:-125829120}"
+[[ "$maximum_aab_bytes" =~ ^[1-9][0-9]*$ ]] \
+  || die "VOZUAL_MAX_AAB_BYTES must be a positive integer"
+aab_bytes="$(wc -c < "$aab_path" | tr -d '[:space:]')"
+(( aab_bytes <= maximum_aab_bytes )) \
+  || die "AAB size $aab_bytes bytes exceeds limit $maximum_aab_bytes bytes"
+
 android_sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-if [[ -z "$android_sdk" && "$(uname -s)" == "Darwin" ]]; then
-  android_sdk="$HOME/Library/Android/sdk"
+if [[ -z "$android_sdk" && -f android/local.properties ]]; then
+  android_sdk="$(sed -n 's/^sdk\.dir=//p' android/local.properties | head -1)"
 fi
+[[ -n "$android_sdk" ]] \
+  || die "ANDROID_SDK_ROOT is unset and android/local.properties has no sdk.dir"
+
 ndk_version="$(sed -n 's/.*ndkVersion = "\([^"]*\)".*/\1/p' android/build.gradle | head -1)"
+[[ -n "$ndk_version" ]] || die "NDK version is not configured in android/build.gradle"
 host_tag="linux-x86_64"
 if [[ "$(uname -s)" == "Darwin" ]]; then
   host_tag="darwin-x86_64"
 fi
 readelf_bin="${READELF:-$android_sdk/ndk/$ndk_version/toolchains/llvm/prebuilt/$host_tag/bin/llvm-readelf}"
-if [[ ! -x "$readelf_bin" ]]; then
-  echo "llvm-readelf not found for NDK $ndk_version: $readelf_bin" >&2
-  exit 1
-fi
+[[ -x "$readelf_bin" ]] || die "llvm-readelf is unavailable for configured NDK $ndk_version"
 
 bundle_config="$(bundletool dump config --bundle="$aab_path")"
-if ! grep -q 'PAGE_ALIGNMENT_16K' <<<"$bundle_config"; then
-  echo "AAB does not request 16 KB native-library ZIP alignment." >&2
-  exit 1
-fi
+grep -q 'PAGE_ALIGNMENT_16K' <<<"$bundle_config" \
+  || die "AAB does not request 16 KB native-library ZIP alignment"
 
 manifest="$(bundletool dump manifest --bundle="$aab_path" --module=base)"
-grep -q 'package="com.androsja.vozual"' <<<"$manifest"
-grep -q 'android:compileSdkVersion="37"' <<<"$manifest"
-grep -q 'android:targetSdkVersion="37"' <<<"$manifest"
+grep -q 'package="com.androsja.vozual"' <<<"$manifest" \
+  || die "release package is not com.androsja.vozual"
+grep -q 'android:compileSdkVersion="37"' <<<"$manifest" \
+  || die "release compile SDK is not 37"
+grep -q 'android:targetSdkVersion="37"' <<<"$manifest" \
+  || die "release target SDK is not 37"
 if grep -q 'android:debuggable="true"' <<<"$manifest"; then
-  echo "Release manifest is debuggable." >&2
-  exit 1
+  die "release manifest is debuggable"
 fi
 if grep -q 'android.permission.READ_EXTERNAL_STORAGE\|android.permission.WRITE_EXTERNAL_STORAGE' <<<"$manifest"; then
-  echo "Release manifest contains obsolete external-storage permissions." >&2
-  exit 1
+  die "release manifest contains obsolete external-storage permissions"
+fi
+if grep -q 'com.google.android.gms.permission.AD_ID' <<<"$manifest"; then
+  die "release manifest unexpectedly requests the advertising ID"
 fi
 
 signature_report="$(jarsigner -verify -verbose -certs "$aab_path" 2>&1)"
-grep -q 'jar verified' <<<"$signature_report"
+grep -q 'jar verified' <<<"$signature_report" \
+  || die "AAB signature verification failed"
 if grep -q 'CN=Android Debug' <<<"$signature_report"; then
-  echo "AAB is signed with an Android debug certificate." >&2
-  exit 1
-fi
-
-packaged_abis="$(unzip -Z1 "$aab_path" | awk -F/ '/^base\/lib\// {print $3}' | sort -u)"
-expected_abis=$'arm64-v8a\narmeabi-v7a'
-if [[ "$packaged_abis" != "$expected_abis" ]]; then
-  echo "Unexpected release ABIs:" >&2
-  printf '%s\n' "$packaged_abis" >&2
-  exit 1
+  die "AAB is signed with an Android debug certificate"
 fi
 
 bundle_entries="$(unzip -Z1 "$aab_path")"
-grep -Fxq 'BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map' <<<"$bundle_entries"
-grep -q '^BUNDLE-METADATA/com.android.tools.build.debugsymbols/arm64-v8a/.*\.so\.sym$' <<<"$bundle_entries"
+packaged_abis="$(awk -F/ '/^base\/lib\// {print $3}' <<<"$bundle_entries" | sort -u)"
+expected_abis=$'arm64-v8a\narmeabi-v7a'
+if [[ "$packaged_abis" != "$expected_abis" ]]; then
+  printf 'Unexpected release ABIs:\n%s\n' "$packaged_abis" >&2
+  die "release ABIs differ from arm64-v8a and armeabi-v7a"
+fi
+
+grep -Fxq 'BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map' <<<"$bundle_entries" \
+  || die "R8 mapping is absent from BUNDLE-METADATA"
+grep -q '^BUNDLE-METADATA/com.android.tools.build.debugsymbols/arm64-v8a/.*\.so\.sym$' <<<"$bundle_entries" \
+  || die "ARM64 native debug symbols are absent from BUNDLE-METADATA"
 
 for forbidden_asset in \
   base/assets/models/phonssm.onnx \
   base/assets/avatar/vozual_interpreter_base_v1.png \
   base/assets/avatar/draco/draco_decoder.js; do
-  if unzip -Z1 "$aab_path" | grep -Fxq "$forbidden_asset"; then
-    echo "Development-only asset is present: $forbidden_asset" >&2
-    exit 1
+  if grep -Fxq "$forbidden_asset" <<<"$bundle_entries"; then
+    die "development-only asset is present: $forbidden_asset"
   fi
 done
 
@@ -94,26 +104,25 @@ for development_marker in \
   'React Native DevTools' \
   'localhost:8081'; do
   if grep -aFq "$development_marker" "$temp_dir/index.android.bundle"; then
-    echo "Development-only marker is present in the release JS bundle: $development_marker" >&2
-    exit 1
+    die "development-only marker is present in release JS: $development_marker"
   fi
 done
 
 checked_libraries=0
 for so_file in "$temp_dir"/base/lib/arm64-v8a/*.so; do
+  [[ -f "$so_file" ]] || continue
   while IFS= read -r alignment; do
+    [[ "$alignment" =~ ^0[xX][0-9a-fA-F]+$|^[0-9]+$ ]] \
+      || die "invalid ELF alignment reported for $(basename "$so_file")"
     alignment_value=$((alignment))
     if (( alignment_value < 16384 )); then
-      echo "ELF segment below 16 KB alignment: $(basename "$so_file") ($alignment)" >&2
-      exit 1
+      die "ELF segment below 16 KB alignment: $(basename "$so_file") ($alignment)"
     fi
   done < <("$readelf_bin" -lW "$so_file" | awk '$1 == "LOAD" {print $NF}')
   checked_libraries=$((checked_libraries + 1))
 done
 
-if (( checked_libraries == 0 )); then
-  echo "No arm64 native libraries were found." >&2
-  exit 1
-fi
+(( checked_libraries > 0 )) || die "no ARM64 native libraries were found"
 
-echo "Android release verification passed: API 37, signed non-debug AAB, 2 ABIs, $checked_libraries arm64 libraries aligned to 16 KB."
+printf 'Android release verification passed: API 37, %s bytes, signed non-debug AAB, 2 ABIs, %s ARM64 libraries aligned to 16 KB.\n' \
+  "$aab_bytes" "$checked_libraries"

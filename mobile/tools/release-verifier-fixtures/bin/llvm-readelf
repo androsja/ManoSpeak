@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf 'LOAD 0x0 0x0 0x0 0x0 0x0 R %s\n' "${MOCK_ELF_ALIGNMENT:-0x4000}"

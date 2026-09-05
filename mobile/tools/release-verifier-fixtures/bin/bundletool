@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${2:-}" in
+  config)
+    printf 'compression { uncompressedGlob: "lib/**" }\nPAGE_ALIGNMENT_16K\n'
+    ;;
+  manifest)
+    printf '<manifest package="%s" android:compileSdkVersion="%s"><uses-sdk android:targetSdkVersion="%s" /></manifest>\n' \
+      "${MOCK_PACKAGE:-com.androsja.vozual}" \
+      "${MOCK_COMPILE_SDK:-37}" \
+      "${MOCK_TARGET_SDK:-37}"
+    ;;
+  *)
+    printf 'Unexpected bundletool fixture arguments.\n' >&2
+    exit 2
+    ;;
+esac
