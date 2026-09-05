@@ -14,3 +14,22 @@ index 41b4359..fa79fff 100644
      extractLibs "com.facebook.fbjni:fbjni:+:headers"
      extractLibs "com.facebook.fbjni:fbjni:+"
    }
+
+diff --git a/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java b/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java
+--- a/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java
++++ b/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java
+@@ -8,8 +8,10 @@ import java.util.HashMap;
+ import android.os.Build;
+ import androidx.annotation.NonNull;
++import androidx.annotation.OptIn;
+ import androidx.annotation.RequiresApi;
+ import com.facebook.react.bridge.JavaScriptContextHolder;
+ import com.facebook.react.bridge.ReactMethod;
+ import com.facebook.react.bridge.ReactApplicationContext;
+ import com.facebook.react.bridge.ReactContextBaseJavaModule;
++import com.facebook.react.common.annotations.FrameworkAPI;
+ import com.facebook.react.turbomodule.core.CallInvokerHolderImpl;
+@@ -17,2 +19,3 @@ import com.facebook.react.turbomodule.core.CallInvokerHolderImpl;
+ @RequiresApi(api = Build.VERSION_CODES.N)
++@OptIn(markerClass = FrameworkAPI.class)
+ public class OnnxruntimeModule extends ReactContextBaseJavaModule {

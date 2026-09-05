@@ -19,6 +19,37 @@ describe('native speech privacy contract', () => {
     expect(source).not.toContain('putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)');
   });
 
+  it('never resurrects an Android microphone session without another user action', () => {
+    const source = mobileSource(
+      'android/app/src/main/java/com/androsja/vozual/VoiceListeningService.kt',
+    );
+
+    expect(source).toContain('return START_NOT_STICKY');
+    expect(source).not.toContain('return START_STICKY');
+    expect(source).toContain('override fun onTaskRemoved(rootIntent: Intent?)');
+    expect(source).toContain('ERROR_INSUFFICIENT_PERMISSIONS');
+    expect(source).toContain('ERROR_MICROPHONE_PERMISSION_DENIED');
+    expect(source).toContain('ContextCompat.checkSelfPermission');
+  });
+
+  it('exposes user-visible Android controls for an active microphone service', () => {
+    const serviceSource = mobileSource(
+      'android/app/src/main/java/com/androsja/vozual/VoiceListeningService.kt',
+    );
+    const manifest = mobileSource('android/app/src/main/AndroidManifest.xml');
+    const listenerSource = mobileSource('src/components/ListenerScreen.tsx');
+
+    expect(manifest).toContain('android.permission.POST_NOTIFICATIONS');
+    expect(manifest).toContain('android:foregroundServiceType="microphone"');
+    expect(serviceSource).toContain('ACTION_STOP_LISTENING');
+    expect(serviceSource).toContain('.addAction(android.R.drawable.ic_media_pause, "Detener"');
+    expect(serviceSource).toContain('sendSpeechEvent(EVENT_STOPPED)');
+    expect(listenerSource).toContain('PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS');
+    expect(listenerSource).toContain('Linking.openSettings()');
+    expect(listenerSource).toContain("event.type === 'stopped'");
+    expect(listenerSource).toContain('MICROPHONE_PERMISSION_ERROR');
+  });
+
   it('requires on-device iOS recognition and checks device support', () => {
     const source = mobileSource('ios/Vozual/VozualSpeechRecognizer.m');
 

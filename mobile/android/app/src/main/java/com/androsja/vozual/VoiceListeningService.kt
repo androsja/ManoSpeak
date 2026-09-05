@@ -1,9 +1,12 @@
 package com.androsja.vozual
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -14,6 +17,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import java.lang.ref.WeakReference
 
 /**
@@ -42,26 +46,57 @@ class VoiceListeningService : Service() {
     activeService = WeakReference(this)
     Log.i(TAG, "Local speech service created")
     createNotificationChannel()
-    startForeground(
-      NOTIFICATION_ID,
-      NotificationCompat.Builder(this, CHANNEL_ID)
-        .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-        .setContentTitle("VOZUAL está escuchando")
-        .setContentText("VOZUAL traducirá las palabras publicadas.")
-        .setCategory(NotificationCompat.CATEGORY_SERVICE)
-        .setPriority(NotificationCompat.PRIORITY_LOW)
-        .setOngoing(true)
-        .build(),
+    val stopIntent = Intent(this, VoiceListeningService::class.java).apply {
+      action = ACTION_STOP_LISTENING
+    }
+    val stopPendingIntent = PendingIntent.getService(
+      this,
+      STOP_REQUEST_CODE,
+      stopIntent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
+    val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+      .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+      .setContentTitle("VOZUAL está escuchando")
+      .setContentText("El reconocimiento se realiza localmente en este teléfono.")
+      .setCategory(NotificationCompat.CATEGORY_SERVICE)
+      .setPriority(NotificationCompat.PRIORITY_LOW)
+      .setOngoing(true)
+      .addAction(android.R.drawable.ic_media_pause, "Detener", stopPendingIntent)
+
+    packageManager.getLaunchIntentForPackage(packageName)?.let { launchIntent ->
+      val contentIntent = PendingIntent.getActivity(
+        this,
+        OPEN_APP_REQUEST_CODE,
+        launchIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+      )
+      notification.setContentIntent(contentIntent)
+    }
+    startForeground(NOTIFICATION_ID, notification.build())
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    if (intent?.action == ACTION_STOP_LISTENING) {
+      Log.i(TAG, "Speech service stopped from its notification")
+      sendSpeechEvent(EVENT_STOPPED)
+      stopSelf()
+      return START_NOT_STICKY
+    }
+    if (!hasMicrophonePermission()) {
+      Log.w(TAG, "Speech service cannot start without microphone permission")
+      sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
+      stopSelf()
+      return START_NOT_STICKY
+    }
     // Give Android time to release a previous on-device recognition session
     // before the foreground service requests a new one.
     if (recognizer == null && scheduledRestart == null) {
       scheduleRecognition(delayMillis = INITIAL_HANDOFF_DELAY_MILLIS, recreate = true)
     }
-    return START_STICKY
+    // Listening only exists after an explicit user action. Android must not
+    // resurrect the microphone if it kills this service or the user stops it.
+    return START_NOT_STICKY
   }
 
   override fun onBind(intent: Intent?): IBinder? = null
@@ -76,6 +111,13 @@ class VoiceListeningService : Service() {
     sendSpeechEvent(EVENT_END)
     if (activeService?.get() === this) activeService = null
     super.onDestroy()
+  }
+
+  override fun onTaskRemoved(rootIntent: Intent?) {
+    Log.i(TAG, "App task removed; stopping the active microphone session")
+    sendSpeechEvent(EVENT_STOPPED)
+    stopSelf()
+    super.onTaskRemoved(rootIntent)
   }
 
   private fun finishPhrase() {
@@ -97,6 +139,11 @@ class VoiceListeningService : Service() {
     val restart = Runnable {
       scheduledRestart = null
       if (destroyed) return@Runnable
+      if (!hasMicrophonePermission()) {
+        sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
+        stopSelf()
+        return@Runnable
+      }
       if (recreate || recognizer == null) createRecognizer()
       startCurrentRecognizer()
     }
@@ -122,6 +169,10 @@ class VoiceListeningService : Service() {
         it.setRecognitionListener(createRecognitionListener(sessionId))
       }
       Log.i(TAG, "Created on-device recognizer session=$sessionId")
+    } catch (error: SecurityException) {
+      Log.e(TAG, "Microphone permission was revoked while creating recognition", error)
+      sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
+      stopSelf()
     } catch (error: Exception) {
       Log.e(TAG, "Unable to create on-device recognizer", error)
       sendSpeechEvent(EVENT_ERROR, error = ERROR_OFFLINE_UNAVAILABLE)
@@ -140,6 +191,11 @@ class VoiceListeningService : Service() {
           "language=${currentRecognitionLanguage()}",
       )
       current.startListening(createRecognitionIntent())
+    } catch (error: SecurityException) {
+      recognitionInProgress = false
+      Log.e(TAG, "Microphone permission was revoked while starting recognition", error)
+      sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
+      stopSelf()
     } catch (error: Exception) {
       recognitionInProgress = false
       Log.e(TAG, "Unable to start service-owned recognition", error)
@@ -204,6 +260,12 @@ class VoiceListeningService : Service() {
           return
         }
         recognitionInProgress = false
+        if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+          Log.w(TAG, "Microphone permission was revoked during recognition")
+          sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
+          stopSelf()
+          return
+        }
         val normalSilence =
           error == SpeechRecognizer.ERROR_NO_MATCH ||
             error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
@@ -334,6 +396,10 @@ class VoiceListeningService : Service() {
   private fun currentRecognitionLanguage(): String =
     RECOGNITION_LANGUAGES[recognitionLanguageIndex]
 
+  private fun hasMicrophonePermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+      PackageManager.PERMISSION_GRANTED
+
   private fun sendSpeechEvent(
     event: String,
     values: ArrayList<String>? = null,
@@ -378,9 +444,13 @@ class VoiceListeningService : Service() {
     const val EVENT_RESULTS = "results"
     const val EVENT_END = "end"
     const val EVENT_ERROR = "error"
+    const val EVENT_STOPPED = "stopped"
 
+    const val ACTION_STOP_LISTENING = "com.androsja.vozual.STOP_VOICE_LISTENING"
     private const val CHANNEL_ID = "vozual_voice_listening"
     private const val NOTIFICATION_ID = 2701
+    private const val STOP_REQUEST_CODE = 2702
+    private const val OPEN_APP_REQUEST_CODE = 2703
     private const val INITIAL_HANDOFF_DELAY_MILLIS = 350L
     // Google's Android on-device provider does not expose es-CO on every
     // device. These fallbacks remain fully local and preserve Spanish speech
@@ -388,5 +458,6 @@ class VoiceListeningService : Service() {
     private val RECOGNITION_LANGUAGES = listOf("es-CO", "es-US", "es-ES")
     const val ERROR_OFFLINE_UNAVAILABLE = "offline_speech_unavailable"
     const val ERROR_OFFLINE_LANGUAGE_UNAVAILABLE = "offline_es_co_unavailable"
+    const val ERROR_MICROPHONE_PERMISSION_DENIED = "microphone_permission_denied"
   }
 }

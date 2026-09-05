@@ -1,0 +1,10 @@
+diff --git a/node_modules/react-native-webview/android/build.gradle b/node_modules/react-native-webview/android/build.gradle
+--- a/node_modules/react-native-webview/android/build.gradle
++++ b/node_modules/react-native-webview/android/build.gradle
+@@ -11,5 +11,5 @@ buildscript {
+     dependencies {
+         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${safeExtGet('kotlinVersion')}")
+-        classpath("com.android.tools.build:gradle:7.0.4")
++        classpath("com.android.tools.build:gradle:9.2.1")
+     }
+ }

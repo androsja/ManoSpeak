@@ -4,6 +4,7 @@ import {
   Alert,
   AppState,
   DeviceEventEmitter,
+  Linking,
   Modal,
   NativeEventEmitter,
   NativeModules,
@@ -79,13 +80,14 @@ type IosNativeSpeechEndEvent = {
   reason?: string;
 };
 type PipSpeechEvent = SpeechEvent & {
-  type?: 'start' | 'partialResults' | 'results' | 'end' | 'error';
+  type?: 'start' | 'partialResults' | 'results' | 'end' | 'error' | 'stopped';
 };
 const OFFLINE_SPEECH_ERRORS = new Set([
   'offline_speech_unavailable',
   'offline_es_co_unavailable',
 ]);
 const OFFLINE_SPEECH_MESSAGE = 'El reconocimiento local de español (Colombia) no está disponible. Descarga el idioma en los ajustes del teléfono y vuelve a intentarlo.';
+const MICROPHONE_PERMISSION_ERROR = 'microphone_permission_denied';
 function speechErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error !== null && 'message' in error) {
@@ -190,6 +192,8 @@ export function ListenerScreen({
   const [playbackId, setPlaybackId] = useState(0);
   const [continuePhrase, setContinuePhrase] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [microphonePermissionBlocked, setMicrophonePermissionBlocked] = useState(false);
+  const [notificationPermissionBlocked, setNotificationPermissionBlocked] = useState(false);
   const [draftPreviewActive, setDraftPreviewActive] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [phraseSuggestionIndex, setPhraseSuggestionIndex] = useState(0);
@@ -710,6 +714,7 @@ export function ListenerScreen({
     nativePipSpeechActiveRef.current = false;
     setStarting(true);
     setErrorMessage('');
+    setMicrophonePermissionBlocked(false);
     try {
       if (Platform.OS === 'android') {
         const permission = await PermissionsAndroid.request(
@@ -722,8 +727,23 @@ export function ListenerScreen({
           },
         );
         if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+          setMicrophonePermissionBlocked(true);
           setErrorMessage('Debes permitir el micrófono en los ajustes del teléfono.');
           return;
+        }
+        if (Number(Platform.Version) >= 33) {
+          const notificationPermission = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+            {
+              title: 'Control de escucha activa',
+              message: 'Permite las notificaciones para ver y detener la escucha de VOZUAL desde Android.',
+              buttonPositive: 'Permitir',
+              buttonNegative: 'Ahora no',
+            },
+          );
+          setNotificationPermissionBlocked(
+            notificationPermission !== PermissionsAndroid.RESULTS.GRANTED,
+          );
         }
       }
       if (Platform.OS === 'android' && !pictureInPicture) {
@@ -998,6 +1018,7 @@ export function ListenerScreen({
     setPlannedLsc('');
     setListening(false);
     setPhraseFinalizing(false);
+    setMicrophonePermissionBlocked(false);
     setErrorMessage('');
     try {
       await pictureInPicture?.stopListeningService();
@@ -1160,6 +1181,7 @@ export function ListenerScreen({
           recognitionReadyRef.current = true;
           setRecognitionReady(true);
           recognizedWords.current = [];
+          setMicrophonePermissionBlocked(false);
           setErrorMessage('');
           return;
         }
@@ -1185,7 +1207,36 @@ export function ListenerScreen({
           setListening(false);
           setPhraseFinalizing(false);
           setErrorMessage(OFFLINE_SPEECH_MESSAGE);
-          void pictureInPicture?.stopListeningService();
+          pictureInPicture?.stopListeningService().catch(() => false);
+          return;
+        }
+        if (event.type === 'stopped') {
+          if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
+          phraseFinalizeTimer.current = undefined;
+          listeningRef.current = false;
+          nativePipSpeechActiveRef.current = false;
+          recognitionReadyRef.current = false;
+          setRecognitionReady(false);
+          setListening(false);
+          setPhraseFinalizing(false);
+          setErrorMessage('La escucha se detuvo desde el control de Android.');
+          return;
+        }
+        if (
+          event.type === 'error'
+          && event.error === MICROPHONE_PERMISSION_ERROR
+        ) {
+          if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
+          phraseFinalizeTimer.current = undefined;
+          listeningRef.current = false;
+          nativePipSpeechActiveRef.current = false;
+          recognitionReadyRef.current = false;
+          setRecognitionReady(false);
+          setListening(false);
+          setPhraseFinalizing(false);
+          setMicrophonePermissionBlocked(true);
+          setErrorMessage('Android retiró el permiso del micrófono. Permítelo nuevamente en los ajustes.');
+          pictureInPicture?.stopListeningService().catch(() => false);
           return;
         }
         if (event.type === 'error' && listeningModeRef.current === 'phrase') {
@@ -1409,6 +1460,27 @@ export function ListenerScreen({
           <Text style={draftPreviewActive ? styles.draftWarning : styles.error}>
             {errorMessage}
           </Text>
+        )}
+        {(microphonePermissionBlocked || notificationPermissionBlocked) && (
+          <View style={styles.permissionGuidance}>
+            {notificationPermissionBlocked && !microphonePermissionBlocked && (
+              <Text style={styles.permissionGuidanceText}>
+                La escucha funciona, pero debes permitir notificaciones para ver el botón DETENER de Android.
+              </Text>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir los ajustes de permisos de VOZUAL"
+              style={styles.permissionSettingsButton}
+              onPress={() => {
+                Linking.openSettings().catch(() => {
+                  setErrorMessage('No fue posible abrir los ajustes. Ábrelos desde la configuración de Android.');
+                });
+              }}
+            >
+              <Text style={styles.permissionSettingsButtonText}>ABRIR AJUSTES</Text>
+            </Pressable>
+          </View>
         )}
         <Pressable
           accessibilityRole={transcript ? undefined : 'button'}
@@ -1651,6 +1723,10 @@ const styles = StyleSheet.create({
   suggestionActionText: { color: '#F7F9FC', fontSize: 8, fontWeight: '900', letterSpacing: 0.25, lineHeight: 11 },
   suggestionText: { color: '#D8E1EC', textAlign: 'center', marginTop: 1, fontSize: 13, fontWeight: '700', lineHeight: 18 },
   error: { color: '#A9B8C9', textAlign: 'center', marginTop: 8, fontSize: 12 },
+  permissionGuidance: { alignItems: 'center', marginTop: 8, gap: 7 },
+  permissionGuidanceText: { color: '#A9B8C9', textAlign: 'center', fontSize: 11, lineHeight: 15 },
+  permissionSettingsButton: { minHeight: 34, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: '#69DDD9', alignItems: 'center', justifyContent: 'center' },
+  permissionSettingsButtonText: { color: '#69DDD9', fontSize: 10, fontWeight: '900', letterSpacing: 0.35 },
   draftWarning: { color: '#FBBF24', textAlign: 'center', marginTop: 8, fontSize: 12, fontWeight: '700' },
   settingsOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#020812A6' },
   settingsSheet: { margin: 16, padding: 20, borderRadius: 22, backgroundColor: '#102337', borderWidth: 1, borderColor: '#31506A' },
