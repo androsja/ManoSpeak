@@ -1,13 +1,23 @@
+const mockExists = jest.fn();
+const mockReadFile = jest.fn();
+const mockUnlink = jest.fn();
+const mockWriteFile = jest.fn();
+
+jest.mock('react-native-fs', () => ({
+  DocumentDirectoryPath: '/tmp',
+  exists: (...args: unknown[]) => mockExists(...args),
+  readFile: (...args: unknown[]) => mockReadFile(...args),
+  unlink: (...args: unknown[]) => mockUnlink(...args),
+  writeFile: (...args: unknown[]) => mockWriteFile(...args),
+}));
+
 import {
   applyUsageDelta,
+  clearLocalUsage,
   emptyUsagePeriod,
   usageAccountId,
   usagePeriodId,
 } from '../UsageMeterService';
-
-jest.mock('react-native-fs', () => ({
-  DocumentDirectoryPath: '/tmp',
-}));
 
 describe('UsageMeterService', () => {
   it('uses a stable UTC month identifier', () => {
@@ -30,5 +40,21 @@ describe('UsageMeterService', () => {
     expect(period.consumedSeconds).toBe(0);
     expect(usageAccountId()).toBe('anonymous');
     expect(usageAccountId(' user-1 ')).toBe('user-1');
+  });
+
+  it('removes only the deleted account from the private usage ledger', async () => {
+    mockReadFile.mockResolvedValue(JSON.stringify({
+      anonymous: {periodId: '2026-09', consumedSeconds: 3, updatedAt: 'now'},
+      'user-1': {periodId: '2026-09', consumedSeconds: 9, updatedAt: 'now'},
+    }));
+    mockWriteFile.mockResolvedValue(undefined);
+
+    await clearLocalUsage('user-1');
+
+    expect(mockWriteFile).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(mockWriteFile.mock.calls[0][1])).toEqual({
+      anonymous: {periodId: '2026-09', consumedSeconds: 3, updatedAt: 'now'},
+    });
+    expect(mockUnlink).not.toHaveBeenCalled();
   });
 });

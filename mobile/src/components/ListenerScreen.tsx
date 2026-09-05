@@ -35,7 +35,12 @@ import {nextPhraseSuggestionIndex} from '../services/PhraseSuggestionService';
 import { AvatarClip, AvatarRenderMode, SkeletalAvatar } from './SkeletalAvatar';
 import {PipSkeletalAvatar} from './PipSkeletalAvatar';
 import type {ActivationAccount} from '../services/ActivationService';
+import {messageForAccountDeletionError} from '../services/ActivationErrorMessage';
 import type {AppAccessConfig} from '../services/AppAccessConfigService';
+import {
+  VOZUAL_ACCOUNT_DELETION_URL,
+  VOZUAL_PRIVACY_POLICY_URL,
+} from '../services/PrivacyPolicyService';
 import {resolveAccessPolicy} from '../services/AccessPolicyService';
 import {
   emptyUsagePeriod,
@@ -143,6 +148,7 @@ type ListenerScreenProps = {
   onManageAccount?: () => void;
   onManageSignLanguages?: () => void;
   onSignOut?: () => Promise<void>;
+  onDeleteAccount?: () => Promise<void>;
 };
 
 export function ListenerScreen({
@@ -152,6 +158,7 @@ export function ListenerScreen({
   onManageAccount,
   onManageSignLanguages,
   onSignOut,
+  onDeleteAccount,
 }: ListenerScreenProps) {
   const phraseContinuationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const phraseFinalizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -196,6 +203,8 @@ export function ListenerScreen({
   const [notificationPermissionBlocked, setNotificationPermissionBlocked] = useState(false);
   const [draftPreviewActive, setDraftPreviewActive] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [accountActionPending, setAccountActionPending] = useState(false);
+  const [accountActionError, setAccountActionError] = useState('');
   const [phraseSuggestionIndex, setPhraseSuggestionIndex] = useState(0);
   const [pictureInPictureMode, setPictureInPictureMode] = useState(false);
   const [avatarReady, setAvatarReady] = useState(false);
@@ -327,6 +336,39 @@ export function ListenerScreen({
       })
       .catch(() => setBillingSandboxFeedback('No se pudo reiniciar el estado de prueba.'));
   }, [account?.uid]);
+
+  const openAccountResource = useCallback((url: string) => {
+    Linking.openURL(url).catch(() => {
+      setAccountActionError('No pudimos abrir el enlace. Escríbenos a androsjapps@gmail.com.');
+    });
+  }, []);
+
+  const confirmAccountDeletion = useCallback(() => {
+    if (!account || !onDeleteAccount || accountActionPending) return;
+    Alert.alert(
+      'Eliminar cuenta y datos',
+      'Esta acción elimina tu cuenta de VOZUAL, el perfil y el uso asociados. Google puede pedirte confirmar tu identidad. No elimina tu cuenta de Google.',
+      [
+        {text: 'Cancelar', style: 'cancel'},
+        {
+          text: 'Eliminar definitivamente',
+          style: 'destructive',
+          onPress: () => {
+            setAccountActionPending(true);
+            setAccountActionError('');
+            onDeleteAccount()
+              .then(() => {
+                setSettingsVisible(false);
+              })
+              .catch(error => {
+                setAccountActionError(messageForAccountDeletionError(error));
+              })
+              .finally(() => setAccountActionPending(false));
+          },
+        },
+      ],
+    );
+  }, [account, accountActionPending, onDeleteAccount]);
 
   useEffect(() => {
     if (!playingSign || activeClip === 'IDLE' || activeClip === 'PHRASE_WAIT') return;
@@ -1637,6 +1679,7 @@ export function ListenerScreen({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={account ? 'Cerrar sesión' : 'Activar cuenta'}
+                disabled={accountActionPending}
                 onPress={() => {
                   if (account) {
                     onSignOut?.().catch(() => undefined);
@@ -1650,6 +1693,47 @@ export function ListenerScreen({
                 <Text style={styles.settingsAccountButtonText}>
                   {account ? 'SALIR' : 'ACTIVAR'}
                 </Text>
+              </Pressable>
+            </View>
+            {account && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Eliminar cuenta y datos"
+                disabled={accountActionPending}
+                onPress={confirmAccountDeletion}
+                style={styles.settingsDeleteAccountButton}
+              >
+                {accountActionPending
+                  ? <ActivityIndicator color="#F06275" />
+                  : <Text style={styles.settingsDeleteAccountText}>ELIMINAR CUENTA Y DATOS</Text>}
+              </Pressable>
+            )}
+            {!!accountActionError && (
+              <Text style={styles.settingsAccountError}>{accountActionError}</Text>
+            )}
+            {!!accountActionError && account && (
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Abrir solicitud web de eliminación"
+                onPress={() => openAccountResource(VOZUAL_ACCOUNT_DELETION_URL)}
+              >
+                <Text style={styles.settingsAccountLink}>SOLICITAR ELIMINACIÓN POR WEB</Text>
+              </Pressable>
+            )}
+            <View style={styles.settingsPolicyLinks}>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Abrir política de privacidad"
+                onPress={() => openAccountResource(VOZUAL_PRIVACY_POLICY_URL)}
+              >
+                <Text style={styles.settingsPolicyLink}>PRIVACIDAD</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Abrir solicitud de eliminación de cuenta"
+                onPress={() => openAccountResource(VOZUAL_ACCOUNT_DELETION_URL)}
+              >
+                <Text style={styles.settingsPolicyLink}>ELIMINAR DATOS</Text>
               </Pressable>
             </View>
           </View>
@@ -1761,4 +1845,10 @@ const styles = StyleSheet.create({
   settingsAccountDetail: {color: '#7F91A6', fontSize: 10, lineHeight: 14, marginTop: 3},
   settingsAccountButton: {minWidth: 74, height: 38, paddingHorizontal: 12, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#20344B', borderWidth: 1, borderColor: '#69DDD9'},
   settingsAccountButtonText: {color: '#69DDD9', fontSize: 10, fontWeight: '900', letterSpacing: 0.35},
+  settingsDeleteAccountButton: {minHeight: 38, marginTop: 12, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F06275'},
+  settingsDeleteAccountText: {color: '#F06275', fontSize: 10, fontWeight: '900', letterSpacing: 0.35},
+  settingsAccountError: {color: '#F8A6B1', fontSize: 10, lineHeight: 14, textAlign: 'center', marginTop: 9},
+  settingsAccountLink: {color: '#69DDD9', fontSize: 9, fontWeight: '900', textAlign: 'center', marginTop: 8},
+  settingsPolicyLinks: {flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 15},
+  settingsPolicyLink: {color: '#A9B8C9', fontSize: 9, fontWeight: '800', textDecorationLine: 'underline'},
 });

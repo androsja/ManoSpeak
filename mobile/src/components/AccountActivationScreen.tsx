@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +18,7 @@ import {
   activationErrorDetails,
   messageForActivationError,
 } from '../services/ActivationErrorMessage';
+import {VOZUAL_PRIVACY_POLICY_URL} from '../services/PrivacyPolicyService';
 
 type AccountActivationScreenProps = {
   config: AppAccessConfig;
@@ -127,6 +129,17 @@ export function AccountActivationScreen({
         <Text style={styles.privacy}>
           No se realiza ningún cobro al activar. VOZUAL tampoco guarda el audio ni las frases que dices.
         </Text>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Abrir política de privacidad"
+          onPress={() => {
+            Linking.openURL(VOZUAL_PRIVACY_POLICY_URL).catch(() => {
+              setErrorMessage('No pudimos abrir la política. Escríbenos a androsjapps@gmail.com.');
+            });
+          }}
+        >
+          <Text style={styles.privacyLink}>POLÍTICA DE PRIVACIDAD</Text>
+        </Pressable>
         <Text style={styles.support}>Soporte: {config.supportEmail}</Text>
       </View>
     </ScrollView>
@@ -160,6 +173,7 @@ const styles = StyleSheet.create({
   closeButton: {height: 48, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#69DDD9', marginTop: 14},
   closeButtonText: {color: '#69DDD9', fontSize: 13, fontWeight: '900'},
   privacy: {color: '#7F91A6', textAlign: 'center', fontSize: 11, lineHeight: 16, marginTop: 20},
+  privacyLink: {color: '#69DDD9', textAlign: 'center', fontSize: 10, fontWeight: '800', textDecorationLine: 'underline', marginTop: 8},
   support: {color: '#7F91A6', textAlign: 'center', fontSize: 10, marginTop: 7},
   buttonPressed: {opacity: 0.76},
 });

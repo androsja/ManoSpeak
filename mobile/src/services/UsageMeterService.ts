@@ -83,3 +83,20 @@ export function recordActiveTranslationSeconds(
   updateQueue = operation.catch(() => undefined);
   return operation;
 }
+
+export function clearLocalUsage(uid: string): Promise<void> {
+  const accountId = uid.trim();
+  if (!accountId) return Promise.reject(new Error('An account identifier is required.'));
+
+  const operation = updateQueue.then(async () => {
+    const ledger = await readLedger();
+    delete ledger[accountId];
+    if (Object.keys(ledger).length > 0) {
+      await RNFS.writeFile(USAGE_PATH, JSON.stringify(ledger), 'utf8');
+      return;
+    }
+    if (await RNFS.exists(USAGE_PATH)) await RNFS.unlink(USAGE_PATH);
+  });
+  updateQueue = operation.catch(() => undefined);
+  return operation;
+}

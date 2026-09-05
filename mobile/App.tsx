@@ -10,6 +10,7 @@ import {
 } from './src/services/AppAccessConfigService';
 import {
   closeActivationSession,
+  deleteActivationAccount,
   observeActivationAccount,
   type ActivationAccount,
 } from './src/services/ActivationService';
@@ -145,6 +146,7 @@ function AppContent() {
           setLibraryOpen(true);
         }}
         onSignOut={() => closeActivationSession()}
+        onDeleteAccount={() => deleteActivationAccount(accessConfig.googleWebClientId)}
       />
     </SafeAreaView>
   );

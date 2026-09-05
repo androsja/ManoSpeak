@@ -65,9 +65,12 @@ The mobile client may read its own access and usage documents. Only trusted Clou
 
 VOZUAL keeps microphone audio, speech transcripts and landmark animation data on device by default. Usage accounting sends duration deltas and event identifiers, never the spoken content.
 
+Account deletion is fail-closed and ordered: provider reauthentication, Firestore profile/access/usage deletion with a server-write barrier, local account-scoped usage removal, and finally Firebase Authentication deletion. If cloud deletion cannot be confirmed, the account remains active and the user is directed to the public deletion-request page. Firestore rules allow an owner to delete these account documents without allowing client entitlement creation or updates.
+
 ## Current implementation state
 
 - Google and Apple authentication are connected to Firebase Authentication, with persisted sessions and explicit sign-out.
+- Settings includes direct account deletion plus public privacy and deletion-request links. The activation screen exposes the privacy policy before sign-in.
 - The app synchronizes the signed-in user's profile on a best-effort basis. A Firestore outage or missing database never blocks local translation.
 - The mobile app keeps a monthly, account-scoped usage preview in its private document directory. It measures active avatar playback seconds and never stores audio or transcript content.
 - The settings screen shows the current launch-access status and measured minutes. It does not enforce a quota while `monetization_enabled` is false.
@@ -93,4 +96,5 @@ The product identifiers, entitlement names and billing periods must match across
 3. Select the Firestore location, create the database and deploy `firestore.rules`.
 4. Validate store receipts and monthly usage accounting.
 5. Enable activation for internal testers, then for a small percentage of production users.
-6. Enable monetization only after purchase restoration and account deletion pass end-to-end tests.
+6. Deploy and verify the public privacy/deletion site and the owner-delete Firestore rules.
+7. Enable monetization only after purchase restoration and account deletion pass end-to-end tests.
