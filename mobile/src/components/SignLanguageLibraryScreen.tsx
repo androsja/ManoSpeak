@@ -197,6 +197,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
           contentContainerStyle={styles.filters}
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.filterScroller}
         >
           {[ALL_CATEGORIES, INSTALLED_CATEGORY, ...categories].map(value => {
             const selected = category === value;
@@ -380,8 +381,9 @@ const styles = StyleSheet.create({
   catalogTitle: {color: '#F8FAFC', fontSize: 26, fontWeight: '800'},
   catalogSummary: {color: '#94A3B8', fontSize: 14, lineHeight: 20, marginTop: 7},
   searchInput: {backgroundColor: '#1E293B', borderColor: '#334155', borderRadius: 12, borderWidth: 1, color: '#F8FAFC', fontSize: 16, marginTop: 20, paddingHorizontal: 15, paddingVertical: 13},
-  filters: {gap: 8, paddingVertical: 12},
-  filterChip: {backgroundColor: '#1E293B', borderColor: '#334155', borderRadius: 18, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 8},
+  filterScroller: {flexGrow: 0, marginTop: 10, maxHeight: 42},
+  filters: {alignItems: 'center', gap: 8, paddingRight: 12},
+  filterChip: {alignItems: 'center', alignSelf: 'center', backgroundColor: '#1E293B', borderColor: '#334155', borderRadius: 18, borderWidth: 1, height: 36, justifyContent: 'center', paddingHorizontal: 13},
   filterChipSelected: {backgroundColor: '#155E75', borderColor: '#38BDF8'},
   filterChipText: {color: '#94A3B8', fontSize: 11, fontWeight: '800'},
   filterChipTextSelected: {color: '#E0F2FE'},
