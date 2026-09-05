@@ -1,5 +1,6 @@
 import {
   extractKnownSpeechWords,
+  mergeSpeechSegments,
   normalizeSpeech,
   selectKnownSpeechAlternative,
   shouldDeferPartialSpeechMatch,
@@ -45,6 +46,11 @@ describe('VoiceCommandService', () => {
     expect(extractKnownSpeechWords('no entiendo', vocabulary)).toEqual(['NO ENTIENDO']);
     expect(shouldDeferPartialSpeechMatch('no', vocabulary)).toBe(true);
     expect(shouldDeferPartialSpeechMatch('no entiendo', vocabulary)).toBe(false);
+  });
+
+  it('joins consecutive recognizer segments for a longer expression', () => {
+    expect(mergeSpeechSegments('cómo', 'estás')).toBe('como estas');
+    expect(mergeSpeechSegments('cómo', 'cómo estás')).toBe('como estas');
   });
 
   it('maps verb conjugations to one canonical sign clip', () => {

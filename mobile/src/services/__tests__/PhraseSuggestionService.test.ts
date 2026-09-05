@@ -13,6 +13,7 @@ describe('PhraseSuggestionService', () => {
       'Buenas noches, amigo',
       'Adiós, amigo',
       'Comer carne',
+      'Hola, ¿cómo estás?',
     ]);
     expect(resolvePublishedLscPlan('muchas gracias').tokens).toEqual([]);
   });

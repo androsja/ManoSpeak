@@ -8,6 +8,19 @@ export function normalizeSpeech(text: string): string {
     .trim();
 }
 
+/** Joins consecutive recognizer segments without duplicating a repeated prefix. */
+export function mergeSpeechSegments(prefix: string, next: string): string {
+  const normalizedPrefix = normalizeSpeech(prefix);
+  const normalizedNext = normalizeSpeech(next);
+  if (!normalizedPrefix) return normalizedNext;
+  if (!normalizedNext) return normalizedPrefix;
+  if (normalizedNext === normalizedPrefix || normalizedNext.startsWith(`${normalizedPrefix} `)) {
+    return normalizedNext;
+  }
+  if (normalizedPrefix.startsWith(`${normalizedNext} `)) return normalizedPrefix;
+  return `${normalizedPrefix} ${normalizedNext}`;
+}
+
 export function speechContainsWord(text: string, word: string): boolean {
   const normalizedText = normalizeSpeech(text);
   const normalizedWord = normalizeSpeech(word);

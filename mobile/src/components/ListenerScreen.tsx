@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import RNFS from 'react-native-fs';
 import {
+  mergeSpeechSegments,
   selectKnownSpeechAlternative,
   shouldDeferPartialSpeechMatch,
 } from '../services/VoiceCommandService';
@@ -58,6 +59,7 @@ const AVATAR_ZOOM_MIN = 0.85;
 const AVATAR_ZOOM_MAX = 1.3;
 const AVATAR_ZOOM_STEP = 0.05;
 const DEFAULT_AVATAR_ZOOM = 1;
+const CONTINUOUS_PREFIX_WAIT_MS = 1200;
 type ListeningMode = 'continuous' | 'phrase';
 const LISTENING_MODES: Array<{value: ListeningMode; label: string; detail: string}> = [
   {value: 'continuous', label: 'EN VIVO', detail: 'Escucha continuamente y traduce al instante'},
@@ -151,6 +153,8 @@ export function ListenerScreen({
 }: ListenerScreenProps) {
   const phraseContinuationTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
   const phraseFinalizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const deferredSpeechTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const deferredSpeechPrefix = useRef('');
   const iosRecognitionRestartTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
   const startActivityRecognitionRef = useRef<() => Promise<void>>(async () => undefined);
   const iosLastSpeechEvent = useRef<SpeechEvent | undefined>();
@@ -483,8 +487,21 @@ export function ListenerScreen({
     }
   }, [installedSigns, playNextSign]);
 
+  const clearDeferredSpeech = useCallback(() => {
+    if (deferredSpeechTimer.current) clearTimeout(deferredSpeechTimer.current);
+    deferredSpeechTimer.current = undefined;
+    deferredSpeechPrefix.current = '';
+  }, []);
+
   const onSpeechResults = useCallback((event: SpeechEvent, isFinal = false) => {
-    const bestText = selectKnownSpeechAlternative(event.value, knownWords);
+    const currentText = selectKnownSpeechAlternative(event.value, knownWords);
+    const combinedText = listeningModeRef.current === 'continuous' && deferredSpeechPrefix.current
+      ? mergeSpeechSegments(deferredSpeechPrefix.current, currentText)
+      : currentText;
+    const bestText = selectKnownSpeechAlternative(
+      combinedText === currentText ? [currentText] : [combinedText, currentText],
+      knownWords,
+    );
     if (listeningModeRef.current === 'phrase' && !isFinal) {
       if (bestText) {
         phrasePartialTextRef.current = bestText;
@@ -515,10 +532,21 @@ export function ListenerScreen({
       }
       return;
     }
-    if (!isFinal && shouldDeferPartialSpeechMatch(phraseText, knownWords)) {
+    if (shouldDeferPartialSpeechMatch(phraseText, knownWords)) {
       setTranscript(phraseText);
+      if (isFinal && listeningModeRef.current === 'continuous') {
+        if (deferredSpeechTimer.current) clearTimeout(deferredSpeechTimer.current);
+        deferredSpeechPrefix.current = phraseText;
+        deferredSpeechTimer.current = setTimeout(() => {
+          const pendingText = deferredSpeechPrefix.current;
+          deferredSpeechTimer.current = undefined;
+          deferredSpeechPrefix.current = '';
+          if (pendingText && listeningRef.current) handleText(pendingText);
+        }, CONTINUOUS_PREFIX_WAIT_MS);
+      }
       return;
     }
+    if (listeningModeRef.current === 'continuous') clearDeferredSpeech();
     const phraseResolution = resolveRuntimeLscPlayback(phraseText, installedSigns, __DEV__);
     const matches = phraseResolution.glosses;
     if (matches.length > 0) {
@@ -540,7 +568,7 @@ export function ListenerScreen({
       setPhraseFinalizing(false);
       void pictureInPicture?.stopListeningService();
     }
-  }, [handleText, installedSigns, knownWords]);
+  }, [clearDeferredSpeech, handleText, installedSigns, knownWords]);
 
   const markRecognitionUnavailable = useCallback(() => {
     recognitionReadyRef.current = false;
@@ -957,6 +985,7 @@ export function ListenerScreen({
     recognizedWords.current = [];
     signQueue.current = [];
     phrasePartialTextRef.current = '';
+    clearDeferredSpeech();
     if (iosRecognitionRestartTimer.current) clearTimeout(iosRecognitionRestartTimer.current);
     iosRecognitionRestartTimer.current = undefined;
     if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
@@ -984,7 +1013,7 @@ export function ListenerScreen({
     } finally {
       // UI and lifecycle state were already cleared synchronously above.
     }
-  }, [clearPhraseContinuationTimer, markRecognitionUnavailable]);
+  }, [clearDeferredSpeech, clearPhraseContinuationTimer, markRecognitionUnavailable]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('onVozualPipPrimaryAction', () => {
@@ -1196,9 +1225,10 @@ export function ListenerScreen({
       void pictureInPicture?.stopListeningService();
       speechAudio?.restoreAudioAfter(900);
       if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
+      clearDeferredSpeech();
       clearPhraseContinuationTimer();
     };
-  }, [clearPhraseContinuationTimer, finalizeIosSpeechResult, markRecognitionUnavailable, onSpeechResults, scheduleIosRecognitionRestart]);
+  }, [clearDeferredSpeech, clearPhraseContinuationTimer, finalizeIosSpeechResult, markRecognitionUnavailable, onSpeechResults, scheduleIosRecognitionRestart]);
 
   const onSignEnd = useCallback(() => {
     const nextWord = signQueue.current.shift();
