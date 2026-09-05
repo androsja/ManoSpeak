@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "ManoSpeak.app"
-               BlueprintName = "ManoSpeak"
-               ReferencedContainer = "container:ManoSpeak.xcodeproj">
+               BuildableName = "Vozual.app"
+               BlueprintName = "Vozual"
+               ReferencedContainer = "container:Vozual.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "ManoSpeakTests.xctest"
-               BlueprintName = "ManoSpeakTests"
-               ReferencedContainer = "container:ManoSpeak.xcodeproj">
+               BuildableName = "VozualTests.xctest"
+               BlueprintName = "VozualTests"
+               ReferencedContainer = "container:Vozual.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "ManoSpeak.app"
-            BlueprintName = "ManoSpeak"
-            ReferencedContainer = "container:ManoSpeak.xcodeproj">
+            BuildableName = "Vozual.app"
+            BlueprintName = "Vozual"
+            ReferencedContainer = "container:Vozual.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "ManoSpeak.app"
-            BlueprintName = "ManoSpeak"
-            ReferencedContainer = "container:ManoSpeak.xcodeproj">
+            BuildableName = "Vozual.app"
+            BlueprintName = "Vozual"
+            ReferencedContainer = "container:Vozual.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

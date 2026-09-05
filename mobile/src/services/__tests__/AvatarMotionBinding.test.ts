@@ -2,6 +2,7 @@ import {
   armMotionScore,
   bindHandsToArms,
   bindingsForMotion,
+  createNeutralAvatarAlignmentFrame,
   presentationArmIndexes,
 } from '../AvatarMotionBinding';
 import {MotionFrame, MotionPoint, SignMotion} from '../CompactSignMotion';
@@ -34,6 +35,23 @@ function frame(
 }
 
 describe('avatar hand-to-arm binding', () => {
+  it('provides alignment geometry before optional signs are downloaded', () => {
+    const neutral = createNeutralAvatarAlignmentFrame();
+
+    expect(neutral.bodyHands).toHaveLength(75);
+    expect(neutral.bodyHands[11]).not.toEqual(missing());
+    expect(neutral.bodyHands[12]).not.toEqual(missing());
+    expect(neutral.bodyHands[23]).not.toEqual(missing());
+    expect(neutral.bodyHands[24]).not.toEqual(missing());
+    expect(neutral.bodyHands[11][0]).toBeGreaterThan(neutral.bodyHands[12][0]);
+    expect(neutral.bodyHands[11][0] - neutral.bodyHands[12][0]).toBeCloseTo(0.42);
+    expect((neutral.bodyHands[11][0] + neutral.bodyHands[12][0]) / 2).toBeCloseTo(0.5);
+    expect(neutral.bodyHands[11][1]).toBeCloseTo(neutral.bodyHands[12][1]);
+    expect(neutral.bodyHands[23][1]).toBeGreaterThan(neutral.bodyHands[11][1]);
+    expect(neutral.bodyHands[24][1]).toBeGreaterThan(neutral.bodyHands[12][1]);
+    expect(neutral.face).toEqual([]);
+  });
+
   it('applies presentation profiles to both arms for two-handed signs', () => {
     expect(presentationArmIndexes()).toEqual([0, 1]);
     expect(presentationArmIndexes('L')).toEqual([0]);

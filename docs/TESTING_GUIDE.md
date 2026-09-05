@@ -1,4 +1,4 @@
-# Testing Guide — ManoSpeak
+# Testing Guide — Vozual
 
 ## 1. Machine Learning Testing (`ml/`)
 ML tests focus on landmark coordinate extraction, normalization logic, and model shape contracts. We use `pytest` as our testing framework.

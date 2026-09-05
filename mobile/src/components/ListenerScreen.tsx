@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,21 +17,18 @@ import {
   View,
 } from 'react-native';
 import RNFS from 'react-native-fs';
-import Voice from '@react-native-voice/voice';
 import {
   selectKnownSpeechAlternative,
   shouldDeferPartialSpeechMatch,
 } from '../services/VoiceCommandService';
+import type {InstalledSign} from '../services/SignLanguageService';
 import {
-  PUBLISHED_LSC_SIGN_COUNT,
-  PUBLISHED_LSC_SPEECH_VOCABULARY,
-  resolvePublishedLscPlan,
-} from '../services/LinguisticCatalogService';
+  playableLscPhraseSuggestions,
+  playableLscPhraseVocabulary,
+  resolvePlayableLscPhrase,
+} from '../services/LscPhraseAssetCatalogService';
 import {PHRASE_CONTINUATION_GRACE_MS} from '../services/SignPhraseContinuity';
-import {
-  AVAILABLE_PHRASE_SUGGESTIONS,
-  nextPhraseSuggestionIndex,
-} from '../services/PhraseSuggestionService';
+import {nextPhraseSuggestionIndex} from '../services/PhraseSuggestionService';
 import { AvatarClip, AvatarRenderMode, SkeletalAvatar } from './SkeletalAvatar';
 import {PipSkeletalAvatar} from './PipSkeletalAvatar';
 import type {ActivationAccount} from '../services/ActivationService';
@@ -54,8 +51,6 @@ import {
 } from '../services/BillingSandboxService';
 // The shared linguistic catalog controls what speech can activate a published
 // avatar clip. A clip may stay in VOZUAL without entering this vocabulary.
-const KNOWN_WORDS = PUBLISHED_LSC_SPEECH_VOCABULARY;
-const PUBLISHED_SIGN_COUNT = PUBLISHED_LSC_SIGN_COUNT;
 const PLAYBACK_SPEEDS = [1, 2, 3, 4] as const;
 const PLAYBACK_SPEED_PREFERENCE_PATH = `${RNFS.DocumentDirectoryPath}/vozual-playback-speed.json`;
 const AVATAR_ZOOM_MIN = 0.85;
@@ -74,9 +69,8 @@ const AVATAR_RENDER_MODES: Array<{value: AvatarRenderMode; label: string}> = [
 type KnownWord = string;
 type SpeechEvent = {
   value?: string[];
-  error?: string | {code?: string; message?: string};
+  error?: string | {code?: string | number; message?: string};
 };
-type SpeechRecognizedEvent = {isFinal?: boolean};
 type IosNativeSpeechEndEvent = {
   willRestart?: boolean;
   reason?: string;
@@ -84,6 +78,24 @@ type IosNativeSpeechEndEvent = {
 type PipSpeechEvent = SpeechEvent & {
   type?: 'start' | 'partialResults' | 'results' | 'end' | 'error';
 };
+const OFFLINE_SPEECH_ERRORS = new Set([
+  'offline_speech_unavailable',
+  'offline_es_co_unavailable',
+]);
+const OFFLINE_SPEECH_MESSAGE = 'El reconocimiento local de español (Colombia) no está disponible. Descarga el idioma en los ajustes del teléfono y vuelve a intentarlo.';
+function speechErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as {message?: unknown}).message;
+    if (typeof message === 'string') return message;
+  }
+  return '';
+}
+
+function isOfflineSpeechUnavailable(error: unknown): boolean {
+  const message = speechErrorMessage(error).toLocaleLowerCase('es-CO');
+  return message.includes('reconocimiento local') || message.includes('no admite reconocimiento de voz local');
+}
 type NativeVoiceModule = {
   startSpeech: (locale: string, options: Record<string, unknown>, callback: (error?: string) => void) => void;
   stopSpeech: (callback: (error?: string) => void) => void;
@@ -122,12 +134,20 @@ const pictureInPicture = NativeModules.VozualPictureInPicture as {
 type ListenerScreenProps = {
   account?: ActivationAccount | null;
   accessConfig: AppAccessConfig;
+  installedSigns?: readonly InstalledSign[];
   onManageAccount?: () => void;
+  onManageSignLanguages?: () => void;
   onSignOut?: () => Promise<void>;
 };
 
-export function ListenerScreen({account, accessConfig, onManageAccount, onSignOut}: ListenerScreenProps) {
-  const libraryHintTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
+export function ListenerScreen({
+  account,
+  accessConfig,
+  installedSigns = [],
+  onManageAccount,
+  onManageSignLanguages,
+  onSignOut,
+}: ListenerScreenProps) {
   const phraseContinuationTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
   const phraseFinalizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
   const iosRecognitionRestartTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
@@ -165,11 +185,8 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
   const [playbackId, setPlaybackId] = useState(0);
   const [continuePhrase, setContinuePhrase] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [showLibraryHint, setShowLibraryHint] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [phraseSuggestionIndex, setPhraseSuggestionIndex] = useState(() => (
-    Math.floor(Math.random() * Math.max(1, AVAILABLE_PHRASE_SUGGESTIONS.length))
-  ));
+  const [phraseSuggestionIndex, setPhraseSuggestionIndex] = useState(0);
   const [pictureInPictureMode, setPictureInPictureMode] = useState(false);
   const [avatarReady, setAvatarReady] = useState(false);
   // Remount the full WebView after leaving PiP. Android can keep the compact
@@ -183,7 +200,18 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
   );
   const compactMode = pictureInPictureMode;
   const microphonePreparing = listening && !recognitionReady;
-  const phraseSuggestion = AVAILABLE_PHRASE_SUGGESTIONS[phraseSuggestionIndex] ?? 'Hola, ¿cómo estás?';
+  const phraseSuggestions = useMemo(
+    () => playableLscPhraseSuggestions(installedSigns),
+    [installedSigns],
+  );
+  const phraseSuggestion = phraseSuggestions.length > 0
+    ? phraseSuggestions[phraseSuggestionIndex % phraseSuggestions.length]
+    : 'Aún no hay frases LSC revisadas disponibles';
+  const knownWords = useMemo(
+    () => playableLscPhraseVocabulary(installedSigns),
+    [installedSigns],
+  );
+  const installedSignCount = installedSigns.length;
   // Development builds exercise the complete Plus flow without contacting a
   // store or charging a real payment method. Release builds always use the
   // remotely configured production policy and verified store entitlements.
@@ -202,8 +230,12 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
   );
 
   const showNextPhraseSuggestion = useCallback(() => {
-    setPhraseSuggestionIndex(current => nextPhraseSuggestionIndex(current));
-  }, []);
+    setPhraseSuggestionIndex(current => nextPhraseSuggestionIndex(
+      current,
+      Math.random(),
+      phraseSuggestions.length,
+    ));
+  }, [phraseSuggestions.length]);
 
   useEffect(() => {
     const timer = setInterval(showNextPhraseSuggestion, 60_000);
@@ -386,15 +418,6 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
     }
   }, [applyPictureInPictureState]);
 
-  const showPublishedSignCount = useCallback(() => {
-    if (libraryHintTimer.current) clearTimeout(libraryHintTimer.current);
-    setShowLibraryHint(true);
-    libraryHintTimer.current = setTimeout(() => {
-      libraryHintTimer.current = undefined;
-      setShowLibraryHint(false);
-    }, 2200);
-  }, []);
-
   const clearPhraseContinuationTimer = useCallback(() => {
     if (!phraseContinuationTimer.current) return;
     clearTimeout(phraseContinuationTimer.current);
@@ -434,12 +457,12 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
 
   const handleText = useCallback((text: string) => {
     setTranscript(text);
-    const plan = resolvePublishedLscPlan(text);
-    const words = plan.tokens.map((token) => token.gloss) as KnownWord[];
-    const unavailable = plan.unavailableMarkers.length > 0
-      ? ` · pendiente: ${plan.unavailableMarkers.join(', ')}`
-      : '';
-    setPlannedLsc(words.length > 0 ? `${words.join(' · ')}${unavailable}` : '');
+    const resolution = resolvePlayableLscPhrase(text, installedSigns);
+    const words = resolution.status === 'matched'
+      ? resolution.entry.lsc.glossSequence as KnownWord[]
+      : [];
+    setPlannedLsc(words.join(' · '));
+    setErrorMessage(resolution.status === 'matched' ? '' : resolution.message);
     const previous = recognizedWords.current;
     const extendsPrevious = previous.every((word, index) => words[index] === word);
     if (extendsPrevious && words.length > previous.length) {
@@ -455,15 +478,18 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
     } else if (words.length === 0) {
       recognizedWords.current = [];
     }
-  }, [playNextSign]);
+  }, [installedSigns, playNextSign]);
 
   const onSpeechResults = useCallback((event: SpeechEvent, isFinal = false) => {
-    const bestText = selectKnownSpeechAlternative(event.value, KNOWN_WORDS);
+    const bestText = selectKnownSpeechAlternative(event.value, knownWords);
     if (listeningModeRef.current === 'phrase' && !isFinal) {
       if (bestText) {
         phrasePartialTextRef.current = bestText;
         setTranscript(bestText);
-        const preview = resolvePublishedLscPlan(bestText).tokens.map((token) => token.gloss);
+        const previewResolution = resolvePlayableLscPhrase(bestText, installedSigns);
+        const preview = previewResolution.status === 'matched'
+          ? previewResolution.entry.lsc.glossSequence
+          : [];
         setPlannedLsc(preview.length > 0 ? preview.join(' · ') : '');
       }
       return;
@@ -487,11 +513,14 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
       }
       return;
     }
-    if (!isFinal && shouldDeferPartialSpeechMatch(phraseText, KNOWN_WORDS)) {
+    if (!isFinal && shouldDeferPartialSpeechMatch(phraseText, knownWords)) {
       setTranscript(phraseText);
       return;
     }
-    const matches = resolvePublishedLscPlan(phraseText).tokens.map((token) => token.gloss);
+    const phraseResolution = resolvePlayableLscPhrase(phraseText, installedSigns);
+    const matches = phraseResolution.status === 'matched'
+      ? phraseResolution.entry.lsc.glossSequence
+      : [];
     if (matches.length > 0) {
       pictureInPicture?.reportPlaybackEvent(
         'matched-speech',
@@ -511,7 +540,7 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
       setPhraseFinalizing(false);
       void pictureInPicture?.stopListeningService();
     }
-  }, [handleText]);
+  }, [handleText, installedSigns, knownWords]);
 
   const markRecognitionUnavailable = useCallback(() => {
     recognitionReadyRef.current = false;
@@ -533,18 +562,10 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
     lastRecognitionActivity.current = Date.now();
     if (Platform.OS === 'ios') {
       try {
-        if (iosSpeechRecognizer) {
-          await iosSpeechRecognizer.start('es-CO', listeningModeRef.current);
-        } else {
-          // Keep the third-party recognizer as a compatibility fallback for
-          // old iOS builds that do not yet contain the VOZUAL native bridge.
-          await Voice.destroy().catch(() => undefined);
-          if (!listeningRef.current || generation !== recognitionGeneration.current) {
-            nativeStartInFlight.current = false;
-            return;
-          }
-          await Voice.start('es-CO');
+        if (!iosSpeechRecognizer) {
+          throw new Error(OFFLINE_SPEECH_MESSAGE);
         }
+        await iosSpeechRecognizer.start('es-CO', listeningModeRef.current);
         nativeStartInFlight.current = false;
         if (
           listeningRef.current &&
@@ -557,9 +578,15 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
           recognitionReadyRef.current = true;
           setRecognitionReady(true);
         }
-      } catch {
+      } catch (error) {
         nativeStartInFlight.current = false;
         markRecognitionUnavailable();
+        if (isOfflineSpeechUnavailable(error)) {
+          listeningRef.current = false;
+          setListening(false);
+          setErrorMessage(OFFLINE_SPEECH_MESSAGE);
+          return;
+        }
         if (
           listeningRef.current &&
           generation === recognitionGeneration.current &&
@@ -575,7 +602,7 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
         } else if (listeningRef.current && generation === recognitionGeneration.current) {
           listeningRef.current = false;
           setListening(false);
-          setErrorMessage('No se pudo iniciar el reconocimiento de voz en este iPhone.');
+          setErrorMessage(speechErrorMessage(error) || 'No se pudo iniciar el reconocimiento de voz en este iPhone.');
         }
       }
       return;
@@ -709,9 +736,7 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
     setPhraseFinalizing(true);
     setRecognitionReady(false);
     const requested = Platform.OS === 'ios'
-      ? (iosSpeechRecognizer
-        ? await iosSpeechRecognizer.finishPhrase().catch(() => false)
-        : await Voice.stop().then(() => true).catch(() => false))
+      ? await iosSpeechRecognizer?.finishPhrase().catch(() => false) ?? false
       : await pictureInPicture?.finishListeningPhrase().catch(() => false);
     if (!requested) {
       setPhraseFinalizing(false);
@@ -870,9 +895,7 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
       listeningModeRef.current !== 'continuous' ||
       nativeStartInFlight.current
     ) return;
-    const isRecognizing = iosSpeechRecognizer
-      ? await iosSpeechRecognizer.isListening().catch(() => false)
-      : await Voice.isRecognizing().catch(() => false);
+    const isRecognizing = await iosSpeechRecognizer?.isListening().catch(() => false) ?? false;
     if (!listeningRef.current || listeningModeRef.current !== 'continuous') return;
     if (!isRecognizing) {
       markRecognitionUnavailable();
@@ -952,12 +975,7 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
       pictureInPicture?.resetPlayback();
       await speechAudio?.silenceRecognitionPrompts();
       if (Platform.OS === 'ios') {
-        if (iosSpeechRecognizer) {
-          await iosSpeechRecognizer.stop().catch(() => undefined);
-        } else {
-          await Voice.cancel().catch(() => undefined);
-          await Voice.destroy().catch(() => undefined);
-        }
+        await iosSpeechRecognizer?.stop().catch(() => undefined);
       } else {
         nativeVoice?.cancelSpeech(() => undefined);
         nativeVoice?.stopSpeech(() => undefined);
@@ -1014,10 +1032,19 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
             onSpeechResults(event, true);
           },
         );
-        const errorSubscription = emitter.addListener('onVozualIosSpeechError', () => {
+        const errorSubscription = emitter.addListener('onVozualIosSpeechError', (event: SpeechEvent) => {
           nativeStartInFlight.current = false;
           if (listeningModeRef.current === 'phrase') {
             finalizeIosSpeechResult();
+          }
+          if (isOfflineSpeechUnavailable(event.error)) {
+            listeningRef.current = false;
+            markRecognitionUnavailable();
+            setListening(false);
+            setPhraseFinalizing(false);
+            setErrorMessage(OFFLINE_SPEECH_MESSAGE);
+            void iosSpeechRecognizer.stop();
+            return;
           }
           // Continuous recognition is restarted by the native module. Do not
           // stop the user's listening session because one Apple task ended.
@@ -1042,64 +1069,12 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
           errorSubscription.remove();
           endSubscription.remove();
           void iosSpeechRecognizer.stop();
-          if (libraryHintTimer.current) clearTimeout(libraryHintTimer.current);
           if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
           clearPhraseContinuationTimer();
         };
       }
-      Voice.onSpeechStart = () => {
-        nativeStartInFlight.current = false;
-        recognitionReadyRef.current = true;
-        iosLastSpeechEvent.current = undefined;
-        iosFinalResultHandled.current = false;
-        lastRecognitionActivity.current = Date.now();
-        setRecognitionReady(true);
-        recognizedWords.current = [];
-        setErrorMessage('');
-      };
-      Voice.onSpeechPartialResults = (event) => {
-        lastRecognitionActivity.current = Date.now();
-        const speechEvent = event as SpeechEvent;
-        if (speechEvent.value?.length) iosLastSpeechEvent.current = speechEvent;
-        onSpeechResults(speechEvent, false);
-      };
-      Voice.onSpeechResults = (event) => {
-        lastRecognitionActivity.current = Date.now();
-        const speechEvent = event as SpeechEvent;
-        if (speechEvent.value?.length) iosLastSpeechEvent.current = speechEvent;
-        // On iOS this library emits onSpeechResults for interim hypotheses as
-        // well as final text. Completion is reported separately through
-        // onSpeechRecognized; treating this event as final caused VOZUAL to
-        // restart the microphone while it was still active.
-        onSpeechResults(speechEvent, false);
-      };
-      Voice.onSpeechRecognized = (event) => {
-        if (!(event as SpeechRecognizedEvent).isFinal) return;
-        finalizeIosSpeechResult();
-        markRecognitionUnavailable();
-        scheduleIosRecognitionRestart();
-      };
-      Voice.onSpeechError = () => {
-        if (listeningModeRef.current === 'phrase') finalizeIosSpeechResult();
-        markRecognitionUnavailable();
-        scheduleIosRecognitionRestart();
-      };
-      Voice.onSpeechEnd = () => {
-        if (listeningModeRef.current === 'phrase') finalizeIosSpeechResult();
-        markRecognitionUnavailable();
-        scheduleIosRecognitionRestart();
-      };
-      return () => {
-        listeningRef.current = false;
-        recognitionGeneration.current += 1;
-        if (iosRecognitionRestartTimer.current) clearTimeout(iosRecognitionRestartTimer.current);
-        iosRecognitionRestartTimer.current = undefined;
-        Voice.removeAllListeners();
-        void Voice.destroy();
-        if (libraryHintTimer.current) clearTimeout(libraryHintTimer.current);
-        if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
-        clearPhraseContinuationTimer();
-      };
+      setErrorMessage(OFFLINE_SPEECH_MESSAGE);
+      return undefined;
     }
     if (!pictureInPicture) {
       setErrorMessage('El escuchador nativo no está disponible en este dispositivo.');
@@ -1167,6 +1142,23 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
           onSpeechResults(event, event.type === 'results');
           return;
         }
+        if (
+          event.type === 'error'
+          && typeof event.error === 'string'
+          && OFFLINE_SPEECH_ERRORS.has(event.error)
+        ) {
+          if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
+          phraseFinalizeTimer.current = undefined;
+          listeningRef.current = false;
+          nativePipSpeechActiveRef.current = false;
+          recognitionReadyRef.current = false;
+          setRecognitionReady(false);
+          setListening(false);
+          setPhraseFinalizing(false);
+          setErrorMessage(OFFLINE_SPEECH_MESSAGE);
+          void pictureInPicture?.stopListeningService();
+          return;
+        }
         if (event.type === 'error' && listeningModeRef.current === 'phrase') {
           if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
           phraseFinalizeTimer.current = undefined;
@@ -1203,7 +1195,6 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
       nativeVoice?.destroySpeech(() => undefined);
       void pictureInPicture?.stopListeningService();
       speechAudio?.restoreAudioAfter(900);
-      if (libraryHintTimer.current) clearTimeout(libraryHintTimer.current);
       if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
       clearPhraseContinuationTimer();
     };
@@ -1288,17 +1279,12 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
         </Pressable>}
         {Platform.OS === 'android' && <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${PUBLISHED_SIGN_COUNT} señas publicadas en esta app`}
-          onPress={showPublishedSignCount}
+          accessibilityLabel={`${installedSignCount} señas descargadas. Abrir lenguas de señas`}
+          onPress={onManageSignLanguages}
           style={styles.avatarSignCountBadge}
         >
-          <Text style={styles.signCountText}>{PUBLISHED_SIGN_COUNT}</Text>
+          <Text style={styles.signCountText}>{installedSignCount}</Text>
         </Pressable>}
-        {showLibraryHint && (
-          <View style={styles.avatarSignCountHint}>
-            <Text style={styles.signCountHintText}>{PUBLISHED_SIGN_COUNT} señas publicadas</Text>
-          </View>
-        )}
         {compactMode ? (
           <PipSkeletalAvatar
             clip={activeClip}
@@ -1484,7 +1470,18 @@ export function ListenerScreen({account, accessConfig, onManageAccount, onSignOu
                 <Text style={styles.settingsZoomButtonText}>+</Text>
               </Pressable>
             </View>
-            <Text style={styles.settingsLibraryCount}>{PUBLISHED_SIGN_COUNT} señas disponibles en VOZUAL</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir lenguas de señas"
+              onPress={() => {
+                setSettingsVisible(false);
+                onManageSignLanguages?.();
+              }}
+            >
+              <Text style={styles.settingsLibraryCount}>
+                {installedSignCount} señas descargadas · ADMINISTRAR LENGUAS
+              </Text>
+            </Pressable>
 
             <View style={styles.settingsDivider} />
             <Text style={styles.settingsLabel}>ACCESO</Text>

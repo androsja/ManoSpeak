@@ -1,8 +1,8 @@
-# Architectural Specification: ManoSpeak
+# Architectural Specification: Vozual
 
 ## 1. Status
 
-ManoSpeak is transitioning from variable-duration isolated sign recognition to a
+Vozual is transitioning from variable-duration isolated sign recognition to a
 constrained continuous recognition pilot. The current model is not release-ready CSLR:
 
 - Training assigns exactly one phonological target triple to each clip.

@@ -74,7 +74,7 @@ function compileMotion(motion, scale = DEFAULT_SCALE, sourceName = 'motion') {
   return output;
 }
 
-function compactPublishedMotions(sourceDirectory, outputDirectory) {
+function buildAvatarProfiles(sourceDirectory) {
   const catalogPath = path.join(sourceDirectory, 'published_signs.json');
   const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
   const glosses = Array.isArray(catalog.publishedGlosses) ? catalog.publishedGlosses : [];
@@ -83,6 +83,36 @@ function compactPublishedMotions(sourceDirectory, outputDirectory) {
   const profileOverrides = fs.existsSync(profileOverridesPath)
     ? JSON.parse(fs.readFileSync(profileOverridesPath, 'utf8'))
     : {};
+  return Object.fromEntries(glosses.flatMap(rawGloss => {
+    const gloss = String(rawGloss).trim();
+    const sourcePath = path.join(sourceDirectory, `${gloss.toLowerCase()}.motion.json`);
+    const sourceMotion = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+    const profileOverride = profileOverrides[gloss.toUpperCase()];
+    const profile = (sourceMotion.avatarProfile || profileOverride)
+      ? {...(sourceMotion.avatarProfile || {}), ...(profileOverride || {})}
+      : undefined;
+    return profile && typeof profile === 'object'
+      ? [[gloss.toUpperCase(), profile]]
+      : [];
+  }));
+}
+
+function writeAvatarProfiles(sourceDirectory, outputDirectory) {
+  fs.mkdirSync(outputDirectory, {recursive: true});
+  const avatarProfiles = buildAvatarProfiles(sourceDirectory);
+  fs.writeFileSync(
+    path.join(outputDirectory, 'avatar_profiles.json'),
+    JSON.stringify(avatarProfiles),
+  );
+  return {signCount: Object.keys(avatarProfiles).length};
+}
+
+function compactPublishedMotions(sourceDirectory, outputDirectory) {
+  const catalogPath = path.join(sourceDirectory, 'published_signs.json');
+  const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+  const glosses = Array.isArray(catalog.publishedGlosses) ? catalog.publishedGlosses : [];
+  if (glosses.length === 0) throw new Error('The published sign catalog is empty.');
+  const avatarProfiles = buildAvatarProfiles(sourceDirectory);
 
   fs.mkdirSync(outputDirectory, {recursive: true});
   for (const filename of fs.readdirSync(outputDirectory)) {
@@ -93,18 +123,12 @@ function compactPublishedMotions(sourceDirectory, outputDirectory) {
 
   let sourceBytes = 0;
   let compactBytes = 0;
-  const avatarProfiles = {};
   for (const rawGloss of glosses) {
     const gloss = String(rawGloss).trim();
     const sourcePath = path.join(sourceDirectory, `${gloss.toLowerCase()}.motion.json`);
     const outputPath = path.join(outputDirectory, `${motionAssetName(gloss)}.motion.bin`);
     const source = fs.readFileSync(sourcePath);
     const sourceMotion = JSON.parse(source.toString('utf8'));
-    const profileOverride = profileOverrides[gloss.toUpperCase()];
-    const profile = (sourceMotion.avatarProfile || profileOverride)
-      ? {...(sourceMotion.avatarProfile || {}), ...(profileOverride || {})}
-      : undefined;
-    if (profile && typeof profile === 'object') avatarProfiles[gloss.toUpperCase()] = profile;
     const compact = compileMotion(sourceMotion, DEFAULT_SCALE, sourcePath);
     fs.writeFileSync(outputPath, compact);
     sourceBytes += source.byteLength;
@@ -116,16 +140,31 @@ function compactPublishedMotions(sourceDirectory, outputDirectory) {
 }
 
 if (require.main === module) {
-  const [, , sourceDirectory, outputDirectory] = process.argv;
+  const profilesOnly = process.argv[2] === '--profiles-only';
+  const sourceDirectory = process.argv[profilesOnly ? 3 : 2];
+  const outputDirectory = process.argv[profilesOnly ? 4 : 3];
   if (!sourceDirectory || !outputDirectory) {
-    throw new Error('Usage: node compact-sign-motion.js <source-directory> <output-directory>');
+    throw new Error(
+      'Usage: node compact-sign-motion.js [--profiles-only] <source-directory> <output-directory>',
+    );
   }
-  const result = compactPublishedMotions(sourceDirectory, outputDirectory);
-  const reduction = 100 * (1 - result.compactBytes / result.sourceBytes);
-  console.log(
-    `Compiled ${result.signCount} signs: ${result.sourceBytes} -> ${result.compactBytes} bytes ` +
-      `(${reduction.toFixed(1)}% smaller before APK compression).`,
-  );
+  if (profilesOnly) {
+    const result = writeAvatarProfiles(sourceDirectory, outputDirectory);
+    console.log(`Compiled ${result.signCount} avatar profiles.`);
+  } else {
+    const result = compactPublishedMotions(sourceDirectory, outputDirectory);
+    const reduction = 100 * (1 - result.compactBytes / result.sourceBytes);
+    console.log(
+      `Compiled ${result.signCount} signs: ${result.sourceBytes} -> ${result.compactBytes} bytes ` +
+        `(${reduction.toFixed(1)}% smaller before APK compression).`,
+    );
+  }
 }
 
-module.exports = {compileMotion, compactPublishedMotions, motionAssetName};
+module.exports = {
+  buildAvatarProfiles,
+  compileMotion,
+  compactPublishedMotions,
+  motionAssetName,
+  writeAvatarProfiles,
+};

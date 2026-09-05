@@ -1,4 +1,5 @@
 #import "AppDelegate.h"
+#import <Firebase/Firebase.h>
 
 #import <React/RCTBundleURLProvider.h>
 
@@ -6,7 +7,8 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-  self.moduleName = @"ManoSpeak";
+  [FIRApp configure];
+  self.moduleName = @"Vozual";
   self.initialProps = @{};
 
   return [super application:application didFinishLaunchingWithOptions:launchOptions];

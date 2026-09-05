@@ -1,10 +1,10 @@
-# ManoSpeak Recognition Contract
+# Vozual Recognition Contract
 
 _Contract version: 1.0, 2026-07-19_
 
 ## Purpose
 
-This contract defines what ManoSpeak may claim, what each recognition mode consumes and
+This contract defines what Vozual may claim, what each recognition mode consumes and
 emits, and when an output is safe to display or speak. It separates controlled data
 collection from runtime recognition and prevents isolated-sign results from being
 reported as continuous LSC translation.

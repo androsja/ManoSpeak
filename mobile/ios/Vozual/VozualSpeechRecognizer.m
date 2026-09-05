@@ -221,6 +221,23 @@ RCT_REMAP_METHOD(isListening,
     }
     return NO;
   }
+  if (@available(iOS 13.0, *)) {
+    if (!self.speechRecognizer.supportsOnDeviceRecognition) {
+      self.starting = NO;
+      if (error != NULL) {
+        *error = [self errorWithCode:412
+                             message:@"El reconocimiento local de español (Colombia) no está disponible. Descarga el idioma en los ajustes del dispositivo."];
+      }
+      return NO;
+    }
+  } else {
+    self.starting = NO;
+    if (error != NULL) {
+      *error = [self errorWithCode:412
+                           message:@"Este iPhone no admite reconocimiento de voz local para VOZUAL."];
+    }
+    return NO;
+  }
 
   AVAudioSession *audioSession = [AVAudioSession sharedInstance];
   AVAudioSessionCategoryOptions options =
@@ -247,6 +264,7 @@ RCT_REMAP_METHOD(isListening,
   }
 
   self.recognitionRequest = [[SFSpeechAudioBufferRecognitionRequest alloc] init];
+  self.recognitionRequest.requiresOnDeviceRecognition = YES;
   self.recognitionRequest.shouldReportPartialResults = YES;
   self.recognitionRequest.taskHint = SFSpeechRecognitionTaskHintDictation;
   self.audioEngine = [[AVAudioEngine alloc] init];
@@ -360,7 +378,10 @@ RCT_REMAP_METHOD(isListening,
     NSError *restartError = nil;
     if (![self startRecognitionSession:&restartError]) {
       NSLog(@"[VOZUAL_IOS_ASR] restart failed: %@", restartError.localizedDescription);
-      [self scheduleRestartAfter:0.65];
+      self.desiredListening = NO;
+      [self emit:VozualSpeechErrorEvent
+            body:@{@"error": @{ @"code": @(restartError.code), @"message": restartError.localizedDescription ?: @"" }}];
+      [self emit:VozualSpeechEndEvent body:@{@"willRestart": @NO, @"reason": @"restart-failed"}];
     }
   });
 }

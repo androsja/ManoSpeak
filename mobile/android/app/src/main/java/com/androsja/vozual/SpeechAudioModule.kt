@@ -1,4 +1,4 @@
-package com.manospeak
+package com.androsja.vozual
 
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext

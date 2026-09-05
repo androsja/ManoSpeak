@@ -2,7 +2,7 @@
 
 ## Decision
 
-The initial ManoSpeak release will use locally packaged H.264 MP4 avatar clips at 1280x720,
+The initial Vozual release will use locally packaged H.264 MP4 avatar clips at 1280x720,
 24 frames per second, in a landscape upper-body frame. The source GLB is retained only for
 authoring. It will not be bundled in the mobile application.
 

@@ -45,6 +45,35 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Public metadata only. Each compiled motion lives in its own version
+    // document and all catalogue writes are restricted to trusted tools.
+    match /signLanguages/{languageId} {
+      allow read: if resource.data.published == true;
+      allow write: if false;
+    }
+
+    match /signs/{signId} {
+      // Only trusted tooling can create documents. Keeping the metadata query
+      // predicate limited to `published` lets Firestore prove that a public
+      // catalogue query cannot include drafts. The client still validates all
+      // schema and approval fields before presenting a sign.
+      allow read: if resource.data.published == true;
+      allow write: if false;
+    }
+
+    match /signs/{signId}/versions/{versionId} {
+      allow read: if get(/databases/$(database)/documents/signs/$(signId)).data.published == true
+        && get(/databases/$(database)/documents/signs/$(signId)).data.approved == true
+        && get(/databases/$(database)/documents/signs/$(signId)).data.compiled == true
+        && resource.data.published == true
+        && resource.data.approved == true
+        && resource.data.compiled == true
+        && resource.data.contentBase64 is string
+        && resource.data.sha256 is string
+        && resource.data.sizeBytes is int;
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

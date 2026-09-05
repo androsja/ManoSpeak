@@ -1,4 +1,4 @@
-# AI Agent Collaboration — ManoSpeak
+# AI Agent Collaboration — Vozual
 
 This guide defines how agents cooperate, document tasks, and coordinate implementation boundaries when working in parallel.
 

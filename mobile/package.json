@@ -1,5 +1,5 @@
 {
-  "name": "manospeak-mobile",
+  "name": "vozual-mobile",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,6 +7,10 @@
     "audit:avatar-signs": "esbuild tools/audit-avatar-signs.ts --bundle --platform=node --format=cjs --outfile=build/audit-avatar-signs.cjs && node build/audit-avatar-signs.cjs",
     "audit:avatar-visual": "node tools/capture-avatar-visual-audit.cjs",
     "build:avatar-runtime": "bash tools/build-avatar-runtime.sh",
+    "build:published-signs": "node tools/build-published-signs.js",
+    "status:published-signs": "node tools/firebase-sign-status.js",
+    "publish:approved-signs": "node tools/publish-approved-signs.js",
+    "verify:published-signs": "node tools/verify-published-signs.js",
     "ios": "react-native run-ios",
     "start": "react-native start",
     "test": "jest",

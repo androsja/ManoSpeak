@@ -1,4 +1,4 @@
-# Engineering Standards — ManoSpeak
+# Engineering Standards — Vozual
 
 ## 1. Landmark Coordinate Normalization
 Raw landmark coordinates from MediaPipe Holistic contain environmental noise such as camera distance, tilt, and user height. The pipeline must apply strict translational and scale normalization.

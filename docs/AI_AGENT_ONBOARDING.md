@@ -1,6 +1,6 @@
-# AI Agent Onboarding Guide — ManoSpeak
+# AI Agent Onboarding Guide — Vozual
 
-Welcome! This guide outlines the sequence of steps an AI agent or a new developer must take when first checking out the ManoSpeak repository.
+Welcome! This guide outlines the sequence of steps an AI agent or a new developer must take when first checking out the Vozual repository.
 
 ## 1. Initial Setup Checklist
 Follow these steps in order to set up your local development workspace:

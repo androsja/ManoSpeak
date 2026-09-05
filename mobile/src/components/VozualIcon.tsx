@@ -6,12 +6,12 @@ interface Props {
 }
 
 /**
- * ManoSpeak brand icon.
+ * Vozual brand icon.
  * B-handshape (palm facing viewer) with a vertical sky-blue gradient.
  * Three right-pointing cubic bezier arcs represent speech/TTS output.
  * Transparent background — designed for dark surfaces.
  */
-export const ManoSpeakIcon: React.FC<Props> = ({ size = 44 }) => {
+export const VozualIcon: React.FC<Props> = ({ size = 44 }) => {
   const w = Math.round((60 / 44) * size);
 
   return (

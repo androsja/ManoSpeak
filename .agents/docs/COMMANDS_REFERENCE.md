@@ -1,4 +1,4 @@
-# Commands Reference — ManoSpeak
+# Commands Reference — Vozual
 
 This document indexes all short DWP alias commands configured under the `.agents/commands/` directory.
 

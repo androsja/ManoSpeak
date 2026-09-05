@@ -1,0 +1,187 @@
+import React, {useEffect, useState} from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {
+  installSignLanguageChanges,
+  listSignLanguages,
+  selectSignLanguage,
+  type SignLanguageStatus,
+} from '../services/SignLanguageService';
+
+type Props = {
+  initialSetup: boolean;
+  onContinue: (statuses: readonly SignLanguageStatus[]) => void;
+};
+
+function megabytes(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
+  const [languages, setLanguages] = useState<SignLanguageStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeLanguageId, setActiveLanguageId] = useState('');
+  const [progress, setProgress] = useState(0);
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      setLanguages(await listSignLanguages());
+    } catch {
+      setError('No fue posible consultar las lenguas disponibles. Revisa tu conexión.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const install = async (language: SignLanguageStatus) => {
+    setActiveLanguageId(language.id);
+    setProgress(0);
+    try {
+      const changed = await installSignLanguageChanges(language, setProgress);
+      await load();
+      Alert.alert(
+        'Biblioteca actualizada',
+        `${changed} ${changed === 1 ? 'cambio aplicado' : 'cambios aplicados'} para ${language.name}. Esta lengua quedó activa.`,
+      );
+    } catch {
+      Alert.alert('No se pudo descargar', 'Las señas no se instalaron. Intenta nuevamente.');
+    } finally {
+      setActiveLanguageId('');
+      setProgress(0);
+    }
+  };
+
+  const select = async (language: SignLanguageStatus) => {
+    try {
+      await selectSignLanguage(language.id);
+      await load();
+    } catch {
+      Alert.alert('No se pudo seleccionar', 'Descarga al menos una seña de esta lengua primero.');
+    }
+  };
+
+  const hasInstalledSigns = languages.some(language => language.installedSignCount > 0);
+  const isSkipping = initialSetup && !hasInstalledSigns;
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.brand}>VOZUAL</Text>
+      <Text style={styles.title}>
+        {initialSetup ? 'Elige tus lenguas de señas' : 'Lenguas de señas'}
+      </Text>
+      <Text style={styles.description}>
+        Vozual se instala sin movimientos de señas. Elige una lengua y descarga únicamente sus señas aprobadas. Las nuevas señas se agregan de forma independiente.
+      </Text>
+
+      {loading ? <ActivityIndicator color="#38BDF8" size="large" /> : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {!loading && !error && languages.length === 0 ? (
+        <Text style={styles.empty}>Todavía no hay lenguas publicadas.</Text>
+      ) : null}
+
+      {languages.map(language => {
+        const downloading = activeLanguageId === language.id;
+        const unavailable = language.signs.length === 0 && language.installedSignCount === 0;
+        const current = language.selected && language.installedSignCount > 0 && language.changeCount === 0;
+        const canSelect = language.installedSignCount > 0 && language.changeCount === 0 && !language.selected;
+        const label = unavailable
+          ? 'NO DISPONIBLE'
+          : current
+            ? 'EN USO'
+            : canSelect
+              ? 'USAR'
+              : language.pendingSigns.length === 0 && language.removedSigns.length > 0
+                ? `APLICAR ${language.changeCount} CAMBIO${language.changeCount === 1 ? '' : 'S'}`
+            : language.installedSignCount > 0
+              ? `DESCARGAR ${language.changeCount}`
+              : `DESCARGAR ${language.signs.length}`;
+        return (
+          <View key={language.id} style={styles.card}>
+            <View style={styles.cardCopy}>
+              <Text style={styles.packName}>{language.name}</Text>
+              <Text style={styles.metadata}>
+                {language.region} · {language.signs.length} señas · {megabytes(language.totalSizeBytes)}
+              </Text>
+              {language.installedSignCount > 0 ? (
+                <Text style={styles.installed}>{language.installedSignCount} instaladas</Text>
+              ) : null}
+              {language.changeCount > 0 && language.installedSignCount > 0 ? (
+                <>
+                  <Text style={styles.update}>
+                    {language.changeCount} {language.changeCount === 1 ? 'cambio disponible' : 'cambios disponibles'}
+                  </Text>
+                  {language.pendingSigns.length > 0 ? (
+                    <Text style={styles.pendingSigns}>
+                      Pendientes: {language.pendingSigns.map(sign => sign.gloss).join(', ')}
+                    </Text>
+                  ) : null}
+                </>
+              ) : null}
+              {downloading ? (
+                <Text style={styles.progress}>Descargando · {Math.round(progress * 100)}%</Text>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              style={[styles.action, (downloading || unavailable || current) && styles.disabled]}
+              disabled={downloading || unavailable || current}
+              onPress={() => void (canSelect ? select(language) : install(language))}
+            >
+              <Text style={styles.actionText}>{downloading ? '…' : label}</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+
+      {error ? (
+        <TouchableOpacity style={styles.secondary} onPress={() => void load()}>
+          <Text style={styles.secondaryText}>REINTENTAR</Text>
+        </TouchableOpacity>
+      ) : null}
+      <TouchableOpacity
+        style={isSkipping ? styles.skipButton : styles.continueButton}
+        onPress={() => onContinue(languages)}
+      >
+        <Text style={isSkipping ? styles.skipText : styles.continueText}>
+          {isSkipping ? 'AHORA NO' : initialSetup ? 'CONTINUAR' : 'CERRAR'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {flex: 1, backgroundColor: '#0F172A', padding: 24, paddingTop: 48},
+  brand: {color: '#38BDF8', fontSize: 15, fontWeight: '900', letterSpacing: 4, marginBottom: 18},
+  title: {color: '#F8FAFC', fontSize: 28, fontWeight: '800', marginBottom: 12},
+  description: {color: '#CBD5E1', fontSize: 16, lineHeight: 23, marginBottom: 28},
+  card: {alignItems: 'center', backgroundColor: '#1E293B', borderRadius: 16, flexDirection: 'row', marginBottom: 12, padding: 16},
+  cardCopy: {flex: 1, paddingRight: 10},
+  packName: {color: '#F8FAFC', fontSize: 18, fontWeight: '800'},
+  metadata: {color: '#94A3B8', fontSize: 13, marginTop: 5},
+  installed: {color: '#7DD3FC', fontSize: 13, marginTop: 7},
+  update: {color: '#FBBF24', fontSize: 13, fontWeight: '700', marginTop: 7},
+  pendingSigns: {color: '#FDE68A', fontSize: 12, marginTop: 4},
+  progress: {color: '#38BDF8', fontSize: 13, marginTop: 7},
+  action: {backgroundColor: '#0284C7', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11},
+  disabled: {backgroundColor: '#475569'},
+  actionText: {color: '#FFFFFF', fontSize: 12, fontWeight: '900'},
+  error: {color: '#FCA5A5', fontSize: 15, marginBottom: 18},
+  empty: {color: '#94A3B8', fontSize: 15, marginBottom: 18},
+  secondary: {alignItems: 'center', borderColor: '#38BDF8', borderRadius: 12, borderWidth: 1, padding: 14},
+  secondaryText: {color: '#38BDF8', fontWeight: '800'},
+  continueButton: {alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 12, marginTop: 'auto', padding: 16},
+  continueText: {color: '#0F172A', fontWeight: '900'},
+  skipButton: {alignItems: 'center', marginTop: 'auto', padding: 16},
+  skipText: {color: '#CBD5E1', fontWeight: '800'},
+});

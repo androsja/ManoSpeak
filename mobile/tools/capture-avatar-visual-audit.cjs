@@ -185,7 +185,7 @@ async function main() {
     : {};
   const motionFiles = motionFilesByGloss();
 
-  const processIdentifier = adb('shell', 'pidof', 'com.manospeak').split(/\s+/)[0];
+  const processIdentifier = adb('shell', 'pidof', 'com.androsja.vozual').split(/\s+/)[0];
   if (!processIdentifier) throw new Error('VOZUAL is not running on Android.');
   adb('forward', `tcp:${port}`, `localabstract:webview_devtools_remote_${processIdentifier}`);
 

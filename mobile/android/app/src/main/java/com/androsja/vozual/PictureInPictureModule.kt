@@ -1,4 +1,4 @@
-package com.manospeak
+package com.androsja.vozual
 
 import android.content.Intent
 import android.os.Build

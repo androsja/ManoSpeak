@@ -1,7 +1,7 @@
-# Security and Privacy Policy — ManoSpeak
+# Security and Privacy Policy — Vozual
 
 ## 1. The Local-First Privacy Boundary
-ManoSpeak is built on a **privacy-by-design** architecture. Because sign language translators capture video containing faces and private living environments, sending raw video data or skeletal coordinates to a third-party server represents a major privacy risk.
+Vozual is built on a **privacy-by-design** architecture. Because sign language translators capture video containing faces and private living environments, sending raw video data or skeletal coordinates to a third-party server represents a major privacy risk.
 
 ### Security Guarantees
 - **No Cloud Uploads:** The application does not upload video feeds, extracted coordinate landmarks, or translation outputs to external cloud endpoints.
@@ -14,7 +14,7 @@ The TFLite model weights stored in the mobile assets directory (`mobile/assets/m
 - **No Ad-Hoc Dynamic Loading:** The model is bundled statically inside the application binary. Over-the-air model updates must be delivered through signed store updates rather than dynamic web downloads.
 
 ## 3. Guidelines for AI Agents
-When modifying or developing code for ManoSpeak:
+When modifying or developing code for Vozual:
 - **No Analytics Hooks:** Do not introduce tracking scripts, crash report uploads that include landmark vectors, or network telemetry libraries (e.g., Firebase, Segment) without explicit security reviews.
 - **Secrets Management:** Keep credentials out of the repository. Since all synthesis is local, there are no cloud API keys needed for Google Cloud TTS or Amazon Polly. Any local configuration keys must live in `.env` files which are strictly gitignored.
 - **Asset Access Permissions:** Ensure camera access permissions requested in `AndroidManifest.xml` and `Info.plist` are limited only to runtime translation needs. Do not ask for photo library writes or general storage tracking unless explicitly required.

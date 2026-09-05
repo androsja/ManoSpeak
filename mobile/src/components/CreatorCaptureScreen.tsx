@@ -65,7 +65,7 @@ export const CreatorCaptureScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.eyebrow}>MANOSPEAK · CREADOR</Text>
+      <Text style={styles.eyebrow}>VOZUAL · CREADOR</Text>
       <Text style={styles.title}>Crea una referencia de seña</Text>
       <Text style={styles.body}>
         Para la primera prueba haremos HOLA. Ubícate frente a la cámara, con buena luz, el rostro

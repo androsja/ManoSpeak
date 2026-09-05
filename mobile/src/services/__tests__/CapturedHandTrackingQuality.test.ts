@@ -1,5 +1,6 @@
 import {
   auditCapturedHandTracking,
+  lockPalmHandLandmarkFrames,
   repairStablePalmHandLandmarkFrames,
 } from '../CapturedHandTrackingQuality';
 import {MotionPoint, SignMotion} from '../CompactSignMotion';
@@ -77,5 +78,23 @@ describe('captured hand tracking quality', () => {
     repaired.forEach((hand, frameIndex) => {
       expect(hand[0]).toEqual(captured[frameIndex][0]);
     });
+  });
+
+  it('locks an authored support palm while preserving every captured wrist', () => {
+    const hands = [openPalm(0.1), openPalm(0.14), openPalm(0.18)];
+    [hands[1][5], hands[1][17]] = [hands[1][17], hands[1][5]];
+    const original = hands.map(hand => hand.map(value => [...value] as MotionPoint));
+    const locked = lockPalmHandLandmarkFrames(hands);
+
+    locked.forEach((hand, frameIndex) => {
+      expect(hand[0]).toEqual(original[frameIndex][0]);
+      hand.slice(1).forEach((landmark, landmarkIndex) => {
+        const reference = original[0][landmarkIndex + 1];
+        expect(landmark[0] - hand[0][0]).toBeCloseTo(reference[0] - original[0][0][0]);
+        expect(landmark[1] - hand[0][1]).toBeCloseTo(reference[1] - original[0][0][1]);
+        expect(landmark[2] - hand[0][2]).toBeCloseTo(reference[2] - original[0][0][2]);
+      });
+    });
+    expect(hands).toEqual(original);
   });
 });

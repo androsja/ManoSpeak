@@ -1,4 +1,4 @@
-# Interface and Design System — ManoSpeak
+# Interface and Design System — Vozual
 
 ## 1. Visual Interface Architecture
 Sign translation apps require a clear camera viewing space so that signers can monitor their own posture and ensure their hands stay within MediaPipe's tracking bounding boxes.

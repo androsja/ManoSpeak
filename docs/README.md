@@ -1,6 +1,6 @@
-# ManoSpeak Documentation Index
+# Vozual Documentation Index
 
-This directory contains the standard specifications, guidelines, and policies for the **ManoSpeak** sign-to-speech translation system.
+This directory contains the standard specifications, guidelines, and policies for the **Vozual** sign-to-speech translation system.
 
 ## Available Documentation
 

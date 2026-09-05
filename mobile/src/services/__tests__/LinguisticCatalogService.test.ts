@@ -1,3 +1,4 @@
+import publishedSigns from '../../../assets/motions/published_signs.json';
 import {extractKnownSpeechWords} from '../VoiceCommandService';
 import {
   findPublishedLscEntry,
@@ -5,110 +6,76 @@ import {
   PUBLISHED_LSC_ENTRIES,
   PUBLISHED_LSC_SIGN_COUNT,
   PUBLISHED_LSC_SPEECH_VOCABULARY,
+  resolveInstalledSignPlan,
   resolvePublishedLscPlan,
+  speechVocabularyForInstalledSigns,
 } from '../LinguisticCatalogService';
 
 describe('LinguisticCatalogService', () => {
-  it('covers every currently published motion through one LSC catalog', () => {
-    expect(findPublishedLscEntry('NECESITAR')?.categories).toContain('necesidades');
-    expect(findPublishedLscEntry('QUERER')?.categories).toContain('verbos_acciones');
+  it('exposes exactly the signs explicitly approved by the project owner', () => {
+    expect(PUBLISHED_LSC_ENTRIES.every(
+      (entry) => entry.review.ownerApproval?.status === 'approved',
+    )).toBe(true);
+    expect(PUBLISHED_LSC_ENTRIES.map((entry) => entry.motion.clip).sort())
+      .toEqual([...publishedSigns.publishedGlosses].sort());
+    expect(PUBLISHED_LSC_SIGN_COUNT).toBe(publishedSigns.publishedGlosses.length);
   });
 
-  it('counts shared historical records as one playable animation', () => {
-    const elEntries = PUBLISHED_LSC_ENTRIES.filter((entry) => entry.motion.clip === 'EL');
-
-    expect(elEntries).toHaveLength(1);
-    expect(elEntries[0]).toEqual(expect.objectContaining({gloss: 'ÉL', lexicalClass: 'pronoun'}));
-    expect(new Set(PUBLISHED_LSC_ENTRIES.map((entry) => entry.motion.clip)).size)
-      .toBe(PUBLISHED_LSC_SIGN_COUNT);
+  it('resolves every personally approved manifest clip through the catalog', () => {
+    publishedSigns.publishedGlosses.forEach((clip) => {
+      expect(findPublishedLscEntry(clip)).toEqual(expect.objectContaining({
+        motion: expect.objectContaining({clip}),
+        review: expect.objectContaining({
+          ownerApproval: expect.objectContaining({status: 'approved'}),
+        }),
+      }));
+    });
   });
 
-  it('normalizes verb forms while retaining every approved lexical clip', () => {
+  it('does not expose a linguistically reviewed sign before personal approval', () => {
+    expect(findPublishedLscEntry('GRACIAS')).toBeUndefined();
+    expect(planPublishedLscGlosses(['GRACIAS'])).toEqual([]);
+    expect(resolvePublishedLscPlan('muchas gracias').tokens).toEqual([]);
+  });
+
+  it('recognizes voice forms only for personally approved clips', () => {
+    const approvedEntry = PUBLISHED_LSC_ENTRIES[0];
+    expect(approvedEntry).toBeDefined();
+    const approvedPhrase = approvedEntry.spanish.lemmas[0] || approvedEntry.gloss;
     const recognized = extractKnownSpeechWords(
-      'necesitamos ayuda porque requiero apoyo',
+      approvedPhrase,
       PUBLISHED_LSC_SPEECH_VOCABULARY,
     );
 
-    expect(planPublishedLscGlosses(recognized).map((token) => token.gloss)).toEqual([
-      'NECESITAR',
-      'AYUDAR',
-      'NECESITAR',
-    ]);
+    expect(recognized).toEqual([approvedEntry.motion.clip]);
+    expect(planPublishedLscGlosses(recognized).map((token) => token.gloss))
+      .toEqual([approvedEntry.motion.clip]);
+    expect(resolvePublishedLscPlan(approvedPhrase).tokens.map((token) => token.gloss))
+      .toEqual([approvedEntry.motion.clip]);
   });
 
-  it('retains linguistic metadata instead of treating a verb as an anonymous clip', () => {
-    expect(planPublishedLscGlosses(['IR'])).toEqual([expect.objectContaining({
-      gloss: 'IR',
-      verbType: 'directional_review_required',
-      requiresSubjectMarker: true,
-    })]);
+  it('plans only signs that the user downloaded', () => {
+    const installed = new Set(['AGUA']);
+    expect(resolvePublishedLscPlan('agua y amigo', installed).tokens.map(token => token.gloss))
+      .toEqual(['AGUA']);
   });
 
-  it('adds an approved subject marker before a first-person verb', () => {
-    expect(resolvePublishedLscPlan('necesito ayuda').tokens.map((token) => token.gloss))
-      .toEqual(['YO', 'NECESITAR', 'AYUDAR']);
-  });
+  it('uses linguistic metadata downloaded with an independent sign', () => {
+    const signs = [{
+      languageId: 'lsc-co',
+      gloss: 'NUEVA',
+      speechAliases: ['seña nueva'],
+      categories: ['prueba'],
+      lexicalClass: 'noun',
+      verbType: 'none' as const,
+      requiresSubjectMarker: false,
+    }];
 
-  it('adds the published second-person marker for a conjugated verb', () => {
-    expect(resolvePublishedLscPlan('necesitas ayuda').tokens.map((token) => token.gloss))
-      .toEqual(['TÚ', 'NECESITAR', 'AYUDAR']);
-  });
-
-  it('does not duplicate an explicit subject separated by negation', () => {
-    expect(resolvePublishedLscPlan('yo no quiero comer').tokens.map((token) => token.gloss))
-      .toEqual(['YO', 'NO', 'QUERER', 'COMER']);
-  });
-
-  it('omits the definite article but retains the third-person pronoun', () => {
-    expect(resolvePublishedLscPlan('el médico come').tokens.map((token) => token.gloss))
-      .toEqual(['MÉDICO', 'COMER']);
-    expect(resolvePublishedLscPlan('el come').tokens.map((token) => token.gloss))
-      .toEqual(['EL', 'COMER']);
-    expect(resolvePublishedLscPlan('el médico come con perro').tokens.map((token) => token.gloss))
-      .toEqual(['MÉDICO', 'COMER', 'PERRO']);
-  });
-
-  it('maps comer conjugations and comida to the COMER lexical sign', () => {
-    expect(resolvePublishedLscPlan('yo no como').tokens.map((token) => token.gloss))
-      .toEqual(['YO', 'NO', 'COMER']);
-    expect(resolvePublishedLscPlan('comida').tokens.map((token) => token.gloss))
-      .toEqual(['COMER']);
-    expect(resolvePublishedLscPlan('alimento').tokens.map((token) => token.gloss))
-      .toEqual(['COMER']);
-    expect(resolvePublishedLscPlan('alimentaremos').tokens.map((token) => token.gloss))
-      .toEqual(['COMER']);
-  });
-
-  it('maps mucho gender and number variants to one lexical sign', () => {
-    expect(resolvePublishedLscPlan('mucha').tokens.map((token) => token.gloss))
-      .toEqual(['MUCHO']);
-    expect(resolvePublishedLscPlan('muchos').tokens.map((token) => token.gloss))
-      .toEqual(['MUCHO']);
-    expect(resolvePublishedLscPlan('muchas').tokens.map((token) => token.gloss))
-      .toEqual(['MUCHO']);
-  });
-
-  it('maps doctor and doctora to the published MÉDICO sign', () => {
-    expect(resolvePublishedLscPlan('doctor come').tokens.map((token) => token.gloss))
-      .toEqual(['MÉDICO', 'COMER']);
-    expect(resolvePublishedLscPlan('doctora come').tokens.map((token) => token.gloss))
-      .toEqual(['MÉDICO', 'COMER']);
-    expect(resolvePublishedLscPlan('médica come').tokens.map((token) => token.gloss))
-      .toEqual(['MÉDICO', 'COMER']);
-  });
-
-  it('keeps consecutive phrase signs in spoken order', () => {
-    expect(resolvePublishedLscPlan('hola cómo estás').tokens.map((token) => token.gloss))
-      .toEqual(['HOLA', '¿CÓMO ESTÁS?']);
-  });
-
-  it('reports an unavailable marker instead of inventing an unapproved animation', () => {
-    expect(resolvePublishedLscPlan('necesitamos ayuda')).toEqual(expect.objectContaining({
-      tokens: [
-        expect.objectContaining({gloss: 'NECESITAR'}),
-        expect.objectContaining({gloss: 'AYUDAR'}),
-      ],
-      unavailableMarkers: ['NOSOTROS'],
-    }));
+    expect(speechVocabularyForInstalledSigns(signs)).toEqual([{
+      gloss: 'NUEVA',
+      aliases: ['NUEVA', 'seña nueva'],
+    }]);
+    expect(resolveInstalledSignPlan('esta seña nueva', signs).tokens.map(token => token.gloss))
+      .toEqual(['NUEVA']);
   });
 });

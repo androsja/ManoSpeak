@@ -13,12 +13,26 @@ import {
   type ActivationAccount,
 } from './src/services/ActivationService';
 import {ensureAccountProfile} from './src/services/AccountProfileService';
+import {SignLanguageLibraryScreen} from './src/components/SignLanguageLibraryScreen';
+import {
+  completeSignLanguageSetup,
+  dismissSignLanguageChanges,
+  hasUnpromptedSignChanges,
+  hasCompletedSignLanguageSetup,
+  installedSignsForSelectedLanguage,
+  listSignLanguages,
+  type InstalledSign,
+} from './src/services/SignLanguageService';
 
 export default function App() {
   const [accessConfig, setAccessConfig] = useState<AppAccessConfig>(DEFAULT_APP_ACCESS_CONFIG);
   const [account, setAccount] = useState<ActivationAccount | null>(null);
   const [accountReady, setAccountReady] = useState(false);
   const [activationOpen, setActivationOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryCheckComplete, setLibraryCheckComplete] = useState(false);
+  const [initialLibrarySetup, setInitialLibrarySetup] = useState(false);
+  const [availableSigns, setAvailableSigns] = useState<InstalledSign[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -45,6 +59,35 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+    Promise.all([installedSignsForSelectedLanguage(), hasCompletedSignLanguageSetup()])
+      .then(async ([installed, setupComplete]) => {
+        if (!mounted) return;
+        setAvailableSigns(installed);
+        const firstSetup = installed.length === 0 && !setupComplete;
+        setInitialLibrarySetup(firstSetup);
+        if (firstSetup) {
+          setLibraryOpen(true);
+          return;
+        }
+        try {
+          const available = await listSignLanguages();
+          if (mounted) setLibraryOpen(hasUnpromptedSignChanges(available));
+        } catch {
+          // Existing local packages remain usable while offline.
+        }
+      })
+      .catch(() => {
+        // A catalogue outage must not prevent an already configured app from
+        // opening. The library screen offers an explicit retry during setup.
+      })
+      .finally(() => {
+        if (mounted) setLibraryCheckComplete(true);
+      });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
     if (!account) return;
     // Profile synchronization is best-effort until the Firestore database and
     // rules are deployed. It never blocks translation or account activation.
@@ -52,6 +95,29 @@ export default function App() {
   }, [account]);
 
   const activationIsRequired = accessConfig.activationRequired && accountReady && !account;
+  if (!libraryCheckComplete) return null;
+  if (libraryOpen) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <SignLanguageLibraryScreen
+          initialSetup={initialLibrarySetup}
+          onContinue={statuses => {
+            void (async () => {
+              try {
+                await dismissSignLanguageChanges(statuses);
+                await completeSignLanguageSetup();
+                setAvailableSigns(await installedSignsForSelectedLanguage());
+              } finally {
+                setLibraryOpen(false);
+                setInitialLibrarySetup(false);
+              }
+            })();
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
   if (activationOpen || activationIsRequired) {
     return (
       <SafeAreaView style={styles.container}>
@@ -72,6 +138,11 @@ export default function App() {
         account={account}
         accessConfig={accessConfig}
         onManageAccount={() => setActivationOpen(true)}
+        installedSigns={availableSigns}
+        onManageSignLanguages={() => {
+          setInitialLibrarySetup(false);
+          setLibraryOpen(true);
+        }}
         onSignOut={() => closeActivationSession()}
       />
     </SafeAreaView>

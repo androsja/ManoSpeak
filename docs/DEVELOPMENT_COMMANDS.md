@@ -1,4 +1,4 @@
-# Development Commands Reference — ManoSpeak
+# Development Commands Reference — Vozual
 
 ## 1. Machine Learning Module (`ml/`)
 The machine learning pipeline is built with Python 3.11/3.12 and managed via Poetry.

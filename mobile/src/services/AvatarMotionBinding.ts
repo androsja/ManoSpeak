@@ -15,6 +15,31 @@ export const AVATAR_ARMS: ReadonlyArray<Omit<AvatarArmBinding, 'handStart'>> = [
 
 export const CAPTURED_HAND_STARTS = [33, 54] as const;
 
+/**
+ * Provides the minimum pose geometry required to align the rig before any
+ * optional sign motions have been downloaded.
+ */
+export function createNeutralAvatarAlignmentFrame(): MotionFrame {
+  const bodyHands = Array.from(
+    {length: CAPTURED_HAND_STARTS[1] + 21},
+    (): MotionPoint => [0, 0, 0],
+  );
+  // MediaPipe anatomical left appears on the right side of a mirrored camera
+  // preview. Keeping that convention prevents the rig from crossing its arms
+  // while it settles into the neutral pose.
+  bodyHands[11] = [0.71, 0.68, 0];
+  bodyHands[12] = [0.29, 0.68, 0];
+  bodyHands[15] = [0.72, 1.09, 0];
+  bodyHands[16] = [0.28, 1.09, 0];
+  bodyHands[23] = [0.59, 1.15, 0];
+  bodyHands[24] = [0.41, 1.15, 0];
+  return {
+    bodyHands,
+    face: [],
+    headOrientation: {yaw: 0, pitch: 0, roll: 0},
+  };
+}
+
 /** Selects every anatomical arm that needs a derived hand presentation. */
 export function presentationArmIndexes(
   singleHandedSide?: 'L' | 'R',

@@ -1,6 +1,6 @@
-# ManoSpeak — Root Agent Guide
+# Vozual — Root Agent Guide
 
-Welcome to the **ManoSpeak** repository. This file serves as the main entry point and guide for AI agents and developers working on this codebase.
+Welcome to the **Vozual** repository. This file serves as the main entry point and guide for AI agents and developers working on this codebase.
 
 ## 1. Document Index
 
@@ -20,7 +20,7 @@ Welcome to the **ManoSpeak** repository. This file serves as the main entry poin
 ## 2. Directory Structure
 
 ```text
-TraductorSeñas/ (ManoSpeak root)
+TraductorSeñas/ (Vozual root)
 ├── ml/                       # Python ML training and coordinate extraction
 │   ├── src/                  # Feature extractors, normalizers, and training loops
 │   ├── tests/                # Unit tests for preprocessing and model serialization

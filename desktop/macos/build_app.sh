@@ -30,7 +30,8 @@ swiftc \
     -o "$CONTENTS/MacOS/VOZUALEditor" \
     -module-cache-path "$TEMP_ROOT/SwiftModuleCache" \
     -framework AppKit \
-    -framework AVFoundation
+    -framework AVFoundation \
+    -framework WebKit
 "$EDITOR_PYTHON" \
     "$SOURCE_DIR/create_icns.py" \
     "$ICON_SOURCE" \

@@ -1,8 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {DeviceEventEmitter, NativeModules, StyleSheet, View} from 'react-native';
-import RNFS from 'react-native-fs';
 import Svg, {G, Line, Path, Polygon} from 'react-native-svg';
-import publishedSigns from '../../assets/motions/published_signs.json';
 import {AvatarClip, AvatarRenderMode} from './SkeletalAvatar';
 import {
   decodeBase64Bytes,
@@ -10,6 +8,10 @@ import {
   MotionFrame,
   SignMotion as Motion,
 } from '../services/CompactSignMotion';
+import {
+  installedSignGlosses,
+  readInstalledSignMotionBase64,
+} from '../services/SignLanguageService';
 import {
   coarticulateSignMotion,
   PHRASE_COAST_TO_REST_RATIO,
@@ -64,14 +66,6 @@ const motionCache = new Map<string, Motion>();
 const pictureInPictureDiagnostics = NativeModules.VozualPictureInPicture as {
   reportPlaybackEvent?: (event: string, publishedGloss: string) => void;
 } | undefined;
-
-function motionAssetName(clip: string): string {
-  const normalized = clip.trim().toLowerCase();
-  if (!normalized) throw new Error(`Motion ${clip} has no usable asset name.`);
-  return `m_${Array.from(normalized, character =>
-    character.codePointAt(0)!.toString(16).padStart(6, '0'),
-  ).join('')}`;
-}
 
 function valid(point: Point | undefined): point is Point {
   return point != null && point.some(value => Math.abs(value) > 1e-8);
@@ -165,8 +159,8 @@ async function loadMotion(clip: string): Promise<Motion> {
   const key = clip.trim().toUpperCase();
   const cached = motionCache.get(key);
   if (cached) return cached;
-  const filename = `${motionAssetName(clip)}.motion.bin`;
-  const content = await RNFS.readFileAssets(`avatar/motions/${filename}`, 'base64');
+  const content = await readInstalledSignMotionBase64(clip);
+  if (!content) throw new Error(`Motion ${clip} is not installed.`);
   const parsed = decodeCompactMotion(decodeBase64Bytes(content));
   if (!Array.isArray(parsed.frames) || parsed.frames.length < 2) {
     throw new Error(`Motion ${clip} does not contain enough frames.`);
@@ -349,16 +343,19 @@ export function PipSkeletalAvatar({clip, playbackId, playbackSpeed, continuePhra
 
   useEffect(() => {
     let cancelled = false;
-    const firstPublished = publishedSigns.publishedGlosses[0];
-    if (!firstPublished) return undefined;
-    loadMotion(firstPublished).then(motion => {
-      if (cancelled) return;
-      const initialBindings = bindingsForMotion(motion);
-      bindings.current = initialBindings;
-      restReference.current = motion.frames[0];
-      display(makeRestPose(motion.frames[0], initialBindings));
-      setReady(true);
-    }).catch(error => console.error('[PiP skeleton] Could not load the rest pose.', error));
+    installedSignGlosses()
+      .then(glosses => glosses[0] ? loadMotion(glosses[0]) : undefined)
+      .then(motion => {
+        if (cancelled) return;
+        if (motion) {
+          const initialBindings = bindingsForMotion(motion);
+          bindings.current = initialBindings;
+          restReference.current = motion.frames[0];
+          display(makeRestPose(motion.frames[0], initialBindings));
+        }
+        setReady(true);
+      })
+      .catch(error => console.error('[PiP skeleton] Could not load the rest pose.', error));
     return () => {
       cancelled = true;
     };

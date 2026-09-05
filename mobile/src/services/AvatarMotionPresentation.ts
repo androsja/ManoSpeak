@@ -84,12 +84,364 @@ export type RiggedHandPresentation =
   | 'anatomical'
   | 'open'
   | 'open-palm'
+  | 'fully-open'
+  | 'flat-palm'
   | 'soft-curl'
   | 'fist'
   | 'pointing'
   | 'self-pointing'
   | 'index-only'
-  | 'thumb-up';
+  | 'thumb-up'
+  | 'pinched'
+  | 'money-rub'
+  | 'question-q';
+
+export type RiggedFingerName = 'thumb' | 'index' | 'middle' | 'ring' | 'pinky';
+export type RiggedFingerJointEdits = Record<RiggedFingerName, [number, number, number]>;
+export type RiggedFingerState = 'captured' | 'extended' | 'closed';
+export type RiggedHandFingerStates = Partial<Record<RiggedFingerName, RiggedFingerState>>;
+
+export type RiggedHandEditPose = {
+  elbowRotation: number;
+  wristPitch: number;
+  wristYaw: number;
+  wristRoll: number;
+  horizontalOffset: number;
+  verticalOffset: number;
+  depthOffset: number;
+  fist: number;
+  fingers: Record<RiggedFingerName, number>;
+  fingerJoints: RiggedFingerJointEdits;
+};
+
+export type RiggedHandEditPoseInput = Partial<Omit<RiggedHandEditPose, 'fingers' | 'fingerJoints'>> & {
+  fingers?: Partial<Record<RiggedFingerName, number>>;
+  fingerJoints?: Partial<Record<RiggedFingerName, readonly number[]>>;
+};
+
+export type RiggedHandEditKeyframe = {
+  frame: number;
+  transitionFrames?: number;
+  smile?: number;
+  left?: RiggedHandEditPoseInput;
+  right?: RiggedHandEditPoseInput;
+};
+
+export type RiggedHandsEditPose = {
+  left: RiggedHandEditPose;
+  right: RiggedHandEditPose;
+};
+
+export type NormalizedRiggedHandEditKeyframe = RiggedHandsEditPose & {
+  frame: number;
+  transitionFrames: number;
+  smile: number;
+};
+
+const RIGGED_EDIT_FINGERS: readonly RiggedFingerName[] = [
+  'thumb', 'index', 'middle', 'ring', 'pinky',
+];
+
+function boundedEditValue(value: unknown, minimum: number, maximum: number): number {
+  const numeric = typeof value === 'number' ? value : Number(value ?? 0);
+  return Number.isFinite(numeric)
+    ? Math.min(maximum, Math.max(minimum, numeric))
+    : 0;
+}
+
+function normalizedRiggedHandEditPose(
+  pose: RiggedHandEditPoseInput | undefined,
+): RiggedHandEditPose {
+  return {
+    elbowRotation: boundedEditValue(pose?.elbowRotation, -90, 90),
+    wristPitch: boundedEditValue(pose?.wristPitch, -180, 180),
+    wristYaw: boundedEditValue(pose?.wristYaw, -180, 180),
+    wristRoll: boundedEditValue(pose?.wristRoll, -180, 180),
+    horizontalOffset: boundedEditValue(pose?.horizontalOffset, -1, 1),
+    verticalOffset: boundedEditValue(pose?.verticalOffset, -1, 1),
+    depthOffset: boundedEditValue(pose?.depthOffset, -1, 1),
+    fist: boundedEditValue(pose?.fist, 0, 1),
+    fingers: Object.fromEntries(RIGGED_EDIT_FINGERS.map(finger => [
+      finger,
+      boundedEditValue(pose?.fingers?.[finger], -1, 1),
+    ])) as Record<RiggedFingerName, number>,
+    fingerJoints: Object.fromEntries(RIGGED_EDIT_FINGERS.map(finger => [
+      finger,
+      [0, 1, 2].map(joint => boundedEditValue(
+        pose?.fingerJoints?.[finger]?.[joint],
+        -1,
+        1,
+      )) as [number, number, number],
+    ])) as RiggedFingerJointEdits,
+  };
+}
+
+/** Returns a bounded screen-space wrist offset for editor hand alignment. */
+export function riggedHandPositionOffset(
+  pose: RiggedHandEditPoseInput | undefined,
+): MotionPoint {
+  return [
+    boundedEditValue(pose?.horizontalOffset, -1, 1),
+    boundedEditValue(pose?.verticalOffset, -1, 1),
+    0,
+  ];
+}
+
+/** Rotates a complete forearm target around its elbow in the screen plane. */
+export function riggedElbowPivotTarget(
+  elbow: MotionPoint,
+  wrist: MotionPoint,
+  degrees: number,
+): MotionPoint {
+  const radians = boundedEditValue(degrees, -90, 90) * Math.PI / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  const deltaX = wrist[0] - elbow[0];
+  const deltaY = wrist[1] - elbow[1];
+  return [
+    elbow[0] + deltaX * cosine - deltaY * sine,
+    elbow[1] + deltaX * sine + deltaY * cosine,
+    wrist[2],
+  ];
+}
+
+/** True when an author has manually changed the hand or wrist transform. */
+export function hasRiggedHandTransformEdit(
+  pose: RiggedHandEditPoseInput | undefined,
+): boolean {
+  const normalized = normalizedRiggedHandEditPose(pose);
+  return [
+    normalized.elbowRotation,
+    normalized.wristPitch,
+    normalized.wristYaw,
+    normalized.wristRoll,
+    normalized.horizontalOffset,
+    normalized.verticalOffset,
+    normalized.depthOffset,
+  ].some(value => Math.abs(value) > 0.0001);
+}
+
+export function normalizeRiggedHandEditKeyframes(
+  keyframes: RiggedHandEditKeyframe[] | undefined,
+): NormalizedRiggedHandEditKeyframe[] {
+  if (!Array.isArray(keyframes)) return [];
+  const byFrame = new Map<number, NormalizedRiggedHandEditKeyframe>();
+  keyframes.slice(0, 256).forEach(keyframe => {
+    const frame = Math.min(65535, Math.max(0, Math.round(Number(keyframe?.frame))));
+    if (!Number.isFinite(frame)) return;
+    byFrame.set(frame, {
+      frame,
+      transitionFrames: Math.min(
+        120,
+        Math.max(1, Math.round(Number(keyframe.transitionFrames ?? 6))),
+      ),
+      smile: boundedEditValue(keyframe.smile, 0, 1),
+      left: normalizedRiggedHandEditPose(keyframe.left),
+      right: normalizedRiggedHandEditPose(keyframe.right),
+    });
+  });
+  return [...byFrame.values()].sort((first, second) => first.frame - second.frame);
+}
+
+function mixRiggedHandEditPose(
+  start: RiggedHandEditPose,
+  end: RiggedHandEditPose,
+  amount: number,
+): RiggedHandEditPose {
+  const mix = (first: number, second: number) => first + (second - first) * amount;
+  return {
+    elbowRotation: mix(start.elbowRotation, end.elbowRotation),
+    wristPitch: mix(start.wristPitch, end.wristPitch),
+    wristYaw: mix(start.wristYaw, end.wristYaw),
+    wristRoll: mix(start.wristRoll, end.wristRoll),
+    horizontalOffset: mix(start.horizontalOffset, end.horizontalOffset),
+    verticalOffset: mix(start.verticalOffset, end.verticalOffset),
+    depthOffset: mix(start.depthOffset, end.depthOffset),
+    fist: mix(start.fist, end.fist),
+    fingers: Object.fromEntries(RIGGED_EDIT_FINGERS.map(finger => [
+      finger,
+      mix(start.fingers[finger], end.fingers[finger]),
+    ])) as Record<RiggedFingerName, number>,
+    fingerJoints: Object.fromEntries(RIGGED_EDIT_FINGERS.map(finger => [
+      finger,
+      [0, 1, 2].map(joint => mix(
+        start.fingerJoints[finger][joint],
+        end.fingerJoints[finger][joint],
+      )) as [number, number, number],
+    ])) as RiggedFingerJointEdits,
+  };
+}
+
+/**
+ * Evaluates editor-authored hand corrections at an exact captured frame.
+ * Each target controls how many preceding frames form its smooth transition;
+ * outside that window the previous pose is held without unwanted drift.
+ */
+export function riggedHandsEditPoseAtFrame(
+  keyframes: RiggedHandEditKeyframe[] | undefined,
+  frame: number,
+): RiggedHandsEditPose {
+  const empty = normalizedRiggedHandEditPose(undefined);
+  const normalized = normalizeRiggedHandEditKeyframes(keyframes);
+  let previous = {
+    frame: 0,
+    transitionFrames: 1,
+    left: empty,
+    right: normalizedRiggedHandEditPose(undefined),
+  };
+  const currentFrame = Math.max(0, Number.isFinite(frame) ? frame : 0);
+  for (const target of normalized) {
+    if (currentFrame >= target.frame) {
+      previous = target;
+      continue;
+    }
+    const transitionStart = Math.max(
+      previous.frame,
+      target.frame - (target.transitionFrames ?? 6),
+    );
+    if (currentFrame <= transitionStart) {
+      return {left: previous.left, right: previous.right};
+    }
+    const linear = (currentFrame - transitionStart)
+      / Math.max(1, target.frame - transitionStart);
+    const smooth = linear * linear * (3 - 2 * linear);
+    return {
+      left: mixRiggedHandEditPose(previous.left, target.left, smooth),
+      right: mixRiggedHandEditPose(previous.right, target.right, smooth),
+    };
+  }
+  return {left: previous.left, right: previous.right};
+}
+
+/** Evaluates an additional editor-authored smile on the shared smooth timeline. */
+export function riggedSmileEditAtFrame(
+  keyframes: RiggedHandEditKeyframe[] | undefined,
+  frame: number,
+): number {
+  const normalized = normalizeRiggedHandEditKeyframes(keyframes);
+  let previous = {frame: 0, transitionFrames: 1, smile: 0};
+  const currentFrame = Math.max(0, Number.isFinite(frame) ? frame : 0);
+  for (const target of normalized) {
+    if (currentFrame >= target.frame) {
+      previous = target;
+      continue;
+    }
+    const transitionStart = Math.max(
+      previous.frame,
+      target.frame - target.transitionFrames,
+    );
+    if (currentFrame <= transitionStart) return previous.smile;
+    const linear = (currentFrame - transitionStart)
+      / Math.max(1, target.frame - transitionStart);
+    const smooth = linear * linear * (3 - 2 * linear);
+    return previous.smile + (target.smile - previous.smile) * smooth;
+  }
+  return previous.smile;
+}
+
+export type RiggedHandDepthLayer = 'front' | 'back';
+
+export type RiggedHandBoneTarget = {
+  boneName: string;
+  endpoint: boolean;
+};
+
+const RIGGED_HAND_FINGER_CHAINS = [
+  {start: 1, boneName: 'thumb'},
+  {start: 5, boneName: 'f_index'},
+  {start: 9, boneName: 'f_middle'},
+  {start: 13, boneName: 'f_ring'},
+  {start: 17, boneName: 'f_pinky'},
+] as const;
+
+/** Maps every MediaPipe hand landmark to its matching deform-bone joint. */
+export function riggedHandBoneTarget(
+  landmarkIndex: number,
+): RiggedHandBoneTarget | undefined {
+  if (landmarkIndex === 0) return {boneName: 'hand', endpoint: false};
+  const chain = RIGGED_HAND_FINGER_CHAINS.find(({start}) => (
+    landmarkIndex >= start && landmarkIndex <= start + 3
+  ));
+  if (!chain) return undefined;
+  const chainOffset = landmarkIndex - chain.start;
+  const joint = Math.min(3, chainOffset + 1);
+  return {
+    boneName: `${chain.boneName}.0${joint}`,
+    endpoint: chainOffset === 3,
+  };
+}
+
+/**
+ * Moves only the rendered elbow when a captured forearm is excessively
+ * foreshortened toward the camera. The wrist remains exact, while the avatar
+ * receives enough visible forearm length to avoid a round, folded silhouette.
+ */
+export function preserveMinimumProjectedForearmLength(
+  elbow: MotionPoint,
+  wrist: MotionPoint,
+  minimumLength: number,
+): MotionPoint {
+  const deltaX = elbow[0] - wrist[0];
+  const deltaY = elbow[1] - wrist[1];
+  const projectedLength = Math.hypot(deltaX, deltaY);
+  const safeMinimum = Math.max(0, minimumLength);
+  if (projectedLength >= safeMinimum || projectedLength < 0.000001) {
+    return [...elbow] as MotionPoint;
+  }
+  const scale = safeMinimum / projectedLength;
+  return [
+    wrist[0] + deltaX * scale,
+    wrist[1] + deltaY * scale,
+    elbow[2],
+  ];
+}
+
+/**
+ * Selects the visible depth branch of a wrist while preserving the captured
+ * screen-space trajectory. A blended rear branch lets the avatar's real head
+ * mesh occlude a hand naturally instead of painting the hand over the face.
+ */
+export function riggedWristDepth(
+  elbowDepth: number,
+  solvedWristDepth: number,
+  layer: RiggedHandDepthLayer = 'front',
+  layerWeight = 1,
+  minimumDepthDistance = 0,
+): number {
+  const depthDistance = Math.max(
+    Math.abs(solvedWristDepth - elbowDepth),
+    Math.max(0, minimumDepthDistance),
+  );
+  const frontDepth = elbowDepth + depthDistance;
+  if (layer !== 'back') return frontDepth;
+  const backDepth = elbowDepth - depthDistance;
+  const weight = Math.min(1, Math.max(0, layerWeight));
+  return frontDepth + (backDepth - frontDepth) * weight;
+}
+
+/**
+ * Keeps a resting hand visibly in front of the torso, then returns to the
+ * authored depth branch before two hands meet. The smooth fade avoids a depth
+ * pop while preserving the captured screen-space path.
+ */
+export function initialRiggedHandFrontDepth(
+  baseDepth: number,
+  initialDepth: number | undefined,
+  frameIndex: number,
+  holdEndFrame: number,
+  fadeFrames: number,
+): number {
+  const base = Math.max(0, baseDepth);
+  const initial = Math.max(base, initialDepth ?? base);
+  const frame = Math.max(0, frameIndex);
+  const holdEnd = Math.max(0, holdEndFrame);
+  if (frame <= holdEnd) return initial;
+  const fade = Math.max(0, fadeFrames);
+  if (fade === 0 || frame >= holdEnd + fade) return base;
+  const linear = (frame - holdEnd) / fade;
+  const smooth = linear * linear * (3 - 2 * linear);
+  return initial + (base - initial) * smooth;
+}
 
 /**
  * Copies the 21 captured landmarks without changing their configuration.
@@ -126,6 +478,77 @@ export function riggedPalmScaleFactor(
     safeMinimum,
     (longitudinalRatio + lateralRatio) / 2,
   ));
+}
+
+function capturedPalmApparentSize(hand: MotionPoint[]): number {
+  const requiredIndexes = [0, 5, 9, 13, 17];
+  if (!requiredIndexes.every(index => (
+    hand[index] != null
+    && hand[index].every(Number.isFinite)
+  ))) return 0;
+
+  const average = (indexes: number[]): MotionPoint => [0, 1, 2].map(axis => (
+    indexes.reduce((sum, index) => sum + hand[index][axis], 0) / indexes.length
+  )) as MotionPoint;
+  const screenDistance = (first: MotionPoint, second: MotionPoint) => Math.hypot(
+    first[0] - second[0],
+    first[1] - second[1],
+  );
+  const palmCenter = average([5, 9, 13, 17]);
+  const indexSide = average([5, 9]);
+  const pinkySide = average([13, 17]);
+  return (
+    screenDistance(hand[0], palmCenter)
+    + screenDistance(indexSide, pinkySide)
+  ) / 2;
+}
+
+/**
+ * Converts the apparent growth of a reliable captured palm into the shared
+ * scale used by two hands that move toward the camera as one contacted unit.
+ * Only screen-space size is considered because the preview camera is
+ * orthographic and MediaPipe hand Z is local to each hand.
+ */
+export function riggedApproachPalmScaleFactor(
+  hand: MotionPoint[],
+  referenceHand: MotionPoint[],
+  minimumScale = 1,
+  maximumScale = 1.5,
+  approachGain = 1,
+): number {
+  const currentSize = capturedPalmApparentSize(hand);
+  const referenceSize = capturedPalmApparentSize(referenceHand);
+  const safeMinimum = Math.max(0.5, Math.min(2.5, minimumScale));
+  const safeMaximum = Math.max(safeMinimum, Math.min(2.5, maximumScale));
+  if (currentSize < 0.0001 || referenceSize < 0.0001) return safeMinimum;
+  const gain = Math.max(0, Math.min(3, approachGain));
+  const capturedRatio = currentSize / referenceSize;
+  const amplifiedRatio = 1 + (capturedRatio - 1) * gain;
+  return Math.min(safeMaximum, Math.max(safeMinimum, amplifiedRatio));
+}
+
+/** Keeps the strongest approach cue reached so far instead of shrinking a
+ * foreshortened fist while it is still physically close to the camera. */
+export function riggedApproachPalmScaleEnvelope(
+  hands: MotionPoint[][],
+  frameIndex: number,
+  minimumScale = 1,
+  maximumScale = 1.5,
+  approachGain = 1,
+): number {
+  const referenceHand = hands[0];
+  if (!referenceHand) return minimumScale;
+  const lastIndex = Math.min(hands.length - 1, Math.max(0, Math.round(frameIndex)));
+  return hands.slice(0, lastIndex + 1).reduce((largestScale, hand) => Math.max(
+    largestScale,
+    riggedApproachPalmScaleFactor(
+      hand,
+      referenceHand,
+      minimumScale,
+      maximumScale,
+      approachGain,
+    ),
+  ), minimumScale);
 }
 
 /**
@@ -468,6 +891,12 @@ export function capturedFacePresentation(
   );
   const leftCornerDelta = current.leftMouthCornerDrop - calibrated.leftMouthCornerBaseline;
   const rightCornerDelta = current.rightMouthCornerDrop - calibrated.rightMouthCornerBaseline;
+  // A signer can hold a smile for the complete recording. A purely relative
+  // baseline would incorrectly classify that sustained expression as neutral,
+  // so retain mouth corners that are anatomically above the lip center.
+  const absoluteCornerRaise = (cornerDrop: number) => (
+    clampUnit((-cornerDrop - 0.018) / 0.025)
+  );
   const leftBrowDelta = calibrated.leftInnerBrowBaseline - current.leftInnerBrowLift;
   const rightBrowDelta = calibrated.rightInnerBrowBaseline - current.rightInnerBrowLift;
   const mouthOpeningRatio = current.mouthOpening / Math.max(0.1, current.mouthWidth);
@@ -490,8 +919,14 @@ export function capturedFacePresentation(
     )),
     leftMouthCornerDrop: clampUnit(leftCornerDelta / 0.045),
     rightMouthCornerDrop: clampUnit(rightCornerDelta / 0.045),
-    leftMouthCornerRaise: clampUnit(-leftCornerDelta / 0.045),
-    rightMouthCornerRaise: clampUnit(-rightCornerDelta / 0.045),
+    leftMouthCornerRaise: Math.max(
+      clampUnit(-leftCornerDelta / 0.045),
+      absoluteCornerRaise(current.leftMouthCornerDrop),
+    ),
+    rightMouthCornerRaise: Math.max(
+      clampUnit(-rightCornerDelta / 0.045),
+      absoluteCornerRaise(current.rightMouthCornerDrop),
+    ),
     leftInnerBrowLift: clampUnit(leftBrowDelta / 0.06),
     rightInnerBrowLift: clampUnit(rightBrowDelta / 0.06),
     leftInnerBrowLower: clampUnit(-leftBrowDelta / 0.06),
@@ -509,6 +944,7 @@ const THUMB_CHAIN = [1, 2, 3, 4] as const;
 const FIST_FINGER_CHAINS = [THUMB_CHAIN, ...LONG_FINGER_CHAINS] as const;
 const POINTING_INDEX_CHAIN = LONG_FINGER_CHAINS[0];
 const STABLE_OPEN_HAND_PROXIMAL_JOINTS = new Set([1, 5, 9, 13, 17]);
+const FLAT_PALM_DRIVEN_JOINTS = new Set([1, 5, 9, 13, 17]);
 
 const FACE_FEATURE_PAIRS = [
   [159, 145],
@@ -627,7 +1063,10 @@ function median(values: number[]): number {
  * finger chains become straight and near-parallel; the thumb keeps its own
  * open angle while removing an isolated bent distal landmark.
  */
-export function straightenOpenHandLandmarks(hand: MotionPoint[]): MotionPoint[] {
+function straightenOpenHandLandmarksWithPersonalBlend(
+  hand: MotionPoint[],
+  personalBlend: number,
+): MotionPoint[] {
   const result = hand.map(point => [...point] as MotionPoint);
   const directions = LONG_FINGER_CHAINS.map(chain => {
     const base = hand[chain[0]];
@@ -665,10 +1104,11 @@ export function straightenOpenHandLandmarks(hand: MotionPoint[]): MotionPoint[] 
     const alignedPersonal: MotionPoint = dot < 0
       ? [-personal[0], -personal[1], -personal[2]]
       : personal;
+    const sharedBlend = 1 - personalBlend;
     const direction = normalize([
-      shared[0] * 0.82 + alignedPersonal[0] * 0.18,
-      shared[1] * 0.82 + alignedPersonal[1] * 0.18,
-      shared[2] * 0.82 + alignedPersonal[2] * 0.18,
+      shared[0] * sharedBlend + alignedPersonal[0] * personalBlend,
+      shared[1] * sharedBlend + alignedPersonal[1] * personalBlend,
+      shared[2] * sharedBlend + alignedPersonal[2] * personalBlend,
     ]);
     if (!direction) return;
 
@@ -707,6 +1147,90 @@ export function straightenOpenHandLandmarks(hand: MotionPoint[]): MotionPoint[] 
   return result;
 }
 
+export function straightenOpenHandLandmarks(hand: MotionPoint[]): MotionPoint[] {
+  return straightenOpenHandLandmarksWithPersonalBlend(hand, 0.18);
+}
+
+/**
+ * Keeps all four long fingers exactly parallel for signs whose captured hand
+ * remains fully open. This rejects an isolated fingertip direction change
+ * without moving the palm roots or changing any captured phalanx length.
+ */
+export function presentFullyOpenHandLandmarkFrames(
+  hands: MotionPoint[][],
+): MotionPoint[][] {
+  const bases = hands.map(handBasis);
+  const capturedIndexDirections = hands.flatMap((hand, frameIndex) => {
+    const basis = bases[frameIndex];
+    if (!basis || !POINTING_INDEX_CHAIN.every(index => isValid(hand[index]))) return [];
+    const direction = unitVector(
+      hand[POINTING_INDEX_CHAIN[0]],
+      hand[POINTING_INDEX_CHAIN[POINTING_INDEX_CHAIN.length - 1]],
+    );
+    return direction ? [localDirection(direction, basis)] : [];
+  });
+  const reference = capturedIndexDirections[0];
+  const alignedIndexDirections = reference
+    ? capturedIndexDirections.map(direction => (
+      dot(direction, reference) < 0
+        ? [-direction[0], -direction[1], -direction[2]] as MotionPoint
+        : direction
+    ))
+    : [];
+  const stableIndexDirection = alignedIndexDirections.length > 0
+    ? normalize([
+      median(alignedIndexDirections.map(direction => direction[0])),
+      median(alignedIndexDirections.map(direction => direction[1])),
+      median(alignedIndexDirections.map(direction => direction[2])),
+    ])
+    : undefined;
+
+  return hands.map((hand, frameIndex) => {
+    const result = hand.map(point => [...point] as MotionPoint);
+    const basis = bases[frameIndex];
+    const direction = basis && stableIndexDirection
+      ? worldDirection(stableIndexDirection, basis)
+      : undefined;
+    if (!direction) return result;
+
+    LONG_FINGER_CHAINS.forEach(chain => {
+      if (!chain.every(index => isValid(hand[index]))) return;
+      let cursor = [...hand[chain[0]]] as MotionPoint;
+      for (let jointIndex = 1; jointIndex < chain.length; jointIndex += 1) {
+        const segmentLength = distance(hand[chain[jointIndex - 1]], hand[chain[jointIndex]]);
+        cursor = [
+          cursor[0] + direction[0] * segmentLength,
+          cursor[1] + direction[1] * segmentLength,
+          cursor[2] + direction[2] * segmentLength,
+        ];
+        result[chain[jointIndex]] = cursor;
+      }
+    });
+
+    const thumbBase = hand[THUMB_CHAIN[0]];
+    const thumbTip = hand[THUMB_CHAIN[THUMB_CHAIN.length - 1]];
+    const thumbDirection = isValid(thumbBase) && isValid(thumbTip)
+      ? unitVector(thumbBase, thumbTip)
+      : undefined;
+    if (thumbDirection && THUMB_CHAIN.every(index => isValid(hand[index]))) {
+      let cursor = [...thumbBase] as MotionPoint;
+      for (let jointIndex = 1; jointIndex < THUMB_CHAIN.length; jointIndex += 1) {
+        const segmentLength = distance(
+          hand[THUMB_CHAIN[jointIndex - 1]],
+          hand[THUMB_CHAIN[jointIndex]],
+        );
+        cursor = [
+          cursor[0] + thumbDirection[0] * segmentLength,
+          cursor[1] + thumbDirection[1] * segmentLength,
+          cursor[2] + thumbDirection[2] * segmentLength,
+        ];
+        result[THUMB_CHAIN[jointIndex]] = cursor;
+      }
+    }
+    return result;
+  });
+}
+
 /**
  * Legacy entry point retained for older profiles. An open support hand must
  * still come from the 21 recorded landmarks: deriving a clip-wide template
@@ -728,12 +1252,65 @@ export function shouldDriveStableOpenHandSegment(fromIndex: number): boolean {
 }
 
 /**
+ * A fully open hand drives the complete thumb and the proximal joint of each
+ * long finger. The distal joints retain the model's authored pose.
+ */
+export function shouldDriveFullyOpenHandSegment(fromIndex: number): boolean {
+  return (fromIndex >= 1 && fromIndex <= 3)
+    || STABLE_OPEN_HAND_PROXIMAL_JOINTS.has(fromIndex);
+}
+
+/**
+ * An explicitly extended thumb uses the model-authored open rest pose. Solving
+ * its three short bones from an edge-on capture can rotate the entire thumb
+ * back into the palm even when the signer keeps it abducted. Every segment of
+ * an explicitly extended long finger follows the stabilized straight chain;
+ * otherwise a slightly curled authored rest pose becomes visible as the palm
+ * turns and makes the hand appear to contract for a frame.
+ */
+export function shouldDriveConfiguredExtendedFingerSegment(
+  finger: RiggedFingerName,
+  fromIndex: number,
+): boolean {
+  return finger !== 'thumb' && configuredFingerForLandmark(fromIndex) === finger;
+}
+
+function configuredFingerForLandmark(fromIndex: number): RiggedFingerName | undefined {
+  if (fromIndex >= 1 && fromIndex <= 3) return 'thumb';
+  if (fromIndex >= 5 && fromIndex <= 7) return 'index';
+  if (fromIndex >= 9 && fromIndex <= 11) return 'middle';
+  if (fromIndex >= 13 && fromIndex <= 15) return 'ring';
+  if (fromIndex >= 17 && fromIndex <= 19) return 'pinky';
+  return undefined;
+}
+
+/**
+ * A flat palm drives only the captured proximal direction of every finger.
+ * Distal joints inherit the model-authored local alignment. MediaPipe depth
+ * noise is proportionally large across the short thumb phalanges; solving all
+ * three independently can roll the skinned thumb into the palm even when the
+ * source thumb is upright.
+ */
+export function shouldDriveFlatPalmSegment(fromIndex: number): boolean {
+  return FLAT_PALM_DRIVEN_JOINTS.has(fromIndex);
+}
+
+/**
  * Drives only the proximal index bone for a pointing hand. The distal bones
  * inherit the model's straight authored alignment, preventing independent
  * collinear solves from introducing a visible axial twist.
  */
 export function shouldDrivePointingHandSegment(fromIndex: number): boolean {
   return fromIndex !== 6 && fromIndex !== 7;
+}
+
+/**
+ * A thumb-up fist follows the captured thumb while its four overlapping long
+ * fingers use the avatar's compact local fist. MediaPipe cannot reliably
+ * disambiguate every closed phalanx once the fingers occlude one another.
+ */
+export function shouldDriveThumbUpHandSegment(fromIndex: number): boolean {
+  return fromIndex >= 1 && fromIndex <= 3;
 }
 
 /**
@@ -1017,9 +1594,12 @@ export function presentThumbUpHandLandmarkFrames(
         if (!chain.every(index => isValid(hand[index]))) return;
         const spread = (1.5 - chainIndex) * 0.055;
         const localDirections: MotionPoint[] = [
-          normalize([spread, 0.2, 0.98]) ?? [0, 0.2, 0.98],
-          normalize([spread * 0.35, -0.72, 0.69]) ?? [0, -0.72, 0.69],
-          normalize([0, -0.96, 0.28]) ?? [0, -0.96, 0.28],
+          normalize([spread, 0.12, 0.99]) ?? [0, 0.12, 0.99],
+          normalize([spread * 0.25, -0.92, 0.39]) ?? [0, -0.92, 0.39],
+          // Flex the distal phalanx back into the palm and slightly toward
+          // the hand centre. A shallow final bend leaves the fingertip and
+          // nail outside the fist silhouette, especially on the little finger.
+          normalize([-spread * 0.35, -0.38, -0.925]) ?? [0, -0.38, -0.925],
         ];
         let cursor = [...hand[chain[0]]] as MotionPoint;
         for (let segmentIndex = 0; segmentIndex < chain.length - 1; segmentIndex += 1) {
@@ -1039,6 +1619,350 @@ export function presentThumbUpHandLandmarkFrames(
     }
     THUMB_CHAIN.forEach(index => {
       result[index] = [...anatomical[frameIndex][index]] as MotionPoint;
+    });
+    return result;
+  });
+}
+
+function solveFingerChainToTarget(
+  hand: MotionPoint[],
+  chain: readonly number[],
+  target: MotionPoint,
+): MotionPoint[] {
+  const joints = chain.map(index => [...hand[index]] as MotionPoint);
+  const root = [...joints[0]] as MotionPoint;
+  const lengths = joints.slice(1).map((joint, index) => distance(joints[index], joint));
+  const totalLength = lengths.reduce((sum, length) => sum + length, 0);
+  const rootToTarget = distance(root, target);
+  if (totalLength < 1e-8) return joints;
+
+  if (rootToTarget >= totalLength) {
+    const direction = unitVector(root, target);
+    if (!direction) return joints;
+    let cursor = root;
+    return joints.map((_, index) => {
+      if (index === 0) return [...root] as MotionPoint;
+      cursor = [
+        cursor[0] + direction[0] * lengths[index - 1],
+        cursor[1] + direction[1] * lengths[index - 1],
+        cursor[2] + direction[2] * lengths[index - 1],
+      ];
+      return cursor;
+    });
+  }
+
+  for (let iteration = 0; iteration < 28; iteration += 1) {
+    joints[joints.length - 1] = [...target] as MotionPoint;
+    for (let index = joints.length - 2; index >= 0; index -= 1) {
+      const direction = unitVector(joints[index + 1], joints[index]);
+      if (!direction) continue;
+      joints[index] = [
+        joints[index + 1][0] + direction[0] * lengths[index],
+        joints[index + 1][1] + direction[1] * lengths[index],
+        joints[index + 1][2] + direction[2] * lengths[index],
+      ];
+    }
+    joints[0] = [...root] as MotionPoint;
+    for (let index = 0; index < joints.length - 1; index += 1) {
+      const direction = unitVector(joints[index], joints[index + 1]);
+      if (!direction) continue;
+      joints[index + 1] = [
+        joints[index][0] + direction[0] * lengths[index],
+        joints[index][1] + direction[1] * lengths[index],
+        joints[index][2] + direction[2] * lengths[index],
+      ];
+    }
+  }
+  return joints;
+}
+
+/**
+ * Builds the grouped-fingertip handshape used by COMER. MediaPipe captures
+ * this shape correctly in screen space, but its short, overlapping distal
+ * segments contain enough depth noise to spread the avatar fingers apart.
+ * A clip-wide palm-local meeting point keeps all five fingertips together
+ * while each MCP root, phalanx length, wrist trajectory and timestamp remain
+ * tied to the original capture. The source landmarks are never modified.
+ */
+export function presentPinchedHandLandmarkFrames(
+  hands: MotionPoint[][],
+  meetingPointEndFrame = hands.length - 1,
+): MotionPoint[][] {
+  const anatomical = presentAnatomicalHandLandmarkFrames(hands);
+  const bases = anatomical.map(handBasis);
+  const localMeetingPoints = anatomical.flatMap((hand, frameIndex) => {
+    if (frameIndex > meetingPointEndFrame) return [];
+    const basis = bases[frameIndex];
+    if (!basis || !isValid(hand[0]) || ![4, 8, 12, 16, 20].every(index => isValid(hand[index]))) {
+      return [];
+    }
+    const palmWidth = distance(hand[5], hand[17]);
+    if (palmWidth < 1e-8) return [];
+    const meetingPoint = averagePoint(hand[4], hand[8], hand[12], hand[16], hand[20]);
+    const offset = subtract(meetingPoint, hand[0]);
+    return [[
+      dot(offset, basis.lateral) / palmWidth,
+      dot(offset, basis.longitudinal) / palmWidth,
+      dot(offset, basis.normal) / palmWidth,
+    ] as MotionPoint];
+  });
+  if (localMeetingPoints.length === 0) {
+    return anatomical;
+  }
+  const stableMeetingPoint: MotionPoint = [
+    median(localMeetingPoints.map(point => point[0])),
+    median(localMeetingPoints.map(point => point[1])),
+    median(localMeetingPoints.map(point => point[2])),
+  ];
+
+  return anatomical.map((hand, frameIndex) => {
+    const basis = bases[frameIndex];
+    const result = hand.map(point => [...point] as MotionPoint);
+    if (!basis || !isValid(hand[0])) return result;
+    const palmWidth = distance(hand[5], hand[17]);
+    if (palmWidth < 1e-8) return result;
+    let meetingPoint: MotionPoint = [
+      hand[0][0] + palmWidth * (
+        basis.lateral[0] * stableMeetingPoint[0]
+          + basis.longitudinal[0] * stableMeetingPoint[1]
+          + basis.normal[0] * stableMeetingPoint[2]
+      ),
+      hand[0][1] + palmWidth * (
+        basis.lateral[1] * stableMeetingPoint[0]
+          + basis.longitudinal[1] * stableMeetingPoint[1]
+          + basis.normal[1] * stableMeetingPoint[2]
+      ),
+      hand[0][2] + palmWidth * (
+        basis.lateral[2] * stableMeetingPoint[0]
+          + basis.longitudinal[2] * stableMeetingPoint[1]
+          + basis.normal[2] * stableMeetingPoint[2]
+      ),
+    ];
+
+    // Keep the shared point inside every finger's reachable sphere. The
+    // little finger and thumb are shorter than the middle finger, so the raw
+    // captured centroid can otherwise leave one fingertip visibly detached.
+    for (let iteration = 0; iteration < 12; iteration += 1) {
+      FIST_FINGER_CHAINS.forEach(chain => {
+        if (!chain.every(index => isValid(hand[index]))) return;
+        const maximumReach = chain.slice(1).reduce((sum, toIndex, segmentIndex) => (
+          sum + distance(hand[chain[segmentIndex]], hand[toIndex])
+        ), 0) * 0.985;
+        const root = hand[chain[0]];
+        const rootDistance = distance(root, meetingPoint);
+        if (rootDistance <= maximumReach || rootDistance < 1e-8) return;
+        const ratio = maximumReach / rootDistance;
+        meetingPoint = [
+          root[0] + (meetingPoint[0] - root[0]) * ratio,
+          root[1] + (meetingPoint[1] - root[1]) * ratio,
+          root[2] + (meetingPoint[2] - root[2]) * ratio,
+        ];
+      });
+    }
+
+    FIST_FINGER_CHAINS.forEach(chain => {
+      if (!chain.every(index => isValid(hand[index]))) return;
+      const solved = solveFingerChainToTarget(hand, chain, meetingPoint);
+      chain.forEach((landmarkIndex, jointIndex) => {
+        result[landmarkIndex] = solved[jointIndex];
+      });
+    });
+    return result;
+  });
+}
+
+/**
+ * Presents the two-part CUÁNTO handshape: fingertips grouped in an initial Q,
+ * followed by both hands opening. The first captured section supplies one
+ * stable palm-local meeting point and the final section supplies straight,
+ * parallel fingers. Blending segment directions preserves every captured
+ * phalanx length, palm root, wrist trajectory and timestamp.
+ */
+export function presentQuestionQHandLandmarkFrames(
+  hands: MotionPoint[][],
+): MotionPoint[][] {
+  if (hands.length === 0) return [];
+  const lastFrame = hands.length - 1;
+  const closedEndFrame = Math.max(0, Math.round(lastFrame * 0.38));
+  const anatomical = presentAnatomicalHandLandmarkFrames(hands);
+  const pinched = presentPinchedHandLandmarkFrames(hands, closedEndFrame);
+  const opened = presentFullyOpenHandLandmarkFrames(anatomical);
+
+  return anatomical.map((hand, frameIndex) => {
+    const progress = questionQOpeningProgress(frameIndex, hands.length);
+    const result = hand.map(point => [...point] as MotionPoint);
+
+    FIST_FINGER_CHAINS.forEach(chain => {
+      if (!chain.every(index => (
+        isValid(hand[index])
+        && isValid(pinched[frameIndex][index])
+        && isValid(opened[frameIndex][index])
+      ))) return;
+      let cursor = [...hand[chain[0]]] as MotionPoint;
+      result[chain[0]] = cursor;
+      for (let segmentIndex = 0; segmentIndex < chain.length - 1; segmentIndex += 1) {
+        const fromIndex = chain[segmentIndex];
+        const toIndex = chain[segmentIndex + 1];
+        const pinchedDirection = unitVector(
+          pinched[frameIndex][fromIndex],
+          pinched[frameIndex][toIndex],
+        );
+        const openedDirection = unitVector(
+          opened[frameIndex][fromIndex],
+          opened[frameIndex][toIndex],
+        );
+        if (!pinchedDirection || !openedDirection) continue;
+        const direction = normalize([
+          pinchedDirection[0] * (1 - progress) + openedDirection[0] * progress,
+          pinchedDirection[1] * (1 - progress) + openedDirection[1] * progress,
+          pinchedDirection[2] * (1 - progress) + openedDirection[2] * progress,
+        ]);
+        if (!direction) continue;
+        const segmentLength = distance(hand[fromIndex], hand[toIndex]);
+        cursor = [
+          cursor[0] + direction[0] * segmentLength,
+          cursor[1] + direction[1] * segmentLength,
+          cursor[2] + direction[2] * segmentLength,
+        ];
+        result[toIndex] = cursor;
+      }
+    });
+    return result;
+  });
+}
+
+/**
+ * Returns the smooth opening amount for CUÁNTO. The rigged renderer uses the
+ * same value as the landmark presentation so its anatomical local finger pose
+ * cannot drift out of phase with the captured palm movement.
+ */
+export function questionQOpeningProgress(
+  frameIndex: number,
+  frameCount: number,
+): number {
+  const lastFrame = Math.max(0, frameCount - 1);
+  const closedEndFrame = Math.max(0, Math.round(lastFrame * 0.38));
+  const openStartFrame = Math.max(
+    closedEndFrame + 1,
+    Math.round(lastFrame * 0.54),
+  );
+  const safeFrame = Math.min(lastFrame, Math.max(0, frameIndex));
+  const linearProgress = safeFrame <= closedEndFrame
+    ? 0
+    : safeFrame >= openStartFrame
+      ? 1
+      : (safeFrame - closedEndFrame) / (openStartFrame - closedEndFrame);
+  return linearProgress * linearProgress * (3 - 2 * linearProgress);
+}
+
+/**
+ * Builds the DINERO handshape as the joined index and middle fingertips
+ * touching the thumb pad. The captured clip contains large fingertip tracking
+ * jumps, so a clip-wide palm-local contact point replaces those three chains.
+ * The thumb slides tangentially across the stationary fingertip pair while
+ * wrist, palm, phalanx lengths, frame count and timing remain tied to the
+ * original capture.
+ */
+export function presentMoneyRubHandLandmarkFrames(
+  hands: MotionPoint[][],
+): MotionPoint[][] {
+  const anatomical = presentAnatomicalHandLandmarkFrames(hands);
+  const bases = anatomical.map(handBasis);
+  const contactChains = [
+    THUMB_CHAIN,
+    POINTING_INDEX_CHAIN,
+    LONG_FINGER_CHAINS[1],
+  ] as const;
+  const localContactPoints = anatomical.flatMap((hand, frameIndex) => {
+    const basis = bases[frameIndex];
+    if (
+      !basis
+      || !isValid(hand[0])
+      || !isValid(hand[4])
+      || !isValid(hand[8])
+      || !isValid(hand[12])
+    ) return [];
+    const palmWidth = distance(hand[5], hand[17]);
+    if (palmWidth < 1e-8) return [];
+    const contactPoint = averagePoint(hand[4], hand[8], hand[12]);
+    const offset = subtract(contactPoint, hand[0]);
+    return [[
+      dot(offset, basis.lateral) / palmWidth,
+      dot(offset, basis.longitudinal) / palmWidth,
+      dot(offset, basis.normal) / palmWidth,
+    ] as MotionPoint];
+  });
+  if (localContactPoints.length === 0) return anatomical;
+
+  const stableContactPoint: MotionPoint = [
+    median(localContactPoints.map(point => point[0])),
+    median(localContactPoints.map(point => point[1])),
+    median(localContactPoints.map(point => point[2])),
+  ];
+
+  return anatomical.map((hand, frameIndex) => {
+    const basis = bases[frameIndex];
+    const result = hand.map(point => [...point] as MotionPoint);
+    if (!basis || !isValid(hand[0])) return result;
+    const palmWidth = distance(hand[5], hand[17]);
+    if (palmWidth < 1e-8) return result;
+
+    let contactPoint: MotionPoint = [
+      hand[0][0] + palmWidth * (
+        basis.lateral[0] * stableContactPoint[0]
+          + basis.longitudinal[0] * stableContactPoint[1]
+          + basis.normal[0] * stableContactPoint[2]
+      ),
+      hand[0][1] + palmWidth * (
+        basis.lateral[1] * stableContactPoint[0]
+          + basis.longitudinal[1] * stableContactPoint[1]
+          + basis.normal[1] * stableContactPoint[2]
+      ),
+      hand[0][2] + palmWidth * (
+        basis.lateral[2] * stableContactPoint[0]
+          + basis.longitudinal[2] * stableContactPoint[1]
+          + basis.normal[2] * stableContactPoint[2]
+      ),
+    ];
+
+    // Leave enough reach for the small opposing slide added below. This also
+    // prevents a noisy source frame from pulling either digit out of contact.
+    for (let iteration = 0; iteration < 8; iteration += 1) {
+      contactChains.forEach(chain => {
+        if (!chain.every(index => isValid(hand[index]))) return;
+        const maximumReach = chain.slice(1).reduce((sum, toIndex, segmentIndex) => (
+          sum + distance(hand[chain[segmentIndex]], hand[toIndex])
+        ), 0) * 0.94;
+        const root = hand[chain[0]];
+        const rootDistance = distance(root, contactPoint);
+        if (rootDistance <= maximumReach || rootDistance < 1e-8) return;
+        const ratio = maximumReach / rootDistance;
+        contactPoint = [
+          root[0] + (contactPoint[0] - root[0]) * ratio,
+          root[1] + (contactPoint[1] - root[1]) * ratio,
+          root[2] + (contactPoint[2] - root[2]) * ratio,
+        ];
+      });
+    }
+
+    // Three rubs across the 1.2-second DINERO capture read clearly at normal
+    // playback speed. Only the thumb target moves; index and middle remain
+    // joined so the gesture cannot read as a two-finger pinch.
+    const progress = hands.length > 1 ? frameIndex / (hands.length - 1) : 0;
+    const rubOffset = Math.sin(progress * Math.PI * 6) * palmWidth * 0.025;
+    const thumbTarget: MotionPoint = [
+      contactPoint[0] + basis.longitudinal[0] * rubOffset,
+      contactPoint[1] + basis.longitudinal[1] * rubOffset,
+      contactPoint[2] + basis.longitudinal[2] * rubOffset,
+    ];
+    const targets: MotionPoint[] = [thumbTarget, contactPoint, contactPoint];
+
+    contactChains.forEach((chain, chainIndex) => {
+      if (!chain.every(index => isValid(hand[index]))) return;
+      const solved = solveFingerChainToTarget(hand, chain, targets[chainIndex]);
+      chain.forEach((landmarkIndex, jointIndex) => {
+        result[landmarkIndex] = solved[jointIndex];
+      });
     });
     return result;
   });
@@ -1106,6 +2030,45 @@ export function presentPointingHandLandmarkFrames(
     if (indexDirection) {
       rebuildChain(POINTING_INDEX_CHAIN, [indexDirection, indexDirection, indexDirection]);
     }
+    return result;
+  });
+}
+
+/**
+ * Applies explicit per-finger presentation choices without rewriting the
+ * captured sign. Each chain is copied from a derived anatomical, extended or
+ * closed presentation while its MCP root, segment lengths and timing remain
+ * tied to the source frame. This is used by the authoring editor when a
+ * detector briefly hides a finger or mistakes an occlusion for flexion.
+ */
+export function presentConfiguredHandLandmarkFrames(
+  hands: MotionPoint[][],
+  states: RiggedHandFingerStates,
+): MotionPoint[][] {
+  const anatomical = presentAnatomicalHandLandmarkFrames(hands);
+  const extended = presentFullyOpenHandLandmarkFrames(anatomical);
+  const closed = presentFistHandLandmarkFrames(anatomical);
+  const chains: ReadonlyArray<readonly [RiggedFingerName, readonly number[]]> = [
+    ['thumb', THUMB_CHAIN],
+    ['index', LONG_FINGER_CHAINS[0]],
+    ['middle', LONG_FINGER_CHAINS[1]],
+    ['ring', LONG_FINGER_CHAINS[2]],
+    ['pinky', LONG_FINGER_CHAINS[3]],
+  ];
+
+  return anatomical.map((hand, frameIndex) => {
+    const result = hand.map(point => [...point] as MotionPoint);
+    chains.forEach(([finger, chain]) => {
+      const state = states[finger] ?? 'captured';
+      const source = state === 'extended'
+        ? extended[frameIndex]
+        : state === 'closed'
+          ? closed[frameIndex]
+          : hand;
+      chain.slice(1).forEach(index => {
+        result[index] = [...source[index]] as MotionPoint;
+      });
+    });
     return result;
   });
 }

@@ -9,7 +9,7 @@
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.manospeak.vozual.authoring</string>
+    <string>com.vozual.vozual.authoring</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -24,6 +24,11 @@
     <string>12.0</string>
     <key>NSCameraUsageDescription</key>
     <string>VOZUAL necesita la cámara para grabar videos de referencia de las señas.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

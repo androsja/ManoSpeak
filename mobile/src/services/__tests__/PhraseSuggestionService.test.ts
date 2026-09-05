@@ -1,21 +1,34 @@
 import {
   AVAILABLE_PHRASE_SUGGESTIONS,
   nextPhraseSuggestionIndex,
+  phraseSuggestionsForInstalledGlosses,
 } from '../PhraseSuggestionService';
 import {resolvePublishedLscPlan} from '../LinguisticCatalogService';
 
 describe('PhraseSuggestionService', () => {
-  it('offers only phrases backed by multiple published signs', () => {
-    expect(AVAILABLE_PHRASE_SUGGESTIONS.length).toBeGreaterThanOrEqual(6);
-    for (const phrase of AVAILABLE_PHRASE_SUGGESTIONS) {
-      const plan = resolvePublishedLscPlan(phrase);
-      expect(plan.unavailableMarkers).toEqual([]);
-      expect(plan.tokens.length).toBeGreaterThanOrEqual(2);
-    }
+  it('offers only phrases made entirely from approved signs', () => {
+    expect(AVAILABLE_PHRASE_SUGGESTIONS).toEqual([
+      'Buenos días, amigo',
+      'Buenas tardes, amigo',
+      'Buenas noches, amigo',
+      'Adiós, amigo',
+      'Comer carne',
+    ]);
+    expect(resolvePublishedLscPlan('muchas gracias').tokens).toEqual([]);
   });
 
-  it('selects a different phrase when alternatives are available', () => {
-    expect(nextPhraseSuggestionIndex(0, 0)).toBe(1);
-    expect(nextPhraseSuggestionIndex(0, 0.999)).not.toBe(0);
+  it('filters phrases against the signs stored on the device', () => {
+    expect(phraseSuggestionsForInstalledGlosses(new Set([
+      'BUENOS DÍAS',
+      'AMIGO',
+    ]))).toEqual(['Buenos días, amigo']);
+    expect(phraseSuggestionsForInstalledGlosses(new Set())).toEqual([]);
+  });
+
+  it('keeps a safe index for the currently available suggestions', () => {
+    expect(nextPhraseSuggestionIndex(0, 0, 0)).toBe(0);
+    expect(nextPhraseSuggestionIndex(0, 0.999, 1)).toBe(0);
+    expect(nextPhraseSuggestionIndex(0, 0, 5)).toBe(1);
+    expect(nextPhraseSuggestionIndex(0, 0.999, 5)).toBe(4);
   });
 });

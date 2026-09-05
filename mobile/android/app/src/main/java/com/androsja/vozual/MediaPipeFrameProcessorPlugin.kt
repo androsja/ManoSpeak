@@ -1,4 +1,4 @@
-package com.manospeak
+package com.androsja.vozual
 
 import android.graphics.Bitmap
 import android.os.Build
@@ -101,20 +101,20 @@ class MediaPipeFrameProcessorPlugin(proxy: VisionCameraProxy, options: Map<Strin
             frameCounter += 1
             if (frameCounter % PERF_LOG_EVERY_N_FRAMES == 1L) {
                 Log.i(
-                    "ManoSpeakPerf",
+                    "VozualPerf",
                     "src=${image.width}x${image.height} scaled=${rotatedBitmap.width}x${rotatedBitmap.height} " +
                     "bitmap=${perfBitmapDone - perfStart}ms detect=${perfDetectDone - perfBitmapDone}ms"
                 )
             }
             
             if (result == null) {
-                Log.w("ManoSpeak", "Holistic detect returned null")
+                Log.w("Vozual", "Holistic detect returned null")
                 return emptyMockArray()
             }
             
             return extractLandmarks(result)
         } catch (t: Throwable) {
-            Log.e("ManoSpeak", "CRITICAL ERROR in Frame Processor: ${t.message}", t)
+            Log.e("Vozual", "CRITICAL ERROR in Frame Processor: ${t.message}", t)
             return emptyMockArray()
         }
     }

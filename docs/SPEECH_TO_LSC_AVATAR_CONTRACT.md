@@ -2,7 +2,7 @@
 
 ## Scope
 
-ManoSpeak will provide a local-first, reviewed phrase catalogue for Colombian Sign
+Vozual will provide a local-first, reviewed phrase catalogue for Colombian Sign
 Language (LSC). It is not a general Spanish-to-LSC translator, a word-for-word signer,
 or a generative sign system. Only an active catalogue entry may be played.
 

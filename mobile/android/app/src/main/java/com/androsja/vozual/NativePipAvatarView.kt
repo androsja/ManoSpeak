@@ -1,4 +1,4 @@
-package com.manospeak
+package com.androsja.vozual
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -6,9 +6,11 @@ import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import java.io.File
 import java.lang.ref.WeakReference
 import org.json.JSONObject
 
@@ -58,8 +60,36 @@ class NativePipAvatarView(context: Context) : WebView(context) {
     pendingGloss = gloss.trim().ifEmpty { IDLE_GLOSS }
     if (!runtimeReady) return
     playbackId += 1
-    val script = "window.playVozualClip(${JSONObject.quote(pendingGloss)}, $playbackId, $playbackSpeed, $continuePhrase); true;"
+    val installScript = installedMotionScript(pendingGloss)
+    val script = "$installScript window.playVozualClip(${JSONObject.quote(pendingGloss)}, $playbackId, $playbackSpeed, $continuePhrase); true;"
     evaluateJavascript(script, null)
+  }
+
+  private fun installedMotionScript(gloss: String): String {
+    if (gloss == IDLE_GLOSS || gloss == PHRASE_WAIT_GLOSS) return ""
+    return try {
+      val libraryRoot = File(context.filesDir, LIBRARY_DIRECTORY).canonicalFile
+      val stateFile = File(libraryRoot, LIBRARY_STATE_FILE)
+      if (!stateFile.isFile) return ""
+      val state = JSONObject(stateFile.readText())
+      val installedSigns = state.optJSONObject("installedSigns") ?: return ""
+      val selectedLanguageId = state.optString("selectedLanguageId")
+      val sign = installedSigns.keys().asSequence()
+        .mapNotNull { installedSigns.optJSONObject(it) }
+        .firstOrNull {
+          (selectedLanguageId.isBlank() || it.optString("languageId") == selectedLanguageId) &&
+            it.optString("gloss").trim().uppercase() == gloss.trim().uppercase()
+        }
+        ?: return ""
+      val motionFile = File(sign.optString("localPath")).canonicalFile
+      val allowedPrefix = libraryRoot.path + File.separator
+      if (!motionFile.isFile || !motionFile.path.startsWith(allowedPrefix)) return ""
+      val content = Base64.encodeToString(motionFile.readBytes(), Base64.NO_WRAP)
+      "window.installVozualMotionBase64(${JSONObject.quote(gloss)}, ${JSONObject.quote(content)});"
+    } catch (error: Exception) {
+      Log.e(TAG, "Could not load installed motion for $gloss", error)
+      ""
+    }
   }
 
   fun tick() {
@@ -114,6 +144,9 @@ class NativePipAvatarView(context: Context) : WebView(context) {
     private const val TAG = "VozualPipAvatar"
     private const val AVATAR_URL = "file:///android_asset/avatar/index.html"
     private const val IDLE_GLOSS = "IDLE"
+    private const val PHRASE_WAIT_GLOSS = "PHRASE_WAIT"
+    private const val LIBRARY_DIRECTORY = "vozual-sign-languages"
+    private const val LIBRARY_STATE_FILE = "library.json"
     private const val DEFAULT_RENDER_MODE = "rigged"
     private const val DEFAULT_AVATAR_ZOOM = 1.0
     private const val MIN_AVATAR_ZOOM = 0.85

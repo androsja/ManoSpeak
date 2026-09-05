@@ -1,4 +1,4 @@
-# Performance Budgets: ManoSpeak
+# Performance Budgets: Vozual
 
 ## 1. Measurement Rules
 

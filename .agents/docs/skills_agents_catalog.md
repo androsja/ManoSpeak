@@ -1,4 +1,4 @@
-# Skills and Agents Catalog — ManoSpeak
+# Skills and Agents Catalog — Vozual
 
 This catalog records all configured agent personas and DWP-related skills available in this repository.
 
@@ -11,7 +11,7 @@ This catalog records all configured agent personas and DWP-related skills availa
 ## Installed Skills
 - **deepworkplan:** The core Deep Work Plan planning engine (routes to create, execute, refine, resume, status, and verify).
 
-## Reusable Patterns Identified in PLAN_manospeak_model_inference_integration
+## Reusable Patterns Identified in PLAN_vozual_model_inference_integration
 
 The following patterns emerged during this plan's execution and are candidates for future skill codification:
 
@@ -46,7 +46,7 @@ The following patterns emerged during this plan's execution and are candidates f
 1. Create `src/__mocks__/fileMock.js` with `module.exports = 1;`.
 2. Add `moduleNameMapper: { '\\.tflite$': '<rootDir>/src/__mocks__/fileMock.js' }` to `jest.config.js`.
 
-## Reusable Patterns Identified in PLAN_manospeak_mobile_coordinate_normalization
+## Reusable Patterns Identified in PLAN_vozual_mobile_coordinate_normalization
 
 ### Python-to-TypeScript Numeric Normalizer Pattern
 **Trigger:** Porting a NumPy-based per-frame normalizer to TypeScript for React Native on-device use.  

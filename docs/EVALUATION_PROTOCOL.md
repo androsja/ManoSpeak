@@ -1,4 +1,4 @@
-# ManoSpeak Evaluation Protocol
+# Vozual Evaluation Protocol
 
 _Protocol version: 1.0, 2026-07-19_
 

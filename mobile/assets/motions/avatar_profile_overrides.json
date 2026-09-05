@@ -4,6 +4,7 @@
     "rigContactLandmark": 4,
     "rigContactSnap": 1.0,
     "rigContactUseAvatarAnchor": true,
+    "rigHeadVerticalOffset": -0.045,
     "contactStartFrame": 15,
     "contactEndFrame": 35,
     "contactAnchor": "chin"
@@ -19,17 +20,659 @@
   },
   "AYUDAR": {
     "forceTwoHands": true,
-    "rigLeftHandShape": "captured",
-    "rigRightHandShape": "captured",
+    "rigLeftHandShape": "thumb-up",
+    "rigRightHandShape": "open-palm",
     "rigLeftPalmScaleMin": 1.0,
-    "rigLeftPalmScaleMax": 1.0,
+    "rigLeftPalmScaleMax": 2.25,
     "rigRightPalmScaleMin": 1.0,
-    "rigRightPalmScaleMax": 1.0,
+    "rigRightPalmScaleMax": 2.25,
+    "rigSynchronizedPalmApproach": true,
+    "rigPalmApproachGain": 3.0,
+    "rigPalmApproachVerticalOffset": 0.22,
+    "rigLeftPalmAxialRollDegrees": -28.0,
+    "rigRightHandDepthFlip": false,
     "rigLeftHandFrontDepth": 0.38,
     "rigRightHandFrontDepth": 0.32,
     "rigLeftHandDepthScale": 7.2,
     "rigRightHandDepthScale": 2.2,
-    "rigRightHandTrackingRepair": "stable-palm"
+    "rigRightHandTrackingRepair": "locked-palm",
+    "rigInterHandContact": {
+      "movingSide": "L",
+      "movingLandmarks": [
+        5,
+        9,
+        13,
+        17
+      ],
+      "supportSide": "R",
+      "supportLandmarks": [
+        5,
+        9,
+        13,
+        17
+      ],
+      "snap": 1.0
+    }
+  },
+  "AYER": {
+    "rigLeftHandDepthLayer": "back",
+    "rigLeftHandBackDepth": 0.48
+  },
+  "BAÑO": {
+    "rigLeftHandShape": "flat-palm",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0
+  },
+  "CABALLO": {
+    "forceTwoHands": true,
+    "rigLeftHandShape": "fist",
+    "rigRightHandShape": "fist",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigRightPalmScaleMin": 1.0,
+    "rigRightPalmScaleMax": 1.0,
+    "rigLeftHandFrontDepth": 0.46,
+    "rigRightHandFrontDepth": 0.28,
+    "rigLeftForearmFollowUpperArmRoll": true,
+    "rigRightForearmFollowUpperArmRoll": true,
+    "rigLeftPalmAxialRollDegrees": -90.0,
+    "rigPalmAxialRollStartFrame": 30,
+    "rigPalmAxialRollEndFrame": 36,
+    "rigPalmAxialRollFadeFrames": 6,
+    "rigInterHandContact": {
+      "movingSide": "L",
+      "movingLandmarks": [
+        5,
+        9,
+        13,
+        17
+      ],
+      "supportSide": "R",
+      "supportLandmarks": [
+        5,
+        9,
+        13,
+        17
+      ],
+      "snap": 1.0
+    },
+    "rigHandKeyframes": [
+      {
+        "frame": 0,
+        "transitionFrames": 6,
+        "left": {
+          "elbowRotation": 5.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": -1.0,
+          "wristPitch": 9.0,
+          "wristYaw": 20.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      },
+      {
+        "frame": 16,
+        "transitionFrames": 6,
+        "left": {
+          "elbowRotation": 11.0,
+          "wristPitch": 0.0,
+          "wristYaw": -4.0,
+          "wristRoll": -3.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": -1.0,
+          "wristPitch": 9.0,
+          "wristYaw": 20.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      },
+      {
+        "frame": 45,
+        "transitionFrames": 6,
+        "left": {
+          "elbowRotation": 11.0,
+          "wristPitch": -6.0,
+          "wristYaw": -18.0,
+          "wristRoll": -3.0,
+          "horizontalOffset": 0.06,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.08,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": -1.0,
+          "wristPitch": 9.0,
+          "wristYaw": 20.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      },
+      {
+        "frame": 52,
+        "transitionFrames": 6,
+        "left": {
+          "elbowRotation": 5.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": 7.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "COMER": {
+    "activeHand": "left",
+    "rigLeftHandShape": "pinched",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigContactLandmark": 12,
+    "rigContactSnap": 0.85,
+    "rigContactUseAvatarAnchor": true,
+    "rigContactWindows": [
+      {
+        "startFrame": 18,
+        "endFrame": 35
+      }
+    ],
+    "rigContactFadeFrames": 4,
+    "contactStartFrame": 18,
+    "contactEndFrame": 35,
+    "contactAnchor": "mouth"
+  },
+  "DINERO": {
+    "rigLeftHandShape": "money-rub",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0
+  },
+  "CUÁNTO": {
+    "forceTwoHands": true,
+    "rigLeftHandShape": "question-q",
+    "rigRightHandShape": "question-q",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigRightPalmScaleMin": 1.0,
+    "rigRightPalmScaleMax": 1.0
+  },
+  "CUÁNDO": {
+    "rigContactLandmark": 12,
+    "rigContactSnap": 1.0,
+    "rigContactUseAvatarAnchor": true,
+    "rigContactWindows": [
+      {
+        "startFrame": 3,
+        "endFrame": 6
+      },
+      {
+        "startFrame": 13,
+        "endFrame": 18
+      },
+      {
+        "startFrame": 28,
+        "endFrame": 30
+      },
+      {
+        "startFrame": 34,
+        "endFrame": 35
+      }
+    ],
+    "rigContactFadeFrames": 2,
+    "contactStartFrame": 24,
+    "contactEndFrame": 35,
+    "contactAnchor": "cheek"
+  },
+  "BIEN": {
+    "rigLeftHandShape": "thumb-up",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigLeftHandDepthScale": 1.0,
+    "rigLeftForearmFollowUpperArmRoll": true,
+    "rigLeftForearmMinimumScreenLength": 0.42,
+    "rigHandKeyframes": [
+      {
+        "frame": 22,
+        "transitionFrames": 6,
+        "smile": 0.2,
+        "left": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "BUENAS TARDES": {
+    "forceTwoHands": true,
+    "rigLeftHandShape": "fully-open",
+    "rigRightHandShape": "fully-open",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigRightPalmScaleMin": 1.0,
+    "rigRightPalmScaleMax": 1.0
+  },
+  "DESPACIO": {
+    "forceTwoHands": true,
+    "rigLeftHandShape": "fully-open",
+    "rigRightHandShape": "fully-open",
+    "rigLeftFingerStates": {
+      "thumb": "extended",
+      "index": "extended",
+      "middle": "extended",
+      "ring": "extended",
+      "pinky": "extended"
+    },
+    "rigRightFingerStates": {
+      "thumb": "extended",
+      "index": "extended",
+      "middle": "extended",
+      "ring": "extended",
+      "pinky": "extended"
+    },
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigRightPalmScaleMin": 1.0,
+    "rigRightPalmScaleMax": 1.0
+  },
+  "BLANCO": {
+    "rigLeftHandShape": "pointing",
+    "rigLeftFingerStates": {
+      "thumb": "extended",
+      "index": "extended",
+      "middle": "closed",
+      "ring": "closed",
+      "pinky": "closed"
+    },
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0
   },
   "HAMBRE": {
     "forceTwoHands": true,
@@ -41,5 +684,592 @@
   },
   "YO": {
     "rigSelfPointingHand": true
+  },
+  "BUENAS NOCHES": {
+    "rigHandKeyframes": [
+      {
+        "frame": 0,
+        "transitionFrames": 6,
+        "left": {
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "depthOffset": 0.38,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          }
+        },
+        "right": {
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          }
+        }
+      },
+      {
+        "frame": 2,
+        "transitionFrames": 6,
+        "left": {
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "depthOffset": 0.37,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          }
+        },
+        "right": {
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "depthOffset": 0.54,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          }
+        }
+      }
+    ]
+  },
+  "CARNE": {
+    "rigHandKeyframes": [
+      {
+        "frame": 0,
+        "transitionFrames": 6,
+        "left": {
+          "elbowRotation": -8.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.15,
+          "depthOffset": 0.19,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              -1.0,
+              0.04,
+              0.16
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      },
+      {
+        "frame": 8,
+        "transitionFrames": 6,
+        "left": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              -1.0,
+              0.0,
+              0.3
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      },
+      {
+        "frame": 26,
+        "transitionFrames": 6,
+        "left": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": -0.02,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              -1.0,
+              0.26,
+              0.13
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "BUENOS DÍAS": {
+    "forceTwoHands": true,
+    "rigLeftHandShape": "fully-open",
+    "rigRightHandShape": "fully-open",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigRightPalmScaleMin": 1.0,
+    "rigRightPalmScaleMax": 1.0,
+    "rigLeftHandFrontDepth": 0.46,
+    "rigRightHandFrontDepth": 0.28,
+    "rigLeftHandInitialFrontDepth": 0.54,
+    "rigRightHandInitialFrontDepth": 0.54,
+    "rigInitialHandFrontDepthEndFrame": 12,
+    "rigInitialHandFrontDepthFadeFrames": 7,
+    "rigLeftForearmFollowUpperArmRoll": true,
+    "rigRightForearmFollowUpperArmRoll": true,
+    "rigLeftPalmAxialRollDegrees": -90.0,
+    "rigPalmAxialRollStartFrame": 20,
+    "rigPalmAxialRollEndFrame": 26,
+    "rigPalmAxialRollFadeFrames": 7,
+    "rigInterHandContact": {
+      "movingSide": "L",
+      "movingLandmarks": [
+        0,
+        5,
+        9,
+        13,
+        17
+      ],
+      "supportSide": "R",
+      "supportLandmarks": [
+        0,
+        5,
+        9,
+        13,
+        17
+      ],
+      "snap": 1.0,
+      "preserveCapturedOffset": false,
+      "horizontalOffset": 0.04,
+      "verticalOffset": 0.12,
+      "startFrame": 20,
+      "endFrame": 26,
+      "fadeInFrames": 7,
+      "fadeOutFrames": 6,
+      "maximumCorrection": 0.55,
+      "allowManualTransforms": true
+    }
+  },
+  "HOLA": {
+    "rigHandKeyframes": [
+      {
+        "frame": 0,
+        "transitionFrames": 6,
+        "smile": 1.0,
+        "left": {
+          "elbowRotation": -10.0,
+          "wristPitch": 0.0,
+          "wristYaw": -2.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": -0.02,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.36,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": -0.55,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      },
+      {
+        "frame": 35,
+        "transitionFrames": 6,
+        "smile": 1.0,
+        "left": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": -3.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": -0.02,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": -0.58,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              -0.95,
+              -1.0
+            ],
+            "index": [
+              0.19,
+              0.0,
+              -0.24
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "right": {
+          "elbowRotation": 0.0,
+          "wristPitch": 0.0,
+          "wristYaw": 0.0,
+          "wristRoll": 0.0,
+          "horizontalOffset": 0.0,
+          "verticalOffset": 0.0,
+          "depthOffset": 0.0,
+          "fist": 0.0,
+          "fingers": {
+            "thumb": 0.0,
+            "index": 0.0,
+            "middle": 0.0,
+            "ring": 0.0,
+            "pinky": 0.0
+          },
+          "fingerJoints": {
+            "thumb": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "index": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "middle": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "ring": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pinky": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      }
+    ]
   }
 }

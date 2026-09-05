@@ -5,20 +5,40 @@ import {
   capturedHeadOrientation,
   chooseLivelyFaceExpression,
   contactPresentationWeight,
+  hasRiggedHandTransformEdit,
   hasStaticFaceForLivelyExpression,
+  initialRiggedHandFrontDepth,
   livelyIdleBodyPresentation,
   livelyIdleFacePresentation,
   livelyIdleGazePresentation,
   livelyFaceExpressionIntensity,
   presentAnatomicalHandLandmarkFrames,
   presentCapturedHandLandmarkFrames,
+  presentConfiguredHandLandmarkFrames,
   presentFistHandLandmarkFrames,
+  presentFullyOpenHandLandmarkFrames,
   presentIndexOnlyHandLandmarkFrames,
+  presentMoneyRubHandLandmarkFrames,
+  riggedElbowPivotTarget,
+  riggedHandBoneTarget,
+  riggedHandPositionOffset,
   riggedPalmScaleFactor,
+  riggedApproachPalmScaleEnvelope,
+  riggedApproachPalmScaleFactor,
+  riggedHandsEditPoseAtFrame,
+  riggedSmileEditAtFrame,
+  riggedWristDepth,
+  shouldDriveFlatPalmSegment,
+  shouldDriveConfiguredExtendedFingerSegment,
+  shouldDriveFullyOpenHandSegment,
   presentPointingHandLandmarkFrames,
+  presentPinchedHandLandmarkFrames,
+  presentQuestionQHandLandmarkFrames,
+  preserveMinimumProjectedForearmLength,
   presentSelfPointingHandLandmarkFrames,
   presentThumbUpHandLandmarkFrames,
   shouldDrivePointingHandSegment,
+  shouldDriveThumbUpHandSegment,
   shouldDriveStableOpenHandSegment,
   shouldUseSingleHandRig,
   softenFingerCurlLandmarks,
@@ -67,6 +87,18 @@ function rotateFace(face: MotionPoint[], yaw: number, pitch: number): MotionPoin
 }
 
 describe('avatar motion presentation', () => {
+  it('keeps a foreshortened forearm visible without moving its wrist', () => {
+    const elbow = point(0.1, 0.1, 0.35);
+    const wrist = point(0, 0, 0.8);
+
+    const adjusted = preserveMinimumProjectedForearmLength(elbow, wrist, 0.4);
+
+    expect(Math.hypot(adjusted[0] - wrist[0], adjusted[1] - wrist[1]))
+      .toBeCloseTo(0.4, 8);
+    expect(adjusted[2]).toBe(elbow[2]);
+    expect(wrist).toEqual(point(0, 0, 0.8));
+  });
+
   it('maps human facial anchors onto stylized avatar proportions', () => {
     const source = {
       leftEye: point(-1, 0),
@@ -155,6 +187,36 @@ describe('avatar motion presentation', () => {
     expect(presentation!.mouthPucker).toBeGreaterThan(0.35);
   });
 
+  it('keeps a neutral captured mouth neutral', () => {
+    const face = neutralFace();
+    const presentation = capturedFacePresentation(face, face);
+
+    expect(presentation).toBeDefined();
+    expect(presentation!.leftMouthCornerRaise).toBe(0);
+    expect(presentation!.rightMouthCornerRaise).toBe(0);
+  });
+
+  it('preserves the smile held throughout the BIEN recording', () => {
+    const motion = require('../../../assets/motions/bien.motion.json') as SignMotion;
+    const calibration = capturedFaceCalibration(motion);
+    const presentations = motion.frames
+      .map(frame => capturedFacePresentation(
+        frame.face,
+        motion.frames[0].face,
+        calibration,
+      ))
+      .filter((value): value is NonNullable<typeof value> => value != null);
+    const averageSmile = presentations.reduce((sum, presentation) => (
+      sum + (
+        presentation.leftMouthCornerRaise
+        + presentation.rightMouthCornerRaise
+      ) / 2
+    ), 0) / presentations.length;
+
+    expect(presentations).toHaveLength(motion.frames.length);
+    expect(averageSmile).toBeGreaterThan(0.5);
+  });
+
   it('calibrates mouth motion from the least-open frame instead of frame zero', () => {
     const initiallyRounded = neutralFace();
     initiallyRounded[14] = point(0, 0.226);
@@ -199,9 +261,140 @@ describe('avatar motion presentation', () => {
     expect(riggedPalmScaleFactor(0.45, 1, 0.35, 1, false)).toBe(0.72);
   });
 
+  it('maps every captured hand landmark used by rig contact to a deform bone', () => {
+    expect(riggedHandBoneTarget(0)).toEqual({boneName: 'hand', endpoint: false});
+    expect(riggedHandBoneTarget(5)).toEqual({boneName: 'f_index.01', endpoint: false});
+    expect(riggedHandBoneTarget(9)).toEqual({boneName: 'f_middle.01', endpoint: false});
+    expect(riggedHandBoneTarget(13)).toEqual({boneName: 'f_ring.01', endpoint: false});
+    expect(riggedHandBoneTarget(17)).toEqual({boneName: 'f_pinky.01', endpoint: false});
+    expect(riggedHandBoneTarget(20)).toEqual({boneName: 'f_pinky.03', endpoint: true});
+    expect(Array.from({length: 21}, (_, index) => riggedHandBoneTarget(index)))
+      .not.toContain(undefined);
+    expect(riggedHandBoneTarget(21)).toBeUndefined();
+  });
+
   it('allows an approaching hand to retain its captured apparent growth', () => {
     expect(riggedPalmScaleFactor(2, 1, 2, 1, false, 1, 1.55)).toBe(1.55);
     expect(riggedPalmScaleFactor(0.5, 1, 0.5, 1, false, 1, 1.55)).toBe(1);
+  });
+
+  it('shares the apparent approach scale of a reliable captured palm', () => {
+    const hand = Array.from({length: 21}, () => [0, 0, 0] as MotionPoint);
+    hand[5] = [-1, 1, 0];
+    hand[9] = [-0.5, 1, 0];
+    hand[13] = [0.5, 1, 0];
+    hand[17] = [1, 1, 0];
+    const approaching = hand.map(point => point.map(value => value * 1.4) as MotionPoint);
+
+    expect(riggedApproachPalmScaleFactor(approaching, hand, 1, 1.5)).toBeCloseTo(1.4);
+    expect(riggedApproachPalmScaleFactor(hand, approaching, 1, 1.5)).toBe(1);
+    expect(riggedApproachPalmScaleFactor(approaching, hand, 1, 1.75, 1.5))
+      .toBeCloseTo(1.6);
+    expect(riggedApproachPalmScaleEnvelope(
+      [hand, approaching, hand],
+      2,
+      1,
+      1.75,
+      1.5,
+    )).toBeCloseTo(1.6);
+  });
+
+  it('smoothly reaches an edited hand keyframe without changing earlier frames', () => {
+    const keyframes = [{
+      frame: 12,
+      transitionFrames: 4,
+      left: {
+        elbowRotation: 30,
+        wristRoll: 40,
+        horizontalOffset: 0.6,
+        verticalOffset: -0.4,
+        depthOffset: 0.8,
+        fist: 1,
+        fingers: {index: 0.5},
+        fingerJoints: {index: [0.2, 0.6, 0.9]},
+      },
+    }];
+
+    expect(riggedHandsEditPoseAtFrame(keyframes, 7).left.wristRoll).toBe(0);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 10).left.wristRoll).toBeCloseTo(20);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 10).left.elbowRotation).toBeCloseTo(15);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 10).left.horizontalOffset).toBeCloseTo(0.3);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 10).left.verticalOffset).toBeCloseTo(-0.2);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 10).left.depthOffset).toBeCloseTo(0.4);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 12).left).toEqual(expect.objectContaining({
+      elbowRotation: 30,
+      wristRoll: 40,
+      horizontalOffset: 0.6,
+      verticalOffset: -0.4,
+      depthOffset: 0.8,
+      fist: 1,
+      fingers: expect.objectContaining({index: 0.5}),
+      fingerJoints: expect.objectContaining({index: [0.2, 0.6, 0.9]}),
+    }));
+  });
+
+  it('interpolates each finger joint independently for precise hand shapes', () => {
+    const keyframes = [{
+      frame: 8,
+      transitionFrames: 4,
+      right: {fingerJoints: {index: [0.2, 0.5, 0.8]}},
+    }];
+
+    expect(riggedHandsEditPoseAtFrame(keyframes, 4).right.fingerJoints.index)
+      .toEqual([0, 0, 0]);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 6).right.fingerJoints.index)
+      .toEqual([0.1, 0.25, 0.4]);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 8).right.fingerJoints.index)
+      .toEqual([0.2, 0.5, 0.8]);
+  });
+
+  it('smoothly adds and removes an editor-authored smile', () => {
+    const keyframes = [
+      {frame: 8, transitionFrames: 4, smile: 0.2},
+      {frame: 16, transitionFrames: 4, smile: 0},
+    ];
+
+    expect(riggedSmileEditAtFrame(keyframes, 3)).toBe(0);
+    expect(riggedSmileEditAtFrame(keyframes, 6)).toBeCloseTo(0.1);
+    expect(riggedSmileEditAtFrame(keyframes, 8)).toBeCloseTo(0.2);
+    expect(riggedSmileEditAtFrame(keyframes, 14)).toBeCloseTo(0.1);
+    expect(riggedSmileEditAtFrame(keyframes, 16)).toBe(0);
+  });
+
+  it('bounds hand alignment offsets without changing depth', () => {
+    expect(riggedHandPositionOffset({
+      horizontalOffset: 1.4,
+      verticalOffset: -0.35,
+      depthOffset: 0.8,
+    })).toEqual([1, -0.35, 0]);
+  });
+
+  it('rotates the wrist target around the elbow without changing its depth', () => {
+    const target = riggedElbowPivotTarget([1, 2, 0.4], [2, 2, 0.7], 90);
+    expect(target[0]).toBeCloseTo(1);
+    expect(target[1]).toBeCloseTo(3);
+    expect(target[2]).toBeCloseTo(0.7);
+  });
+
+  it('detects a transform edit on only the hand that was changed', () => {
+    expect(hasRiggedHandTransformEdit({elbowRotation: -12})).toBe(true);
+    expect(hasRiggedHandTransformEdit({wristPitch: 18})).toBe(true);
+    expect(hasRiggedHandTransformEdit({horizontalOffset: -0.25})).toBe(true);
+    expect(hasRiggedHandTransformEdit({fist: 1})).toBe(false);
+    expect(hasRiggedHandTransformEdit(undefined)).toBe(false);
+  });
+
+  it('interpolates independently between generic left and right hand edits', () => {
+    const keyframes = [
+      {frame: 4, right: {wristYaw: -30, fingers: {thumb: -1}}},
+      {frame: 10, transitionFrames: 2, left: {wristPitch: 20}},
+    ];
+
+    expect(riggedHandsEditPoseAtFrame(keyframes, 4).right.wristYaw).toBe(-30);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 4).right.fingers.thumb).toBe(-1);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 8).left.wristPitch).toBe(0);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 9).left.wristPitch).toBeCloseTo(10);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 10).right.wristYaw).toBe(0);
   });
 
   it('keeps AYUDAR captured facial expression ahead of random idle gestures', () => {
@@ -220,19 +413,45 @@ describe('avatar motion presentation', () => {
         expect(hand[index]).toEqual(anatomical[frameIndex][index]);
       });
       [[5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20]]
-        .forEach(chain => chain.slice(1).forEach((toIndex, segmentIndex) => {
-          const fromIndex = chain[segmentIndex];
-          const capturedLength = Math.hypot(
-            ...capturedHands[frameIndex][toIndex].map(
-              (value, axis) => value - capturedHands[frameIndex][fromIndex][axis],
-            ),
+        .forEach(chain => {
+          const segmentLengths = chain.slice(1).map((toIndex, segmentIndex) => {
+            const fromIndex = chain[segmentIndex];
+            const capturedLength = Math.hypot(
+              ...capturedHands[frameIndex][toIndex].map(
+                (value, axis) => value - capturedHands[frameIndex][fromIndex][axis],
+              ),
+            );
+            const presentedLength = Math.hypot(
+              ...hand[toIndex].map((value, axis) => value - hand[fromIndex][axis]),
+            );
+            expect(presentedLength).toBeCloseTo(capturedLength, 6);
+            return presentedLength;
+          });
+          const rootToTip = Math.hypot(
+            ...hand[chain[3]].map((value, axis) => value - hand[chain[0]][axis]),
           );
-          const presentedLength = Math.hypot(
-            ...hand[toIndex].map((value, axis) => value - hand[fromIndex][axis]),
+          expect(rootToTip / segmentLengths.reduce((sum, length) => sum + length, 0))
+            .toBeLessThan(0.62);
+
+          const middleDirection = hand[chain[2]].map(
+            (value, axis) => (value - hand[chain[1]][axis]) / segmentLengths[1],
           );
-          expect(presentedLength).toBeCloseTo(capturedLength, 6);
-        }));
+          const distalDirection = hand[chain[3]].map(
+            (value, axis) => (value - hand[chain[2]][axis]) / segmentLengths[2],
+          );
+          const distalAlignment = middleDirection.reduce(
+            (sum, value, axis) => sum + value * distalDirection[axis],
+            0,
+          );
+          expect(distalAlignment).toBeLessThan(0.25);
+        });
     });
+  });
+
+  it('drives only the captured thumb inside a thumb-up fist', () => {
+    expect([1, 2, 3].filter(shouldDriveThumbUpHandSegment)).toEqual([1, 2, 3]);
+    expect([5, 6, 7, 9, 10, 11, 13, 14, 15, 17, 18, 19]
+      .filter(shouldDriveThumbUpHandSegment)).toEqual([]);
   });
 
   it('keeps all 21 landmarks of both AYUDAR hands unchanged', () => {
@@ -253,17 +472,38 @@ describe('avatar motion presentation', () => {
     });
   });
 
-  it('configures AYUDAR to use captured hands without palm rescaling', () => {
+  it('configures AYUDAR to move both contacted palms toward the camera together', () => {
     const profiles = require('../../../assets/motions/avatar_profile_overrides.json');
+    const motion = require('../../../assets/motions/ayudar.motion.json') as SignMotion;
     const profile = profiles.AYUDAR;
 
-    expect(profile.rigLeftHandShape).toBe('captured');
-    expect(profile.rigRightHandShape).toBe('captured');
+    expect(profile.rigLeftHandShape).toBe('thumb-up');
+    expect(profile.rigRightHandShape).toBe('open-palm');
     expect(profile.rigLeftPalmScaleMin).toBe(1);
-    expect(profile.rigLeftPalmScaleMax).toBe(1);
+    expect(profile.rigLeftPalmScaleMax).toBe(2.25);
     expect(profile.rigRightPalmScaleMin).toBe(1);
-    expect(profile.rigRightPalmScaleMax).toBe(1);
-    expect(profile.rigRightHandTrackingRepair).toBe('stable-palm');
+    expect(profile.rigRightPalmScaleMax).toBe(2.25);
+    expect(profile.rigSynchronizedPalmApproach).toBe(true);
+    expect(profile.rigPalmApproachGain).toBe(3);
+    expect(profile.rigPalmApproachVerticalOffset).toBe(0.22);
+    expect(profile.rigLeftPalmAxialRollDegrees).toBe(-28);
+    const approachHands = motion.frames.map(frame => frame.bodyHands.slice(33, 54));
+    expect(riggedApproachPalmScaleEnvelope(
+      approachHands,
+      motion.frames.length - 1,
+      profile.rigLeftPalmScaleMin,
+      profile.rigLeftPalmScaleMax,
+      profile.rigPalmApproachGain,
+    )).toBeGreaterThan(2.1);
+    expect(profile.rigRightHandDepthFlip).toBe(false);
+    expect(profile.rigRightHandTrackingRepair).toBe('locked-palm');
+    expect(profile.rigInterHandContact).toEqual(expect.objectContaining({
+      movingSide: 'L',
+      movingLandmarks: [5, 9, 13, 17],
+      supportSide: 'R',
+      supportLandmarks: [5, 9, 13, 17],
+      snap: 1,
+    }));
   });
 
   it('preserves the recorded non-manual expression in HAMBRE', () => {
@@ -326,9 +566,275 @@ describe('avatar motion presentation', () => {
     }
   });
 
+  it('keeps BLANCO pointing with the thumb and index extended', () => {
+    const motion = require('../../../assets/motions/blanco.motion.json') as SignMotion;
+    const capturedHands = motion.frames.map(frame => frame.bodyHands.slice(33, 54));
+    const anatomicalHands = presentAnatomicalHandLandmarkFrames(capturedHands);
+    const indexChain = [5, 6, 7, 8];
+    const closedChains = [
+      [9, 10, 11, 12],
+      [13, 14, 15, 16],
+      [17, 18, 19, 20],
+    ];
+
+    const presentedHands = presentPointingHandLandmarkFrames(anatomicalHands);
+
+    anatomicalHands.forEach((hand, frameIndex) => {
+      const presented = presentedHands[frameIndex];
+      const indexDirection = presented[8].map(
+        (value, axis) => value - presented[5][axis],
+      );
+      // In BLANCO the captured index always travels upward on screen. Keep
+      // that sign even when the edge-on middle/ring landmarks briefly point
+      // the opposite way because they occlude one another.
+      expect(indexDirection[1]).toBeLessThan(0);
+      const extensionRatio = (chain: number[]) => {
+        const totalLength = chain.slice(1).reduce((sum, toIndex, segmentIndex) => (
+          sum + Math.hypot(...presented[toIndex].map(
+            (value, axis) => value - presented[chain[segmentIndex]][axis],
+          ))
+        ), 0);
+        const rootToTip = Math.hypot(...presented[chain[3]].map(
+          (value, axis) => value - presented[chain[0]][axis],
+        ));
+        return rootToTip / totalLength;
+      };
+      expect(extensionRatio(indexChain)).toBeGreaterThan(0.98);
+      closedChains.forEach(chain => expect(extensionRatio(chain)).toBeLessThan(0.97));
+      expect(extensionRatio([1, 2, 3, 4])).toBeGreaterThan(0.9);
+    });
+  });
+
+  it('keeps all COMER fingertips grouped without changing roots or phalanx lengths', () => {
+    const motion = require('../../../assets/motions/comer.motion.json') as SignMotion;
+    const hands = motion.frames.map(frame => frame.bodyHands.slice(33, 54));
+    const presented = presentPinchedHandLandmarkFrames(hands);
+    const chains = [
+      [1, 2, 3, 4],
+      [5, 6, 7, 8],
+      [9, 10, 11, 12],
+      [13, 14, 15, 16],
+      [17, 18, 19, 20],
+    ];
+
+    presented.forEach((hand, frameIndex) => {
+      expect(hand[0]).toEqual(hands[frameIndex][0]);
+      chains.forEach(chain => {
+        expect(hand[chain[0]]).toEqual(hands[frameIndex][chain[0]]);
+        chain.slice(1).forEach((toIndex, segmentIndex) => {
+          const fromIndex = chain[segmentIndex];
+          const originalLength = Math.hypot(...hands[frameIndex][toIndex].map(
+            (value, axis) => value - hands[frameIndex][fromIndex][axis],
+          ));
+          const presentedLength = Math.hypot(...hand[toIndex].map(
+            (value, axis) => value - hand[fromIndex][axis],
+          ));
+          expect(presentedLength).toBeCloseTo(originalLength, 6);
+        });
+      });
+      const fingertips = [4, 8, 12, 16, 20].map(index => hand[index]);
+      const maximumSeparation = Math.max(...fingertips.flatMap((first, firstIndex) => (
+        fingertips.slice(firstIndex + 1).map(second => Math.hypot(...second.map(
+          (value, axis) => value - first[axis],
+        )))
+      )));
+      const palmWidth = Math.hypot(...hand[17].map(
+        (value, axis) => value - hand[5][axis],
+      ));
+      const capturedTips = [4, 8, 12, 16, 20].map(index => hands[frameIndex][index]);
+      const capturedMaximumSeparation = Math.max(...capturedTips.flatMap((first, firstIndex) => (
+        capturedTips.slice(firstIndex + 1).map(second => Math.hypot(...second.map(
+          (value, axis) => value - first[axis],
+        )))
+      )));
+      expect(maximumSeparation).toBeLessThan(palmWidth * 0.42);
+      expect(maximumSeparation).toBeLessThan(capturedMaximumSeparation * 0.65);
+    });
+
+    const profiles = require('../../../assets/motions/avatar_profile_overrides.json');
+    expect(profiles.COMER.rigLeftHandShape).toBe('pinched');
+    expect(profiles.COMER.activeHand).toBe('left');
+    expect(profiles.COMER.contactAnchor).toBe('mouth');
+    expect(profiles.COMER.rigContactLandmark).toBe(12);
+    expect(profiles.COMER.rigContactWindows).toEqual([{startFrame: 18, endFrame: 35}]);
+  });
+
+  it('keeps DINERO index and middle together while the thumb rubs them', () => {
+    const motion = require('../../../assets/motions/dinero.motion.json') as SignMotion;
+    const hands = motion.frames.map(frame => frame.bodyHands.slice(33, 54));
+    const presented = presentMoneyRubHandLandmarkFrames(hands);
+    const rubbingOffsets: number[] = [];
+
+    presented.forEach((hand, frameIndex) => {
+      const palmWidth = Math.hypot(...hand[17].map(
+        (value, axis) => value - hand[5][axis],
+      ));
+      const thumbToIndexDistance = Math.hypot(...hand[8].map(
+        (value, axis) => value - hand[4][axis],
+      ));
+      const thumbToMiddleDistance = Math.hypot(...hand[12].map(
+        (value, axis) => value - hand[4][axis],
+      ));
+      const joinedFingertipDistance = Math.hypot(...hand[12].map(
+        (value, axis) => value - hand[8][axis],
+      ));
+      expect(thumbToIndexDistance).toBeLessThan(palmWidth * 0.04);
+      expect(thumbToMiddleDistance).toBeLessThan(palmWidth * 0.04);
+      expect(joinedFingertipDistance).toBeLessThan(palmWidth * 0.01);
+      expect(hand[1]).toEqual(hands[frameIndex][1]);
+      expect(hand[5]).toEqual(hands[frameIndex][5]);
+      expect(hand[9]).toEqual(hands[frameIndex][9]);
+
+      const palmCenter = hand[5].map((value, axis) => (
+        (value + hand[9][axis] + hand[13][axis] + hand[17][axis]) / 4
+      ));
+      const palmDirection = palmCenter.map(
+        (value, axis) => value - hand[0][axis],
+      );
+      const palmLength = Math.hypot(...palmDirection);
+      const joinedTip = hand[8].map((value, axis) => (
+        (value + hand[12][axis]) / 2
+      ));
+      const tipDelta = joinedTip.map((value, axis) => value - hand[4][axis]);
+      rubbingOffsets.push(tipDelta.reduce(
+        (sum, value, axis) => sum + value * palmDirection[axis] / palmLength,
+        0,
+      ) / palmWidth);
+
+      for (const chain of [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]) {
+        chain.slice(1).forEach((toIndex, segmentIndex) => {
+          const fromIndex = chain[segmentIndex];
+          const sourceLength = Math.hypot(...hands[frameIndex][toIndex].map(
+            (value, axis) => value - hands[frameIndex][fromIndex][axis],
+          ));
+          const presentedLength = Math.hypot(...hand[toIndex].map(
+            (value, axis) => value - hand[fromIndex][axis],
+          ));
+          expect(presentedLength).toBeCloseTo(sourceLength, 6);
+        });
+      }
+    });
+
+    expect(Math.max(...rubbingOffsets) - Math.min(...rubbingOffsets)).toBeGreaterThan(0.045);
+    const directionChanges = rubbingOffsets.slice(1).filter((value, index) => (
+      value * rubbingOffsets[index] < 0
+    ));
+    expect(directionChanges.length).toBeGreaterThanOrEqual(5);
+
+    const profiles = require('../../../assets/motions/avatar_profile_overrides.json');
+    expect(profiles.DINERO.rigLeftHandShape).toBe('money-rub');
+  });
+
+  it('presents both CUÁNTO hands as an initial Q that opens fully', () => {
+    const motion = require('../../../assets/motions/cuánto.motion.json') as SignMotion;
+    const profiles = require('../../../assets/motions/avatar_profile_overrides.json');
+    const profile = profiles['CUÁNTO'];
+    const fingerChains = [
+      [1, 2, 3, 4],
+      [5, 6, 7, 8],
+      [9, 10, 11, 12],
+      [13, 14, 15, 16],
+      [17, 18, 19, 20],
+    ];
+    const fingertipSeparation = (hand: MotionPoint[]) => {
+      const tips = [4, 8, 12, 16, 20].map(index => hand[index]);
+      return Math.max(...tips.flatMap((first, firstIndex) => (
+        tips.slice(firstIndex + 1).map(second => Math.hypot(...second.map(
+          (value, axis) => value - first[axis],
+        )))
+      )));
+    };
+
+    expect(profile.forceTwoHands).toBe(true);
+    expect(profile.rigLeftHandShape).toBe('question-q');
+    expect(profile.rigRightHandShape).toBe('question-q');
+    [33, 54].forEach(handStart => {
+      const captured = motion.frames.map(frame => frame.bodyHands.slice(handStart, handStart + 21));
+      const presented = presentQuestionQHandLandmarkFrames(captured);
+      const palmWidth = Math.hypot(...presented[0][17].map(
+        (value, axis) => value - presented[0][5][axis],
+      ));
+      expect(fingertipSeparation(presented[0])).toBeLessThan(palmWidth * 0.5);
+      expect(fingertipSeparation(presented[presented.length - 1]))
+        .toBeGreaterThan(fingertipSeparation(presented[0]) * 2);
+      presented.forEach((hand, frameIndex) => {
+        [0, 1, 5, 9, 13, 17].forEach(root => {
+          expect(hand[root]).toEqual(captured[frameIndex][root]);
+        });
+        fingerChains.forEach(chain => {
+          chain.slice(1).forEach((toIndex, segmentIndex) => {
+            const fromIndex = chain[segmentIndex];
+            const capturedLength = Math.hypot(...captured[frameIndex][toIndex].map(
+              (value, axis) => value - captured[frameIndex][fromIndex][axis],
+            ));
+            const presentedLength = Math.hypot(...hand[toIndex].map(
+              (value, axis) => value - hand[fromIndex][axis],
+            ));
+            expect(presentedLength).toBeCloseTo(capturedLength, 7);
+          });
+        });
+      });
+    });
+  });
+
+  it('applies editor-authored states independently to each finger', () => {
+    const motion = require('../../../assets/motions/blanco.motion.json') as SignMotion;
+    const hands = motion.frames.map(frame => frame.bodyHands.slice(33, 54));
+    const presented = presentConfiguredHandLandmarkFrames(hands, {
+      thumb: 'extended',
+      index: 'extended',
+      middle: 'closed',
+      ring: 'closed',
+      pinky: 'closed',
+    });
+    const extensionRatio = (hand: MotionPoint[], chain: number[]) => {
+      const totalLength = chain.slice(1).reduce((sum, to, index) => (
+        sum + Math.hypot(...hand[to].map(
+          (value, axis) => value - hand[chain[index]][axis],
+        ))
+      ), 0);
+      return Math.hypot(...hand[chain[3]].map(
+        (value, axis) => value - hand[chain[0]][axis],
+      )) / totalLength;
+    };
+
+    presented.forEach(hand => {
+      expect(extensionRatio(hand, [1, 2, 3, 4])).toBeGreaterThan(0.9);
+      expect(extensionRatio(hand, [5, 6, 7, 8])).toBeGreaterThan(0.98);
+      for (const chain of [[9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20]]) {
+        expect(extensionRatio(hand, chain)).toBeLessThan(0.97);
+      }
+    });
+  });
+
   it('drives only proximal finger bones for a stable open-hand rig', () => {
     expect([1, 5, 9, 13, 17].filter(shouldDriveStableOpenHandSegment)).toEqual([1, 5, 9, 13, 17]);
     expect([2, 3, 6, 7, 10, 11, 14, 15, 18, 19].some(shouldDriveStableOpenHandSegment)).toBe(false);
+  });
+
+  it('drives the full thumb and proximal long-finger bones for a fully open hand', () => {
+    expect([1, 2, 3, 5, 9, 13, 17]
+      .every(shouldDriveFullyOpenHandSegment)).toBe(true);
+    expect([0, 4, 6, 7, 8, 10, 11, 12, 14, 15, 16, 18, 19, 20, 21]
+      .some(shouldDriveFullyOpenHandSegment)).toBe(false);
+  });
+
+  it('keeps an extended thumb authored while driving every long-finger segment', () => {
+    expect([1, 2, 3].some(fromIndex => (
+      shouldDriveConfiguredExtendedFingerSegment('thumb', fromIndex)
+    ))).toBe(false);
+    expect([5, 6, 7].every(fromIndex => (
+      shouldDriveConfiguredExtendedFingerSegment('index', fromIndex)
+    ))).toBe(true);
+    expect([9, 10, 11].every(fromIndex => (
+      shouldDriveConfiguredExtendedFingerSegment('middle', fromIndex)
+    ))).toBe(true);
+    expect(shouldDriveConfiguredExtendedFingerSegment('index', 9)).toBe(false);
+  });
+
+  it('drives only proximal bones for a flat palm so its upright thumb cannot twist', () => {
+    expect([1, 5, 9, 13, 17].every(shouldDriveFlatPalmSegment)).toBe(true);
+    expect([2, 3, 6, 7, 10, 11, 14, 15, 18, 19].some(shouldDriveFlatPalmSegment)).toBe(false);
   });
 
   it('lets a pointing index inherit its straight distal alignment', () => {
@@ -393,6 +899,89 @@ describe('avatar motion presentation', () => {
     expect(Math.abs(presented[1][7][0] - presented[1][6][0]))
       .toBeLessThan(Math.abs(noisy[7][0] - noisy[6][0]));
     expect(presented[1].every(value => value.every(Number.isFinite))).toBe(true);
+  });
+
+  it('preserves the captured palm turn in BUENAS TARDES while stabilizing fingers', () => {
+    const motion = require('../../../assets/motions/buenas tardes.motion.json') as SignMotion;
+    const capturedHands = motion.frames.map(frame => frame.bodyHands.slice(33, 54));
+    const presentedHands = presentAnatomicalHandLandmarkFrames(capturedHands);
+    const normal = (hand: MotionPoint[]) => {
+      const wrist = hand[0];
+      const index = hand[5].map((value, axis) => value - wrist[axis]);
+      const pinky = hand[17].map((value, axis) => value - wrist[axis]);
+      const cross = point(
+        index[1] * pinky[2] - index[2] * pinky[1],
+        index[2] * pinky[0] - index[0] * pinky[2],
+        index[0] * pinky[1] - index[1] * pinky[0],
+      );
+      const length = Math.hypot(...cross);
+      return cross.map(value => value / length);
+    };
+    const initialNormal = normal(presentedHands[0]);
+    const alignment = (hand: MotionPoint[]) => normal(hand).reduce(
+      (sum, value, axis) => sum + value * initialNormal[axis],
+      0,
+    );
+
+    presentedHands.forEach((hand, frameIndex) => {
+      [0, 5, 9, 13, 17].forEach(root => {
+        expect(hand[root]).toEqual(capturedHands[frameIndex][root]);
+      });
+    });
+    expect(Math.min(...presentedHands.map(alignment))).toBeLessThan(-0.6);
+  });
+
+  it('keeps both DESPACIO hands open with every finger extended', () => {
+    const profiles = require('../../../assets/motions/avatar_profile_overrides.json');
+    const motion = require('../../../assets/motions/despacio.motion.json') as SignMotion;
+    const profile = profiles.DESPACIO;
+    const expectedStates = {
+      thumb: 'extended',
+      index: 'extended',
+      middle: 'extended',
+      ring: 'extended',
+      pinky: 'extended',
+    } as const;
+
+    expect(profile.forceTwoHands).toBe(true);
+    expect(profile.rigLeftHandShape).toBe('fully-open');
+    expect(profile.rigRightHandShape).toBe('fully-open');
+    expect(profile.rigLeftFingerStates).toEqual(expectedStates);
+    expect(profile.rigRightFingerStates).toEqual(expectedStates);
+
+    const longFingerChains = [
+      [5, 6, 7, 8],
+      [9, 10, 11, 12],
+      [13, 14, 15, 16],
+      [17, 18, 19, 20],
+    ];
+    let checkedFrames = 0;
+    [33, 54].forEach(handStart => {
+      const hands = motion.frames.map(frame => frame.bodyHands.slice(handStart, handStart + 21));
+      const presented = presentConfiguredHandLandmarkFrames(hands, expectedStates);
+      presented.forEach(hand => {
+        if (!longFingerChains.every(chain => chain.every(index => (
+          hand[index].some(value => Math.abs(value) > 1e-8)
+        )))) return;
+        const directions = longFingerChains.map(chain => {
+          const vector = hand[chain[3]].map(
+            (value, axis) => value - hand[chain[0]][axis],
+          );
+          const length = Math.hypot(...vector);
+          expect(length).toBeGreaterThan(1e-8);
+          return vector.map(value => value / length);
+        });
+        directions.slice(1).forEach(direction => {
+          const alignment = direction.reduce(
+            (sum, value, axis) => sum + value * directions[0][axis],
+            0,
+          );
+          expect(alignment).toBeGreaterThan(0.995);
+        });
+        checkedFrames += 1;
+      });
+    });
+    expect(checkedFrames).toBeGreaterThan(0);
   });
 
   it('stabilizes a fist in palm-local space without moving its anatomical roots', () => {
@@ -694,6 +1283,23 @@ describe('avatar motion presentation', () => {
     });
   });
 
+  it('renders CABALLO as two compact aligned fists', () => {
+    const profiles = require('../../../assets/motions/avatar_profile_overrides.json');
+
+    expect(profiles.CABALLO).toEqual(expect.objectContaining({
+      forceTwoHands: true,
+      rigLeftHandShape: 'fist',
+      rigRightHandShape: 'fist',
+      rigLeftPalmScaleMin: 1,
+      rigRightPalmScaleMin: 1,
+      rigInterHandContact: expect.objectContaining({
+        movingSide: 'L',
+        supportSide: 'R',
+        snap: 1,
+      }),
+    }));
+  });
+
   it('adds life only to captures whose normalized facial features remain static', () => {
     const face = Array.from({length: 468}, () => point(0.5, 0.5));
     face[33] = point(0.4, 0.45);
@@ -756,5 +1362,21 @@ describe('avatar motion presentation', () => {
     expect(contactPresentationWeight(11, 7, 11)).toBe(1);
     expect(contactPresentationWeight(12, 7, 11)).toBeCloseTo(0.5, 8);
     expect(contactPresentationWeight(13, 7, 11)).toBe(0);
+  });
+
+  it('moves a profiled wrist behind the head without changing its screen trajectory', () => {
+    expect(riggedWristDepth(0.2, 0.55)).toBeCloseTo(0.55, 8);
+    expect(riggedWristDepth(0.2, 0.55, 'back')).toBeCloseTo(-0.15, 8);
+    expect(riggedWristDepth(0.2, 0.55, 'back', 0.5)).toBeCloseTo(0.2, 8);
+    expect(riggedWristDepth(0.2, 0.55, 'back', -1)).toBeCloseTo(0.55, 8);
+    expect(riggedWristDepth(0.2, 0.55, 'back', 2)).toBeCloseTo(-0.15, 8);
+    expect(riggedWristDepth(0.2, 0.2, 'back', 1, 0.48)).toBeCloseTo(-0.28, 8);
+  });
+
+  it('keeps a resting hand in front and fades to its signing depth smoothly', () => {
+    expect(initialRiggedHandFrontDepth(0.28, 0.54, 0, 12, 7)).toBe(0.54);
+    expect(initialRiggedHandFrontDepth(0.28, 0.54, 12, 12, 7)).toBe(0.54);
+    expect(initialRiggedHandFrontDepth(0.28, 0.54, 15.5, 12, 7)).toBeCloseTo(0.41, 8);
+    expect(initialRiggedHandFrontDepth(0.28, 0.54, 19, 12, 7)).toBe(0.28);
   });
 });

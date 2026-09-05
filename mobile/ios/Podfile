@@ -17,7 +17,7 @@ $RNFirebaseDisableSPM = true
 use_frameworks! :linkage => :static
 $RNFirebaseAsStaticFramework = true
 
-target 'ManoSpeak' do
+target 'Vozual' do
   config = use_native_modules!
 
   use_react_native!(
@@ -27,7 +27,7 @@ target 'ManoSpeak' do
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
-  target 'ManoSpeakTests' do
+  target 'VozualTests' do
     inherit! :complete
     # Pods for testing
   end

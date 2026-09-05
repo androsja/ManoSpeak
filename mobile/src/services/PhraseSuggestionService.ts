@@ -6,6 +6,11 @@ type CuratedPhraseSuggestion = {
 };
 
 const CURATED_PHRASE_SUGGESTIONS: CuratedPhraseSuggestion[] = [
+  {text: 'Buenos días, amigo', expectedGlosses: ['BUENOS DÍAS', 'AMIGO']},
+  {text: 'Buenas tardes, amigo', expectedGlosses: ['BUENAS TARDES', 'AMIGO']},
+  {text: 'Buenas noches, amigo', expectedGlosses: ['BUENAS NOCHES', 'AMIGO']},
+  {text: 'Adiós, amigo', expectedGlosses: ['ADIÓS', 'AMIGO']},
+  {text: 'Comer carne', expectedGlosses: ['COMER', 'CARNE']},
   {text: 'Hola, ¿cómo estás?', expectedGlosses: ['HOLA', '¿CÓMO ESTÁS?']},
   {text: 'Yo quiero comer carne', expectedGlosses: ['YO', 'QUERER', 'COMER', 'CARNE']},
   {text: 'Mamá quiere ir al hospital', expectedGlosses: ['MAMA', 'QUERER', 'IR', 'HOSPITAL']},
@@ -37,8 +42,26 @@ export const AVAILABLE_PHRASE_SUGGESTIONS = CURATED_PHRASE_SUGGESTIONS
   .filter(hasExpectedPublishedPlan)
   .map(suggestion => suggestion.text);
 
-export function nextPhraseSuggestionIndex(currentIndex: number, randomValue = Math.random()): number {
-  const count = AVAILABLE_PHRASE_SUGGESTIONS.length;
+/** Keeps suggestions limited to signs the user chose to store locally. */
+export function phraseSuggestionsForInstalledGlosses(
+  installedGlosses: ReadonlySet<string>,
+): string[] {
+  const normalizedGlosses = new Set(
+    [...installedGlosses].map(gloss => gloss.trim().toUpperCase()),
+  );
+  return CURATED_PHRASE_SUGGESTIONS
+    .filter(hasExpectedPublishedPlan)
+    .filter(suggestion => suggestion.expectedGlosses.every(
+      gloss => normalizedGlosses.has(gloss),
+    ))
+    .map(suggestion => suggestion.text);
+}
+
+export function nextPhraseSuggestionIndex(
+  currentIndex: number,
+  randomValue = Math.random(),
+  count = AVAILABLE_PHRASE_SUGGESTIONS.length,
+): number {
   if (count <= 1) return 0;
   const offset = 1 + Math.floor(Math.min(0.999999, Math.max(0, randomValue)) * (count - 1));
   return (currentIndex + offset) % count;

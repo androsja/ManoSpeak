@@ -1,4 +1,4 @@
-package com.manospeak
+package com.androsja.vozual
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -11,6 +11,6 @@ class PipActionReceiver : BroadcastReceiver() {
   }
 
   companion object {
-    const val ACTION_PRIMARY = "com.manospeak.action.VOZUAL_PIP_PRIMARY"
+    const val ACTION_PRIMARY = "com.androsja.vozual.action.VOZUAL_PIP_PRIMARY"
   }
 }

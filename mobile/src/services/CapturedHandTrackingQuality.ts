@@ -21,7 +21,7 @@ export type CapturedHandTrackingAudit = {
   unstableFrames: number[];
 };
 
-export type RiggedHandTrackingRepair = 'stable-palm';
+export type RiggedHandTrackingRepair = 'stable-palm' | 'locked-palm';
 
 function isValid(point: MotionPoint | undefined): point is MotionPoint {
   return point != null
@@ -235,4 +235,38 @@ export function repairStablePalmHandLandmarkFrames(
     });
   });
   return output;
+}
+
+/**
+ * Keeps a support palm in the first reliable captured orientation while its
+ * captured wrist continues to move. This is intentionally opt-in for signs
+ * whose source video shows a stationary handshape but whose hand detector
+ * repeatedly mirrors or collapses the palm. Original motion data is never
+ * mutated; only the rigged presentation receives the repaired local shape.
+ */
+export function lockPalmHandLandmarkFrames(
+  hands: MotionPoint[][],
+): MotionPoint[][] {
+  const reference = hands.find(hand => (
+    hand.length === HAND_LANDMARK_COUNT && hand.every(isValid)
+  ));
+  if (!reference) {
+    return hands.map(hand => hand.map(point => [...point] as MotionPoint));
+  }
+  const referenceWrist = reference[0];
+  return hands.map(hand => {
+    if (hand.length !== HAND_LANDMARK_COUNT || !isValid(hand[0])) {
+      return hand.map(point => [...point] as MotionPoint);
+    }
+    const wrist = hand[0];
+    return reference.map((referencePoint, pointIndex) => (
+      pointIndex === 0
+        ? [...wrist] as MotionPoint
+        : [
+          wrist[0] + referencePoint[0] - referenceWrist[0],
+          wrist[1] + referencePoint[1] - referenceWrist[1],
+          wrist[2] + referencePoint[2] - referenceWrist[2],
+        ]
+    ));
+  });
 }

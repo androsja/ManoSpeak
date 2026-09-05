@@ -7,11 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		00E356F31AD99517003FC87E /* ManoSpeakTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F21AD99517003FC87E /* ManoSpeakTests.m */; };
+		00E356F31AD99517003FC87E /* VozualTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F21AD99517003FC87E /* VozualTests.m */; };
 		13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.mm */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
-		2644C1F44197D507FAD65F26 /* Pods_ManoSpeak.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A4B2AAD46C9328F620D257EA /* Pods_ManoSpeak.framework */; };
+		2644C1F44197D507FAD65F26 /* Pods_Vozual.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A4B2AAD46C9328F620D257EA /* Pods_Vozual.framework */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		C0DE8AFB5E9BF8675FC7F16D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		C0DE8AFC5E9BF8675FC7F16D /* avatar in Resources */ = {isa = PBXBuildFile; fileRef = C0DE8AFD5E9BF8675FC7F16D /* avatar */; };
@@ -23,7 +23,7 @@
 		C0DE9106A001000000000006 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0DE9207A001000000000007 /* CoreMedia.framework */; };
 		C0DE9107A001000000000007 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0DE9208A001000000000008 /* CoreVideo.framework */; };
 		C0DEF101A001000000000101 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C0DEF102A001000000000102 /* GoogleService-Info.plist */; };
-		F33756A0C6808358025E5748 /* Pods_ManoSpeak_ManoSpeakTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E1702330A557B57A7E1FF912 /* Pods_ManoSpeak_ManoSpeakTests.framework */; };
+		F33756A0C6808358025E5748 /* Pods_Vozual_VozualTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E1702330A557B57A7E1FF912 /* Pods_Vozual_VozualTests.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,39 +32,39 @@
 			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
-			remoteInfo = ManoSpeak;
+			remoteInfo = Vozual;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		00E356EE1AD99517003FC87E /* ManoSpeakTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ManoSpeakTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		00E356EE1AD99517003FC87E /* VozualTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VozualTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		00E356F11AD99517003FC87E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		00E356F21AD99517003FC87E /* ManoSpeakTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ManoSpeakTests.m; sourceTree = "<group>"; };
-		13B07F961A680F5B00A75B9A /* ManoSpeak.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ManoSpeak.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		13B07FAF1A68108700A75B9A /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = ManoSpeak/AppDelegate.h; sourceTree = "<group>"; };
-		13B07FB01A68108700A75B9A /* AppDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = AppDelegate.mm; path = ManoSpeak/AppDelegate.mm; sourceTree = "<group>"; };
-		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = ManoSpeak/Images.xcassets; sourceTree = "<group>"; };
-		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = ManoSpeak/Info.plist; sourceTree = "<group>"; };
-		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = ManoSpeak/main.m; sourceTree = "<group>"; };
-		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = ManoSpeak/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		3B4392A12AC88292D35C810B /* Pods-ManoSpeak.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ManoSpeak.debug.xcconfig"; path = "Target Support Files/Pods-ManoSpeak/Pods-ManoSpeak.debug.xcconfig"; sourceTree = "<group>"; };
-		5709B34CF0A7D63546082F79 /* Pods-ManoSpeak.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ManoSpeak.release.xcconfig"; path = "Target Support Files/Pods-ManoSpeak/Pods-ManoSpeak.release.xcconfig"; sourceTree = "<group>"; };
-		5B7EB9410499542E8C5724F5 /* Pods-ManoSpeak-ManoSpeakTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ManoSpeak-ManoSpeakTests.debug.xcconfig"; path = "Target Support Files/Pods-ManoSpeak-ManoSpeakTests/Pods-ManoSpeak-ManoSpeakTests.debug.xcconfig"; sourceTree = "<group>"; };
-		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = ManoSpeak/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		89C6BE57DB24E9ADA2F236DE /* Pods-ManoSpeak-ManoSpeakTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ManoSpeak-ManoSpeakTests.release.xcconfig"; path = "Target Support Files/Pods-ManoSpeak-ManoSpeakTests/Pods-ManoSpeak-ManoSpeakTests.release.xcconfig"; sourceTree = "<group>"; };
-		A4B2AAD46C9328F620D257EA /* Pods_ManoSpeak.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_ManoSpeak.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		00E356F21AD99517003FC87E /* VozualTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VozualTests.m; sourceTree = "<group>"; };
+		13B07F961A680F5B00A75B9A /* Vozual.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vozual.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07FAF1A68108700A75B9A /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = Vozual/AppDelegate.h; sourceTree = "<group>"; };
+		13B07FB01A68108700A75B9A /* AppDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = AppDelegate.mm; path = Vozual/AppDelegate.mm; sourceTree = "<group>"; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Vozual/Images.xcassets; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Vozual/Info.plist; sourceTree = "<group>"; };
+		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = Vozual/main.m; sourceTree = "<group>"; };
+		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Vozual/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		3B4392A12AC88292D35C810B /* Pods-Vozual.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vozual.debug.xcconfig"; path = "Target Support Files/Pods-Vozual/Pods-Vozual.debug.xcconfig"; sourceTree = "<group>"; };
+		5709B34CF0A7D63546082F79 /* Pods-Vozual.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vozual.release.xcconfig"; path = "Target Support Files/Pods-Vozual/Pods-Vozual.release.xcconfig"; sourceTree = "<group>"; };
+		5B7EB9410499542E8C5724F5 /* Pods-Vozual-VozualTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vozual-VozualTests.debug.xcconfig"; path = "Target Support Files/Pods-Vozual-VozualTests/Pods-Vozual-VozualTests.debug.xcconfig"; sourceTree = "<group>"; };
+		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = Vozual/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		89C6BE57DB24E9ADA2F236DE /* Pods-Vozual-VozualTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vozual-VozualTests.release.xcconfig"; path = "Target Support Files/Pods-Vozual-VozualTests/Pods-Vozual-VozualTests.release.xcconfig"; sourceTree = "<group>"; };
+		A4B2AAD46C9328F620D257EA /* Pods_Vozual.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Vozual.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DE8AFD5E9BF8675FC7F16D /* avatar */ = {isa = PBXFileReference; lastKnownFileType = folder; name = avatar; path = ../android/app/src/main/assets/avatar; sourceTree = "<group>"; };
-		C0DE9200A001000000000000 /* VozualSpeechRecognizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VozualSpeechRecognizer.h; path = ManoSpeak/VozualSpeechRecognizer.h; sourceTree = "<group>"; };
-		C0DE9201A001000000000001 /* VozualSpeechRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = VozualSpeechRecognizer.m; path = ManoSpeak/VozualSpeechRecognizer.m; sourceTree = "<group>"; };
+		C0DE9200A001000000000000 /* VozualSpeechRecognizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VozualSpeechRecognizer.h; path = Vozual/VozualSpeechRecognizer.h; sourceTree = "<group>"; };
+		C0DE9201A001000000000001 /* VozualSpeechRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = VozualSpeechRecognizer.m; path = Vozual/VozualSpeechRecognizer.m; sourceTree = "<group>"; };
 		C0DE9202A001000000000002 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		C0DE9203A001000000000003 /* Speech.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Speech.framework; path = System/Library/Frameworks/Speech.framework; sourceTree = SDKROOT; };
-		C0DE9204A001000000000004 /* VozualPictureInPicture.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VozualPictureInPicture.h; path = ManoSpeak/VozualPictureInPicture.h; sourceTree = "<group>"; };
-		C0DE9205A001000000000005 /* VozualPictureInPicture.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = VozualPictureInPicture.m; path = ManoSpeak/VozualPictureInPicture.m; sourceTree = "<group>"; };
+		C0DE9204A001000000000004 /* VozualPictureInPicture.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VozualPictureInPicture.h; path = Vozual/VozualPictureInPicture.h; sourceTree = "<group>"; };
+		C0DE9205A001000000000005 /* VozualPictureInPicture.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = VozualPictureInPicture.m; path = Vozual/VozualPictureInPicture.m; sourceTree = "<group>"; };
 		C0DE9206A001000000000006 /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
 		C0DE9207A001000000000007 /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		C0DE9208A001000000000008 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
-		C0DEF102A001000000000102 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "ManoSpeak/GoogleService-Info.plist"; sourceTree = "<group>"; };
-		E1702330A557B57A7E1FF912 /* Pods_ManoSpeak_ManoSpeakTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_ManoSpeak_ManoSpeakTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0DEF102A001000000000102 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "Vozual/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		E1702330A557B57A7E1FF912 /* Pods_Vozual_VozualTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Vozual_VozualTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -73,7 +73,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F33756A0C6808358025E5748 /* Pods_ManoSpeak_ManoSpeakTests.framework in Frameworks */,
+				F33756A0C6808358025E5748 /* Pods_Vozual_VozualTests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,20 +86,20 @@
 				C0DE9105A001000000000005 /* AVKit.framework in Frameworks */,
 				C0DE9106A001000000000006 /* CoreMedia.framework in Frameworks */,
 				C0DE9107A001000000000007 /* CoreVideo.framework in Frameworks */,
-				2644C1F44197D507FAD65F26 /* Pods_ManoSpeak.framework in Frameworks */,
+				2644C1F44197D507FAD65F26 /* Pods_Vozual.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		00E356EF1AD99517003FC87E /* ManoSpeakTests */ = {
+		00E356EF1AD99517003FC87E /* VozualTests */ = {
 			isa = PBXGroup;
 			children = (
-				00E356F21AD99517003FC87E /* ManoSpeakTests.m */,
+				00E356F21AD99517003FC87E /* VozualTests.m */,
 				00E356F01AD99517003FC87E /* Supporting Files */,
 			);
-			path = ManoSpeakTests;
+			path = VozualTests;
 			sourceTree = "<group>";
 		};
 		00E356F01AD99517003FC87E /* Supporting Files */ = {
@@ -110,7 +110,7 @@
 			name = "Supporting Files";
 			sourceTree = "<group>";
 		};
-		13B07FAE1A68108700A75B9A /* ManoSpeak */ = {
+		13B07FAE1A68108700A75B9A /* Vozual */ = {
 			isa = PBXGroup;
 			children = (
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
@@ -127,7 +127,7 @@
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				C0DE8AFD5E9BF8675FC7F16D /* avatar */,
 			);
-			name = ManoSpeak;
+			name = Vozual;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
@@ -139,8 +139,8 @@
 				C0DE9207A001000000000007 /* CoreMedia.framework */,
 				C0DE9208A001000000000008 /* CoreVideo.framework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				A4B2AAD46C9328F620D257EA /* Pods_ManoSpeak.framework */,
-				E1702330A557B57A7E1FF912 /* Pods_ManoSpeak_ManoSpeakTests.framework */,
+				A4B2AAD46C9328F620D257EA /* Pods_Vozual.framework */,
+				E1702330A557B57A7E1FF912 /* Pods_Vozual_VozualTests.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -155,9 +155,9 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
-				13B07FAE1A68108700A75B9A /* ManoSpeak */,
+				13B07FAE1A68108700A75B9A /* Vozual */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
-				00E356EF1AD99517003FC87E /* ManoSpeakTests */,
+				00E356EF1AD99517003FC87E /* VozualTests */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
@@ -170,8 +170,8 @@
 		83CBBA001A601CBA00E9B192 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13B07F961A680F5B00A75B9A /* ManoSpeak.app */,
-				00E356EE1AD99517003FC87E /* ManoSpeakTests.xctest */,
+				13B07F961A680F5B00A75B9A /* Vozual.app */,
+				00E356EE1AD99517003FC87E /* VozualTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -179,10 +179,10 @@
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				3B4392A12AC88292D35C810B /* Pods-ManoSpeak.debug.xcconfig */,
-				5709B34CF0A7D63546082F79 /* Pods-ManoSpeak.release.xcconfig */,
-				5B7EB9410499542E8C5724F5 /* Pods-ManoSpeak-ManoSpeakTests.debug.xcconfig */,
-				89C6BE57DB24E9ADA2F236DE /* Pods-ManoSpeak-ManoSpeakTests.release.xcconfig */,
+				3B4392A12AC88292D35C810B /* Pods-Vozual.debug.xcconfig */,
+				5709B34CF0A7D63546082F79 /* Pods-Vozual.release.xcconfig */,
+				5B7EB9410499542E8C5724F5 /* Pods-Vozual-VozualTests.debug.xcconfig */,
+				89C6BE57DB24E9ADA2F236DE /* Pods-Vozual-VozualTests.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -190,9 +190,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		00E356ED1AD99517003FC87E /* ManoSpeakTests */ = {
+		00E356ED1AD99517003FC87E /* VozualTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "ManoSpeakTests" */;
+			buildConfigurationList = 00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "VozualTests" */;
 			buildPhases = (
 				A55EABD7B0C7F3A422A6CC61 /* [CP] Check Pods Manifest.lock */,
 				00E356EA1AD99517003FC87E /* Sources */,
@@ -205,14 +205,14 @@
 			dependencies = (
 				00E356F51AD99517003FC87E /* PBXTargetDependency */,
 			);
-			name = ManoSpeakTests;
-			productName = ManoSpeakTests;
-			productReference = 00E356EE1AD99517003FC87E /* ManoSpeakTests.xctest */;
+			name = VozualTests;
+			productName = VozualTests;
+			productReference = 00E356EE1AD99517003FC87E /* VozualTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		13B07F861A680F5B00A75B9A /* ManoSpeak */ = {
+		13B07F861A680F5B00A75B9A /* Vozual */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "ManoSpeak" */;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Vozual" */;
 			buildPhases = (
 				C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */,
 				13B07F871A680F5B00A75B9A /* Sources */,
@@ -226,9 +226,9 @@
 			);
 			dependencies = (
 			);
-			name = ManoSpeak;
-			productName = ManoSpeak;
-			productReference = 13B07F961A680F5B00A75B9A /* ManoSpeak.app */;
+			name = Vozual;
+			productName = Vozual;
+			productReference = 13B07F961A680F5B00A75B9A /* Vozual.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -248,7 +248,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "ManoSpeak" */;
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Vozual" */;
 			compatibilityVersion = "Xcode 12.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -261,8 +261,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				13B07F861A680F5B00A75B9A /* ManoSpeak */,
-				00E356ED1AD99517003FC87E /* ManoSpeakTests */,
+				13B07F861A680F5B00A75B9A /* Vozual */,
+				00E356ED1AD99517003FC87E /* VozualTests */,
 			);
 		};
 /* End PBXProject section */
@@ -321,7 +321,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-ManoSpeak-ManoSpeakTests-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-Vozual-VozualTests-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -343,7 +343,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-ManoSpeak-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-Vozual-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -356,15 +356,15 @@
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-ManoSpeak/Pods-ManoSpeak-resources-${CONFIGURATION}-input-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vozual/Pods-Vozual-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-ManoSpeak/Pods-ManoSpeak-resources-${CONFIGURATION}-output-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vozual/Pods-Vozual-resources-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-ManoSpeak/Pods-ManoSpeak-resources.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Vozual/Pods-Vozual-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		E8DFB44083CA3D01A1498513 /* [CP-User] [RNFB] Core Configuration */ = {
@@ -386,15 +386,15 @@
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-ManoSpeak-ManoSpeakTests/Pods-ManoSpeak-ManoSpeakTests-resources-${CONFIGURATION}-input-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vozual-VozualTests/Pods-Vozual-VozualTests-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-ManoSpeak-ManoSpeakTests/Pods-ManoSpeak-ManoSpeakTests-resources-${CONFIGURATION}-output-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vozual-VozualTests/Pods-Vozual-VozualTests-resources-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-ManoSpeak-ManoSpeakTests/Pods-ManoSpeak-ManoSpeakTests-resources.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Vozual-VozualTests/Pods-Vozual-VozualTests-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -404,7 +404,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00E356F31AD99517003FC87E /* ManoSpeakTests.m in Sources */,
+				00E356F31AD99517003FC87E /* VozualTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -424,7 +424,7 @@
 /* Begin PBXTargetDependency section */
 		00E356F51AD99517003FC87E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 13B07F861A680F5B00A75B9A /* ManoSpeak */;
+			target = 13B07F861A680F5B00A75B9A /* Vozual */;
 			targetProxy = 00E356F41AD99517003FC87E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -432,14 +432,14 @@
 /* Begin XCBuildConfiguration section */
 		00E356F61AD99517003FC87E /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5B7EB9410499542E8C5724F5 /* Pods-ManoSpeak-ManoSpeakTests.debug.xcconfig */;
+			baseConfigurationReference = 5B7EB9410499542E8C5724F5 /* Pods-Vozual-VozualTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				INFOPLIST_FILE = ManoSpeakTests/Info.plist;
+				INFOPLIST_FILE = VozualTests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -453,17 +453,17 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ManoSpeak.app/ManoSpeak";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vozual.app/Vozual";
 			};
 			name = Debug;
 		};
 		00E356F71AD99517003FC87E /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 89C6BE57DB24E9ADA2F236DE /* Pods-ManoSpeak-ManoSpeakTests.release.xcconfig */;
+			baseConfigurationReference = 89C6BE57DB24E9ADA2F236DE /* Pods-Vozual-VozualTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COPY_PHASE_STRIP = NO;
-				INFOPLIST_FILE = ManoSpeakTests/Info.plist;
+				INFOPLIST_FILE = VozualTests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -477,22 +477,22 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ManoSpeak.app/ManoSpeak";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vozual.app/Vozual";
 			};
 			name = Release;
 		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-ManoSpeak.debug.xcconfig */;
+			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-Vozual.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = ManoSpeak/ManoSpeak.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Vozual/Vozual.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 285H7QF84F;
 				ENABLE_BITCODE = NO;
-				INFOPLIST_FILE = ManoSpeak/Info.plist;
+				INFOPLIST_FILE = Vozual/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -505,7 +505,7 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.androsja.vozual;
-				PRODUCT_NAME = ManoSpeak;
+				PRODUCT_NAME = Vozual;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -514,15 +514,15 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-ManoSpeak.release.xcconfig */;
+			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-Vozual.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = ManoSpeak/ManoSpeak.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Vozual/Vozual.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 285H7QF84F;
-				INFOPLIST_FILE = ManoSpeak/Info.plist;
+				INFOPLIST_FILE = Vozual/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -535,7 +535,7 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.androsja.vozual;
-				PRODUCT_NAME = ManoSpeak;
+				PRODUCT_NAME = Vozual;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
@@ -718,7 +718,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "ManoSpeakTests" */ = {
+		00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "VozualTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				00E356F61AD99517003FC87E /* Debug */,
@@ -727,7 +727,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "ManoSpeak" */ = {
+		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Vozual" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
@@ -736,7 +736,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "ManoSpeak" */ = {
+		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Vozual" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,

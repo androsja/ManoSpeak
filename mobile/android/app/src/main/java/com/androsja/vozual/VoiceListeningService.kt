@@ -1,4 +1,4 @@
-package com.manospeak
+package com.androsja.vozual
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -30,21 +30,16 @@ class VoiceListeningService : Service() {
   private var activeSessionId = 0L
   private var recognitionInProgress = false
   private var consecutiveErrors = 0
-  private var consecutiveSpokenNoMatches = 0
   private var destroyed = false
   private var scheduledRestart: Runnable? = null
   private var lastPartialResults: ArrayList<String>? = null
   private var speechStarted = false
   private var hasReachedReadyState = false
-  private var recognitionLanguageIndex = DEFAULT_RECOGNITION_LANGUAGE_INDEX
 
   override fun onCreate() {
     super.onCreate()
     activeService = WeakReference(this)
-    recognitionLanguageIndex = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
-      .getInt(PREFERENCE_RECOGNITION_LANGUAGE_INDEX, DEFAULT_RECOGNITION_LANGUAGE_INDEX)
-      .coerceIn(RECOGNITION_LANGUAGES.indices)
-    Log.i(TAG, "PiP speech service created")
+    Log.i(TAG, "Local speech service created")
     createNotificationChannel()
     startForeground(
       NOTIFICATION_ID,
@@ -60,9 +55,8 @@ class VoiceListeningService : Service() {
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    // Android retains the activity-owned speech session briefly after
-    // SpeechRecognizer.destroy(). Give it time to release the remote Google
-    // recognition slot before the foreground service requests a new one.
+    // Give Android time to release a previous on-device recognition session
+    // before the foreground service requests a new one.
     if (recognizer == null && scheduledRestart == null) {
       scheduleRecognition(delayMillis = INITIAL_HANDOFF_DELAY_MILLIS, recreate = true)
     }
@@ -111,27 +105,26 @@ class VoiceListeningService : Service() {
 
   private fun createRecognizer() {
     releaseRecognizer()
-    if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-      Log.w(TAG, "Speech recognition is unavailable")
-      sendSpeechEvent(EVENT_ERROR, error = "El reconocimiento de voz no está disponible.")
-      scheduleRecognition(delayMillis = 3000L, recreate = true)
+    if (
+      Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+      !SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
+    ) {
+      Log.w(TAG, "On-device speech recognition is unavailable")
+      sendSpeechEvent(EVENT_ERROR, error = ERROR_OFFLINE_UNAVAILABLE)
+      stopSelf()
       return
     }
 
     val sessionId = ++activeSessionId
     try {
-      // PiP must use the same Android-selected recognition provider as the
-      // visible screen. Forcing Google's explicit service here produced
-      // ERROR_NO_MATCH after the microphone had already detected speech on
-      // some devices, so no transcript ever reached the avatar queue.
-      recognizer = SpeechRecognizer.createSpeechRecognizer(this).also {
+      recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(this).also {
         it.setRecognitionListener(createRecognitionListener(sessionId))
       }
-      Log.i(TAG, "Created default service-owned recognizer session=$sessionId")
+      Log.i(TAG, "Created on-device recognizer session=$sessionId")
     } catch (error: Exception) {
-      Log.e(TAG, "Unable to create service-owned recognizer", error)
-      sendSpeechEvent(EVENT_ERROR, error = error.message ?: "No se pudo iniciar el micrófono.")
-      scheduleRecognition(delayMillis = 1800L, recreate = true)
+      Log.e(TAG, "Unable to create on-device recognizer", error)
+      sendSpeechEvent(EVENT_ERROR, error = ERROR_OFFLINE_UNAVAILABLE)
+      stopSelf()
     }
   }
 
@@ -143,7 +136,7 @@ class VoiceListeningService : Service() {
       Log.i(
         TAG,
         "Starting service-owned recognition session=$activeSessionId " +
-          "language=${RECOGNITION_LANGUAGES[recognitionLanguageIndex]}",
+          "language=$RECOGNITION_LANGUAGE",
       )
       current.startListening(createRecognitionIntent())
     } catch (error: Exception) {
@@ -220,21 +213,22 @@ class VoiceListeningService : Service() {
         } else {
           consecutiveErrors += 1
         }
-        if (
-          error == SpeechRecognizer.ERROR_NO_MATCH &&
-          speechStarted &&
-          lastPartialResults.isNullOrEmpty()
-        ) {
-          consecutiveSpokenNoMatches += 1
-        } else if (!normalSilence || !speechStarted) {
-          consecutiveSpokenNoMatches = 0
-        }
         Log.w(
           TAG,
           "Service-owned recognition error session=$sessionId code=$error speechStarted=$speechStarted",
         )
 
-        // Google's recognizer sometimes emits useful partial text and then
+        if (
+          error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
+          error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE
+        ) {
+          lastPartialResults = null
+          sendSpeechEvent(EVENT_ERROR, error = ERROR_OFFLINE_LANGUAGE_UNAVAILABLE)
+          stopSelf()
+          return
+        }
+
+        // Some recognizers emit useful partial text and then
         // closes an otherwise valid phrase with ERROR_NO_MATCH. Confirm the
         // last partial result before reporting the terminal error so the PiP
         // avatar can still react to the spoken sign. The JS queue deduplicates
@@ -250,24 +244,8 @@ class VoiceListeningService : Service() {
         lastPartialResults = null
         sendSpeechEvent(EVENT_ERROR, error = error.toString())
 
-        // Never rotate after ordinary silence. If the recognizer repeatedly
-        // detects real speech but returns no text, however, its current locale
-        // is unhealthy for this device/session. Move once to the next Spanish
-        // provider and recreate the recognizer instead of failing forever.
-        val shouldTryNextLanguage = consecutiveSpokenNoMatches >= 2
-        if (shouldTryNextLanguage) {
-          recognitionLanguageIndex = (recognitionLanguageIndex + 1) % RECOGNITION_LANGUAGES.size
-          getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
-            .edit()
-            .putInt(PREFERENCE_RECOGNITION_LANGUAGE_INDEX, recognitionLanguageIndex)
-            .apply()
-          consecutiveSpokenNoMatches = 0
-          Log.i(TAG, "Switching recognition locale after repeated spoken no-match")
-        }
-
         val requiresRecreation =
-          shouldTryNextLanguage ||
-            error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
+          error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
             error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
             error == SpeechRecognizer.ERROR_CLIENT
         val baseDelay = when (error) {
@@ -295,16 +273,9 @@ class VoiceListeningService : Service() {
         if (!isCurrentSession(sessionId)) return
         recognitionInProgress = false
         consecutiveErrors = 0
-        consecutiveSpokenNoMatches = 0
         lastPartialResults = null
         val recognizedValues =
           results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-        if (!recognizedValues.isNullOrEmpty()) {
-          getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
-            .edit()
-            .putInt(PREFERENCE_RECOGNITION_LANGUAGE_INDEX, recognitionLanguageIndex)
-            .apply()
-        }
         Log.i(TAG, "Service-owned recognition delivered results session=$sessionId")
         sendSpeechEvent(
           EVENT_RESULTS,
@@ -334,7 +305,7 @@ class VoiceListeningService : Service() {
       putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
       putExtra(
         RecognizerIntent.EXTRA_LANGUAGE,
-        RECOGNITION_LANGUAGES[recognitionLanguageIndex],
+        RECOGNITION_LANGUAGE,
       )
       putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
       putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
@@ -343,10 +314,9 @@ class VoiceListeningService : Service() {
       // natural pauses instead of reporting a timeout immediately.
       putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
       putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
-      // The Pixel reports that its on-device SODA pack does not support
-      // es-CO. Explicitly allow Google's network recognizer instead of ending
-      // every PiP phrase with ERROR_NO_MATCH.
-      putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+      // Defense in depth. The recognizer itself is created with the on-device
+      // factory; this intent also forbids a provider from preferring network.
+      putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
     }
 
   private fun sendSpeechEvent(
@@ -384,7 +354,7 @@ class VoiceListeningService : Service() {
 
     fun hasReadyRecognition(): Boolean =
       activeService?.get()?.hasReachedReadyState == true
-    const val ACTION_SPEECH_EVENT = "com.manospeak.VOZUAL_SPEECH_EVENT"
+    const val ACTION_SPEECH_EVENT = "com.androsja.vozual.VOZUAL_SPEECH_EVENT"
     const val EXTRA_EVENT = "event"
     const val EXTRA_VALUES = "values"
     const val EXTRA_ERROR = "error"
@@ -397,12 +367,8 @@ class VoiceListeningService : Service() {
     private const val CHANNEL_ID = "vozual_voice_listening"
     private const val NOTIFICATION_ID = 2701
     private const val INITIAL_HANDOFF_DELAY_MILLIS = 350L
-    private const val PREFERENCES_NAME = "vozual_voice_listening"
-    private const val PREFERENCE_RECOGNITION_LANGUAGE_INDEX = "recognition_language_index"
-    // The device log confirmed that Google's network recognizer returned
-    // complete Spanish results with this locale. A successful result is then
-    // remembered, so this is only the first-run fallback.
-    private const val DEFAULT_RECOGNITION_LANGUAGE_INDEX = 2
-    private val RECOGNITION_LANGUAGES = arrayOf("es-CO", "es-ES", "es-MX")
+    private const val RECOGNITION_LANGUAGE = "es-CO"
+    const val ERROR_OFFLINE_UNAVAILABLE = "offline_speech_unavailable"
+    const val ERROR_OFFLINE_LANGUAGE_UNAVAILABLE = "offline_es_co_unavailable"
   }
 }

@@ -1,4 +1,4 @@
-package com.manospeak
+package com.androsja.vozual
 
 import android.app.Application
 import android.webkit.WebView

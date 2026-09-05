@@ -1,4 +1,4 @@
-package com.manospeak
+package com.androsja.vozual
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

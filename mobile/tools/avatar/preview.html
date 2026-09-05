@@ -19,6 +19,9 @@
         color: #f5f8fc;
       }
       .visual-comparison {
+        position: sticky;
+        top: 24px;
+        align-self: start;
         display: grid;
         grid-template-columns: minmax(320px, 430px);
         justify-content: end;
@@ -40,7 +43,53 @@
       #avatar { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; background: #343936; }
       #avatar canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; }
       .source-video-panel { border-color: #204557; background: #101923; }
-      #source-video { width: 100%; height: 100%; display: block; object-fit: contain; background: #05080d; }
+      .source-video-viewport {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        touch-action: none;
+        cursor: grab;
+        background: #05080d;
+      }
+      .source-video-viewport.is-dragging { cursor: grabbing; }
+      #source-video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+        pointer-events: none;
+        user-select: none;
+        transform-origin: center;
+        will-change: transform;
+      }
+      .source-video-zoom {
+        position: absolute;
+        z-index: 3;
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        display: grid;
+        grid-template-columns: auto minmax(90px, 1fr) auto auto;
+        align-items: center;
+        gap: 8px;
+        padding: 9px;
+        border-radius: 11px;
+        background: #07111fe8;
+        box-shadow: 0 8px 24px #0008;
+        backdrop-filter: blur(8px);
+      }
+      .source-video-zoom label {
+        color: #c9d5e3;
+        font-size: 11px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+      #source-video-zoom { min-width: 0; width: 100%; accent-color: #20d6ce; cursor: pointer; }
+      .video-zoom-step, #center-source-video { min-height: 34px; padding: 4px 9px; }
+      .video-zoom-step { font-size: 20px; line-height: 1; }
+      #center-source-video { grid-column: 1 / -1; }
       .visual-label {
         position: absolute;
         z-index: 2;
@@ -72,6 +121,40 @@
         font-weight: 900;
       }
       .library-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+      .compilation-review {
+        margin: 10px 0 18px; padding: 16px; border: 1px solid #456079; border-radius: 14px;
+        background: #111e2e;
+      }
+      .compilation-review[data-state="approved"] { border-color: #49d8b0; box-shadow: inset 4px 0 #49d8b0; }
+      .compilation-review[data-state="pending"] { border-color: #ffc857; box-shadow: inset 4px 0 #ffc857; }
+      .compilation-review-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+      .compilation-review-label { color: #20d6ce; font-size: 11px; font-weight: 900; letter-spacing: 0.8px; }
+      .compilation-review h2 { margin: 5px 0 7px; font-size: 20px; }
+      #approval-detail { margin: 0; color: #9fb0c4; font-size: 12px; line-height: 1.45; }
+      .approval-badge {
+        flex: 0 0 auto; padding: 7px 9px; border-radius: 999px; background: #26384e;
+        color: #c9d5e3; font-size: 10px; font-weight: 900; white-space: nowrap;
+      }
+      .compilation-review[data-state="approved"] .approval-badge { background: #193e38; color: #7ee7c1; }
+      .compilation-review[data-state="pending"] .approval-badge { background: #493b20; color: #ffd978; }
+      .approval-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 13px; }
+      .reviewable-navigation {
+        display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 8px;
+      }
+      .reviewable-navigation button:disabled { cursor: default; opacity: 0.45; }
+      #toggle-approval[data-approved="true"] { background: #26384e; color: #ffb1bd; }
+      #approval-status { min-height: 17px; margin-top: 9px; color: #9fb0c4; font-size: 11px; font-weight: 800; }
+      #approval-status[data-tone="success"] { color: #7ee7c1; }
+      #approval-status[data-tone="error"] { color: #ff7185; }
+      .approved-count { margin: 2px 0 0; color: #7f91a7; font-size: 10px; font-weight: 800; }
+      .approved-browser { margin-top: 10px; }
+      .approved-browser > button { width: 100%; }
+      .approved-list {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 7px; margin-top: 8px; padding: 10px; border-radius: 10px; background: #07111f;
+      }
+      .approved-list[hidden] { display: none; }
+      .approved-list button { padding: 8px; font-size: 11px; }
       .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 18px 0; }
       .controls .wide { grid-column: 1 / -1; }
       .zoom-control {
@@ -114,6 +197,43 @@
         font-size: 16px;
         font-weight: 900;
       }
+      .rig-editor { margin: 0 0 18px; padding: 14px; border-radius: 12px; background: #111e2e; }
+      .rig-editor h2 { margin: 0; font-size: 17px; }
+      .rig-editor-help { margin: 7px 0 13px; color: #9fb0c4; font-size: 12px; line-height: 1.45; }
+      .rig-editor-toolbar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      .rig-editor-toolbar label, .rig-edit-row label { color: #c9d5e3; font-size: 11px; font-weight: 900; }
+      .rig-editor-toolbar select, .rig-editor-toolbar input {
+        width: 100%; min-height: 40px; margin-top: 5px; border: 1px solid #456079; border-radius: 9px;
+        padding: 8px; background: #07111f; color: #f5f8fc; font-weight: 900;
+      }
+      .rig-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin-top: 14px; }
+      .rig-edit-row { display: grid; grid-template-columns: 95px minmax(70px, 1fr) 100px; align-items: center; gap: 7px; }
+      .rig-edit-row input { width: 100%; accent-color: #20d6ce; }
+      .rig-edit-row output { color: #20d6ce; font-size: 11px; font-weight: 900; text-align: right; }
+      .rig-keyframe-actions { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; margin-top: 14px; }
+      #rig-keyframe-list {
+        width: 100%; min-height: 92px; margin-top: 10px; border: 1px solid #456079; border-radius: 9px;
+        padding: 7px; background: #07111f; color: #f5f8fc; font-weight: 800;
+      }
+      .rig-save-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+      .rig-app-state {
+        display: flex; align-items: flex-start; gap: 10px; margin: 0 0 13px; padding: 11px 12px;
+        border: 1px solid #456079; border-radius: 10px; background: #07111f;
+      }
+      .rig-app-state-marker {
+        flex: 0 0 auto; width: 13px; height: 13px; margin-top: 2px; border-radius: 50%;
+        background: #20d6ce; box-shadow: 0 0 0 4px rgb(32 214 206 / 14%);
+      }
+      .rig-app-state strong { display: block; color: #f5f8fc; font-size: 12px; }
+      .rig-app-state span:last-child { display: block; margin-top: 4px; color: #9fb0c4; font-size: 11px; line-height: 1.4; }
+      #rig-save-status {
+        min-height: 18px; margin-top: 8px; color: #9fb0c4; font-size: 11px; font-weight: 800;
+        line-height: 1.4;
+      }
+      #rig-save-status[data-tone="success"] { color: #7ee7c1; }
+      #rig-save-status[data-tone="warning"] { color: #ffc857; }
+      #rig-save-status[data-tone="error"] { color: #ff7185; }
+      .rig-save-explanation { margin: 6px 0 0; color: #7f91a7; font-size: 10px; line-height: 1.4; }
       button, select {
         min-height: 44px;
         border: 0;
@@ -131,12 +251,19 @@
       .truth { margin-top: 14px; color: #ffc857; font-size: 12px; line-height: 1.45; }
       @media (max-width: 1200px) {
         body { grid-template-columns: minmax(300px, 880px); }
-        .visual-comparison { justify-content: center; }
+        .visual-comparison { position: static; justify-content: center; }
+      }
+      @media (max-height: 650px) {
+        .visual-comparison { position: static; }
       }
       @media (max-width: 800px) {
         body { grid-template-columns: minmax(300px, 430px); padding: 12px; }
         .visual-comparison.has-source-video { grid-template-columns: minmax(300px, 430px); }
         .phone { height: 68vh; min-height: 500px; }
+        .rig-editor-toolbar, .rig-edit-grid { grid-template-columns: 1fr; }
+        .compilation-review-heading { display: block; }
+        .approval-badge { display: inline-block; margin-top: 8px; }
+        .approval-actions { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -161,7 +288,16 @@
       </main>
       <section class="phone source-video-panel" id="source-video-panel" aria-label="Video real de la seña" hidden>
         <div class="visual-label">VIDEO REAL · TOMA ORIGINAL</div>
-        <video id="source-video" muted playsinline preload="metadata"></video>
+        <div class="source-video-viewport" id="source-video-viewport">
+          <video id="source-video" muted playsinline preload="metadata"></video>
+        </div>
+        <div class="source-video-zoom" aria-label="Zoom del video real">
+          <label for="source-video-zoom">VIDEO <output id="source-video-zoom-value" for="source-video-zoom">100%</output></label>
+          <input id="source-video-zoom" type="range" min="100" max="300" step="10" value="100" aria-label="Zoom del video real" />
+          <button class="video-zoom-step" id="source-video-zoom-out" type="button" aria-label="Alejar video real">−</button>
+          <button class="video-zoom-step" id="source-video-zoom-in" type="button" aria-label="Acercar video real">+</button>
+          <button id="center-source-video" type="button">CENTRAR</button>
+        </div>
       </section>
     </section>
     <aside class="copy">
@@ -181,6 +317,29 @@
         <div class="library-nav">
           <button id="previous-sign" type="button">← ANTERIOR</button>
           <button id="next-sign" type="button">SIGUIENTE →</button>
+        </div>
+      </section>
+      <section class="compilation-review" id="compilation-review" data-state="loading" aria-label="Revisión para publicar">
+        <div class="compilation-review-heading">
+          <div>
+            <div class="compilation-review-label">PASO 1 · REVISAR Y APROBAR</div>
+            <h2 id="approval-title">COMPROBANDO ESTA SEÑA…</h2>
+            <p id="approval-detail">Consultando el estado real guardado por VOZUAL Editor.</p>
+          </div>
+          <span class="approval-badge" id="approval-badge">CARGANDO</span>
+        </div>
+        <div class="approval-actions">
+          <button class="primary" id="toggle-approval" type="button" disabled>1. GUARDAR Y APROBAR ESTA SEÑA</button>
+        </div>
+        <div class="reviewable-navigation" aria-label="Navegar señas pendientes de aprobación">
+          <button id="previous-reviewable-sign" type="button" disabled>← ANTERIOR POR REVISAR</button>
+          <button id="next-reviewable-sign" type="button" disabled>SIGUIENTE POR REVISAR →</button>
+        </div>
+        <div id="approval-status" role="status" aria-live="polite"></div>
+        <p class="approved-count" id="approved-summary">0 señas aprobadas en total.</p>
+        <div class="approved-browser">
+          <button id="toggle-approved-list" type="button" disabled>VER APROBADAS (0)</button>
+          <div class="approved-list" id="approved-list" hidden aria-label="Señas aprobadas para publicar"></div>
         </div>
       </section>
       <div class="controls">
@@ -211,12 +370,96 @@
           <button id="go-to-time" type="button">IR AL MILISEGUNDO</button>
         </div>
       </section>
+      <section class="rig-editor" aria-label="Editor de manos y rostro por cuadro">
+        <h2>EDITOR DE MANOS Y ROSTRO POR CUADRO</h2>
+        <p class="rig-editor-help">
+          Pausa en un cuadro, ajusta una mano y agrega el punto. La transición comienza automáticamente
+          antes del cuadro elegido para evitar saltos. En cada dedo, un valor negativo lo extiende y uno
+          positivo lo cierra; así puedes abrir un dedo incluso sobre un puño. Agrega otro punto neutral
+          cuando quieras regresar a la captura. GIRO DESDE EL CODO rota juntos el antebrazo y la mano.
+          POSICIÓN HORIZONTAL y ALTURA permiten alinear las manos sin separar la muñeca del brazo.
+          PROFUNDIDAD mueve la mano hacia adelante o hacia atrás. SONRISA agrega una expresión leve;
+          prueba entre 15% y 25% para que se vea natural.
+        </p>
+        <div class="rig-app-state" aria-live="polite">
+          <span class="rig-app-state-marker" aria-hidden="true"></span>
+          <div>
+            <strong id="rig-app-state-title">COMPROBANDO ESTA SEÑA…</strong>
+            <span id="rig-app-state-detail">Separando el estado de la biblioteca y las correcciones manuales.</span>
+          </div>
+        </div>
+        <div class="rig-editor-toolbar">
+          <label>CUADRO ACTUAL
+            <input id="rig-editor-frame" type="number" min="0" step="1" value="0" />
+          </label>
+          <label>MANO
+            <select id="rig-editor-hand">
+              <option value="left">IZQUIERDA</option>
+              <option value="right">DERECHA</option>
+            </select>
+          </label>
+          <label>TRANSICIÓN
+            <input id="rig-transition-frames" type="number" min="1" max="120" step="1" value="6" />
+          </label>
+        </div>
+        <div class="rig-edit-grid">
+          <div class="rig-edit-row"><label for="rig-elbow-rotation">GIRO DESDE EL CODO</label><input id="rig-elbow-rotation" type="range" min="-90" max="90" step="1" value="0" /><output id="rig-elbow-rotation-value">0°</output></div>
+          <div class="rig-edit-row"><label for="rig-wrist-pitch">MUÑECA X</label><input id="rig-wrist-pitch" type="range" min="-90" max="90" step="1" value="0" /><output id="rig-wrist-pitch-value">0°</output></div>
+          <div class="rig-edit-row"><label for="rig-wrist-yaw">MUÑECA Y</label><input id="rig-wrist-yaw" type="range" min="-90" max="90" step="1" value="0" /><output id="rig-wrist-yaw-value">0°</output></div>
+          <div class="rig-edit-row"><label for="rig-wrist-roll">MUÑECA Z</label><input id="rig-wrist-roll" type="range" min="-90" max="90" step="1" value="0" /><output id="rig-wrist-roll-value">0°</output></div>
+          <div class="rig-edit-row"><label for="rig-horizontal-offset">POSICIÓN HORIZONTAL</label><input id="rig-horizontal-offset" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-horizontal-offset-value">CENTRO</output></div>
+          <div class="rig-edit-row"><label for="rig-vertical-offset">ALTURA</label><input id="rig-vertical-offset" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-vertical-offset-value">CENTRO</output></div>
+          <div class="rig-edit-row"><label for="rig-depth-offset">PROFUNDIDAD</label><input id="rig-depth-offset" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-depth-offset-value">CENTRO</output></div>
+          <div class="rig-edit-row"><label for="rig-smile">SONRISA</label><input id="rig-smile" type="range" min="0" max="100" step="1" value="0" /><output id="rig-smile-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-fist">PUÑO</label><input id="rig-fist" type="range" min="0" max="100" step="1" value="0" /><output id="rig-fist-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-thumb">PULGAR</label><input id="rig-thumb" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-thumb-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-index">ÍNDICE</label><input id="rig-index" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-index-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-middle">MEDIO</label><input id="rig-middle" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-middle-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-ring">ANULAR</label><input id="rig-ring" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-ring-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-pinky">MEÑIQUE</label><input id="rig-pinky" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-pinky-value">0%</output></div>
+        </div>
+        <div class="rig-editor-toolbar">
+          <label>DEDO DE PRECISIÓN
+            <select id="rig-precision-finger">
+              <option value="thumb">PULGAR</option>
+              <option value="index" selected>ÍNDICE</option>
+              <option value="middle">MEDIO</option>
+              <option value="ring">ANULAR</option>
+              <option value="pinky">MEÑIQUE</option>
+            </select>
+          </label>
+        </div>
+        <p class="rig-editor-help">
+          AJUSTE DE FALANGES: modifica una articulación sin obligar a cerrar todo el dedo. Para una forma
+          tipo C, dobla gradualmente BASE, MEDIA y PUNTA del índice y ajusta después el pulgar.
+        </p>
+        <div class="rig-edit-grid">
+          <div class="rig-edit-row"><label for="rig-joint-base">BASE</label><input id="rig-joint-base" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-joint-base-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-joint-middle">MEDIA</label><input id="rig-joint-middle" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-joint-middle-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-joint-tip">PUNTA</label><input id="rig-joint-tip" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-joint-tip-value">0%</output></div>
+        </div>
+        <div class="rig-keyframe-actions">
+          <button class="primary" id="rig-keyframe-upsert" type="button">AGREGAR / ACTUALIZAR PUNTO</button>
+          <button id="rig-keyframe-delete" type="button">ELIMINAR PUNTO</button>
+          <button id="rig-hand-neutral" type="button">MANO NEUTRAL</button>
+        </div>
+        <select id="rig-keyframe-list" size="4" aria-label="Puntos de edición guardados"></select>
+        <div class="rig-save-row">
+          <button class="primary" id="rig-save-keyframes" type="button">GUARDAR CAMBIOS EN ESTE MAC · NO PUBLICA</button>
+          <button id="rig-clear-keyframes" type="button">QUITAR TODAS</button>
+        </div>
+        <div id="rig-save-status" role="status" aria-live="polite">Sin correcciones cargadas.</div>
+        <p class="rig-save-explanation">
+          Este botón solo guarda los ajustes de manos y rostro. Cuando termines, regresa a VOZUAL Editor y pulsa
+          2. ENVIAR ESTA SEÑA A FIREBASE para actualizar el celular.
+        </p>
+      </section>
       <section class="diagnosis">
         <div><strong>PERSONAJE + ESQUELETO:</strong> superpone en cian y blanco la captura original para comparar cada articulación con el avatar.</div>
         <div><strong>Si PUNTOS se ve mal:</strong> la captura perdió manos, brazos o trayectoria. Vuelve a grabar.</div>
         <div><strong>Si PUNTOS se ve bien y PERSONAJE se ve mal:</strong> no vuelvas a grabar; hay que corregir el perfil o el retargeting del avatar.</div>
       </section>
-      <p class="truth">Esta vista no usa Blender. Carga el movimiento compacto, el GLB, los perfiles y el runtime que entrarán en la próxima compilación móvil.</p>
+      <p class="truth">Esta vista no usa Blender. Carga el movimiento, el GLB, los perfiles y el mismo runtime de la app para revisar la seña antes de publicarla.</p>
     </aside>
     <script>
       const parameters = new URLSearchParams(window.location.search);
@@ -236,12 +479,307 @@
       const libraryCount = document.getElementById('library-count');
       const visualComparison = document.getElementById('visual-comparison');
       const sourceVideoPanel = document.getElementById('source-video-panel');
+      const sourceVideoViewport = document.getElementById('source-video-viewport');
       const sourceVideo = document.getElementById('source-video');
+      const sourceVideoZoom = document.getElementById('source-video-zoom');
+      const sourceVideoZoomValue = document.getElementById('source-video-zoom-value');
+      const rigEditorFrame = document.getElementById('rig-editor-frame');
+      const rigEditorHand = document.getElementById('rig-editor-hand');
+      const rigPrecisionFinger = document.getElementById('rig-precision-finger');
+      const rigSmile = document.getElementById('rig-smile');
+      const rigTransitionFrames = document.getElementById('rig-transition-frames');
+      const rigKeyframeList = document.getElementById('rig-keyframe-list');
+      const rigSaveStatus = document.getElementById('rig-save-status');
+      const rigSaveButton = document.getElementById('rig-save-keyframes');
+      const rigAppStateTitle = document.getElementById('rig-app-state-title');
+      const rigAppStateDetail = document.getElementById('rig-app-state-detail');
+      const compilationReview = document.getElementById('compilation-review');
+      const approvalTitle = document.getElementById('approval-title');
+      const approvalDetail = document.getElementById('approval-detail');
+      const approvalBadge = document.getElementById('approval-badge');
+      const approvalStatus = document.getElementById('approval-status');
+      const toggleApproval = document.getElementById('toggle-approval');
+      const previousReviewableSign = document.getElementById('previous-reviewable-sign');
+      const nextReviewableSign = document.getElementById('next-reviewable-sign');
+      const approvedSummary = document.getElementById('approved-summary');
+      const toggleApprovedList = document.getElementById('toggle-approved-list');
+      const approvedList = document.getElementById('approved-list');
       let playbackId = 1000;
       let paused = false;
       let editingTime = false;
       let availableGlosses = [];
       let recordingUrls = {};
+      let sourceVideoStartSeconds = 0;
+      let sourceVideoDurationSeconds = 0;
+      let sourceVideoPanX = 0;
+      let sourceVideoPanY = 0;
+      let sourceVideoDrag;
+      let rigEditorGloss = '';
+      let rigEditorFrameCount = 1;
+      let rigEditorFps = 30;
+      let rigEditorKeyframes = [];
+      let rigSavedKeyframesSignature = '[]';
+      let rigEditorPose = emptyRigEditorHands();
+      let rigEditorSmile = 0;
+      let rigPreviewDirty = false;
+      let approvalSnapshot;
+
+      const rigEditorFields = [
+        {id: 'rig-elbow-rotation', key: 'elbowRotation', suffix: '°', scale: 1},
+        {id: 'rig-wrist-pitch', key: 'wristPitch', suffix: '°', scale: 1},
+        {id: 'rig-wrist-yaw', key: 'wristYaw', suffix: '°', scale: 1},
+        {id: 'rig-wrist-roll', key: 'wristRoll', suffix: '°', scale: 1},
+        {id: 'rig-horizontal-offset', key: 'horizontalOffset', suffix: '%', scale: 100, direction: 'horizontal'},
+        {id: 'rig-vertical-offset', key: 'verticalOffset', suffix: '%', scale: 100, direction: 'vertical'},
+        {id: 'rig-depth-offset', key: 'depthOffset', suffix: '%', scale: 100, direction: 'depth'},
+        {id: 'rig-fist', key: 'fist', suffix: '%', scale: 100},
+        {id: 'rig-thumb', finger: 'thumb', suffix: '%', scale: 100},
+        {id: 'rig-index', finger: 'index', suffix: '%', scale: 100},
+        {id: 'rig-middle', finger: 'middle', suffix: '%', scale: 100},
+        {id: 'rig-ring', finger: 'ring', suffix: '%', scale: 100},
+        {id: 'rig-pinky', finger: 'pinky', suffix: '%', scale: 100},
+        {id: 'rig-joint-base', joint: 0, suffix: '%', scale: 100},
+        {id: 'rig-joint-middle', joint: 1, suffix: '%', scale: 100},
+        {id: 'rig-joint-tip', joint: 2, suffix: '%', scale: 100},
+      ];
+
+      function emptyRigEditorHand() {
+        return {
+          elbowRotation: 0,
+          wristPitch: 0,
+          wristYaw: 0,
+          wristRoll: 0,
+          horizontalOffset: 0,
+          verticalOffset: 0,
+          depthOffset: 0,
+          fist: 0,
+          fingers: {thumb: 0, index: 0, middle: 0, ring: 0, pinky: 0},
+          fingerJoints: {
+            thumb: [0, 0, 0], index: [0, 0, 0], middle: [0, 0, 0],
+            ring: [0, 0, 0], pinky: [0, 0, 0],
+          },
+        };
+      }
+
+      function emptyRigEditorHands() {
+        return {left: emptyRigEditorHand(), right: emptyRigEditorHand()};
+      }
+
+      function copyRigEditorPose(value) {
+        return JSON.parse(JSON.stringify(value || emptyRigEditorHands()));
+      }
+
+      function renderRigEditorControls() {
+        const hand = rigEditorPose[rigEditorHand.value] || emptyRigEditorHand();
+        rigEditorFields.forEach(field => {
+          const input = document.getElementById(field.id);
+          const value = field.joint !== undefined
+            ? hand.fingerJoints?.[rigPrecisionFinger.value]?.[field.joint]
+            : field.finger ? hand.fingers[field.finger] : hand[field.key];
+          input.value = String(Math.round(Number(value || 0) * field.scale));
+          document.getElementById(`${field.id}-value`).value = rigEditorFieldLabel(field, input.value);
+        });
+        rigSmile.value = String(Math.round(Number(rigEditorSmile || 0) * 100));
+        document.getElementById('rig-smile-value').value = `${rigSmile.value}%`;
+      }
+
+      function rigEditorFieldLabel(field, rawValue) {
+        const value = Number(rawValue);
+        if (!field.direction) return `${rawValue}${field.suffix}`;
+        if (field.direction === 'horizontal') {
+          if (value > 0) return `${value}% DERECHA`;
+          if (value < 0) return `${Math.abs(value)}% IZQUIERDA`;
+        }
+        if (field.direction === 'vertical') {
+          if (value > 0) return `${value}% ARRIBA`;
+          if (value < 0) return `${Math.abs(value)}% ABAJO`;
+        }
+        if (field.direction === 'depth') {
+          if (value > 0) return `+${value}% DELANTE`;
+          if (value < 0) return `${Math.abs(value)}% ATRÁS`;
+        }
+        return 'CENTRO';
+      }
+
+      function readRigEditorControls() {
+        const side = rigEditorHand.value;
+        const hand = rigEditorPose[side] || emptyRigEditorHand();
+        rigEditorFields.forEach(field => {
+          const input = document.getElementById(field.id);
+          const value = Number(input.value) / field.scale;
+          document.getElementById(`${field.id}-value`).value = rigEditorFieldLabel(field, input.value);
+          if (field.joint !== undefined) {
+            hand.fingerJoints ||= emptyRigEditorHand().fingerJoints;
+            hand.fingerJoints[rigPrecisionFinger.value] ||= [0, 0, 0];
+            hand.fingerJoints[rigPrecisionFinger.value][field.joint] = value;
+          } else if (field.finger) hand.fingers[field.finger] = value;
+          else hand[field.key] = value;
+        });
+        rigEditorPose[side] = hand;
+        rigEditorSmile = Math.min(1, Math.max(0, Number(rigSmile.value) / 100));
+        document.getElementById('rig-smile-value').value = `${rigSmile.value}%`;
+      }
+
+      function sortedRigEditorKeyframes(keyframes) {
+        return [...keyframes].sort((first, second) => Number(first.frame) - Number(second.frame));
+      }
+
+      function rigKeyframesSignature(keyframes) {
+        return JSON.stringify(sortedRigEditorKeyframes(keyframes));
+      }
+
+      function hasUnsavedRigChanges() {
+        return rigKeyframesSignature(rigEditorKeyframes) !== rigSavedKeyframesSignature;
+      }
+
+      function setRigSaveStatus(message, tone = '') {
+        rigSaveStatus.textContent = message;
+        if (tone) rigSaveStatus.dataset.tone = tone;
+        else delete rigSaveStatus.dataset.tone;
+      }
+
+      function renderRigAppState() {
+        const isAvailable = availableGlosses.includes(gloss);
+        rigAppStateTitle.textContent = isAvailable
+          ? `${gloss} ESTÁ DISPONIBLE EN ESTA SIMULACIÓN`
+          : `${gloss} NO ESTÁ DISPONIBLE EN ESTA SIMULACIÓN`;
+        const correctionCount = rigEditorKeyframes.length;
+        rigAppStateDetail.textContent = correctionCount
+          ? `${correctionCount} corrección(es) manual(es) por cuadro ${hasUnsavedRigChanges() ? 'pendiente(s) de guardar.' : 'guardada(s) y activa(s).'}`
+          : 'La aprobación para publicar se controla en el bloque REVISIÓN PARA PUBLICAR de arriba.';
+      }
+
+      function upsertRigEditorKeyframe(keyframes) {
+        readRigEditorControls();
+        const frame = Math.min(
+          rigEditorFrameCount - 1,
+          Math.max(0, Math.round(Number(rigEditorFrame.value))),
+        );
+        const keyframe = {
+          frame,
+          transitionFrames: Math.min(120, Math.max(1, Math.round(Number(rigTransitionFrames.value) || 6))),
+          smile: rigEditorSmile,
+          left: copyRigEditorPose(rigEditorPose).left,
+          right: copyRigEditorPose(rigEditorPose).right,
+        };
+        return sortedRigEditorKeyframes([
+          ...keyframes.filter(candidate => Number(candidate.frame) !== frame),
+          keyframe,
+        ]);
+      }
+
+      function renderRigKeyframeList() {
+        const selectedFrame = rigKeyframeList.value;
+        rigKeyframeList.replaceChildren(...rigEditorKeyframes.map(keyframe => {
+          const option = document.createElement('option');
+          option.value = String(keyframe.frame);
+          const smile = Math.round(Number(keyframe.smile || 0) * 100);
+          option.textContent = `CUADRO ${keyframe.frame} · transición ${keyframe.transitionFrames || 6} · sonrisa ${smile}%`;
+          return option;
+        }));
+        if ([...rigKeyframeList.options].some(option => option.value === selectedFrame)) {
+          rigKeyframeList.value = selectedFrame;
+        }
+        renderRigAppState();
+      }
+
+      function applyRigEditorKeyframes(keyframes) {
+        return window.setVozualRigHandKeyframes?.(gloss, keyframes) ?? false;
+      }
+
+      function loadRigEditorForGloss(forceReload = false) {
+        const state = window.getVozualRigHandEditorState?.(gloss);
+        if (!state) return false;
+        if (forceReload || rigEditorGloss !== gloss) {
+          rigEditorGloss = gloss;
+          rigEditorKeyframes = copyRigEditorPose(state.keyframes || []);
+          rigSavedKeyframesSignature = rigKeyframesSignature(rigEditorKeyframes);
+          rigPreviewDirty = false;
+          renderRigKeyframeList();
+        }
+        rigEditorFrameCount = Math.max(1, Number(state.frameCount) || 1);
+        rigEditorFps = Math.max(1, Number(state.fps) || 30);
+        rigEditorFrame.max = String(rigEditorFrameCount - 1);
+        rigEditorFrame.value = String(Math.max(0, Number(state.currentFrame) || 0));
+        rigEditorPose = copyRigEditorPose(state.pose);
+        rigEditorSmile = Math.min(1, Math.max(0, Number(state.smile) || 0));
+        renderRigEditorControls();
+        setRigSaveStatus(rigEditorKeyframes.length
+          ? `${rigEditorKeyframes.length} corrección(es) manual(es) cargada(s) para ${gloss}.`
+          : `${gloss} no tiene correcciones manuales pendientes.`, 'success');
+        renderRigAppState();
+        return true;
+      }
+
+      function syncRigEditorFrame(frame) {
+        if (rigEditorGloss !== gloss) return;
+        applyRigEditorKeyframes(rigEditorKeyframes);
+        const state = window.getVozualRigHandEditorState?.(gloss);
+        if (!state) return;
+        rigEditorFrame.value = String(Math.max(0, Math.round(Number(frame) || 0)));
+        rigEditorPose = copyRigEditorPose(state.pose);
+        rigEditorSmile = Math.min(1, Math.max(0, Number(state.smile) || 0));
+        renderRigEditorControls();
+      }
+
+      function previewRigEditorControls() {
+        readRigEditorControls();
+        rigPreviewDirty = true;
+        paused = window.setVozualPlaybackPaused?.(true) ?? paused;
+        pause.textContent = 'CONTINUAR';
+        const previewKeyframes = upsertRigEditorKeyframe(rigEditorKeyframes);
+        applyRigEditorKeyframes(previewKeyframes);
+        setRigSaveStatus('Vista previa activa. Pulsa AGREGAR / ACTUALIZAR PUNTO para conservarla.', 'warning');
+      }
+
+      async function persistRigEditorKeyframes({quietWhenClean = false} = {}) {
+        if (rigPreviewDirty) {
+          rigEditorKeyframes = upsertRigEditorKeyframe(rigEditorKeyframes);
+          rigPreviewDirty = false;
+          applyRigEditorKeyframes(rigEditorKeyframes);
+          renderRigKeyframeList();
+        }
+        if (!hasUnsavedRigChanges()) {
+          if (!quietWhenClean) {
+            setRigSaveStatus(
+              `${gloss} ya está al día. No hay correcciones manuales nuevas para guardar.`,
+              'success',
+            );
+          }
+          renderRigAppState();
+          return true;
+        }
+        applyRigEditorKeyframes(rigEditorKeyframes);
+        rigSaveButton.disabled = true;
+        rigSaveButton.setAttribute('aria-busy', 'true');
+        setRigSaveStatus(`Guardando ${rigEditorKeyframes.length} corrección(es) de ${gloss}…`, 'warning');
+        try {
+          const response = await fetch('./api/rig-hand-keyframes', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({gloss, keyframes: rigEditorKeyframes}),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+          rigEditorKeyframes = result.keyframes || [];
+          rigSavedKeyframesSignature = rigKeyframesSignature(rigEditorKeyframes);
+          rigPreviewDirty = false;
+          applyRigEditorKeyframes(rigEditorKeyframes);
+          renderRigKeyframeList();
+          setRigSaveStatus(
+            `${gloss} GUARDADA EN ESTE MAC ✓ Aún NO está enviada a Firebase. Regresa y pulsa el botón 2.`,
+            'success',
+          );
+          return true;
+        } catch (error) {
+          setRigSaveStatus(`NO SE PUDO GUARDAR: ${error.message}. Reabre esta vista desde VOZUAL Editor.`, 'error');
+          return false;
+        } finally {
+          rigSaveButton.disabled = false;
+          rigSaveButton.removeAttribute('aria-busy');
+          renderRigAppState();
+        }
+      }
 
       const recordingsReady = fetch('./recordings.json')
         .then(response => response.ok ? response.json() : {})
@@ -251,6 +789,10 @@
       const requestedZoom = Number(parameters.get('zoom'));
       avatarZoom.value = String(parameters.has('zoom') && Number.isFinite(requestedZoom)
         ? Math.min(130, Math.max(55, requestedZoom))
+        : 100);
+      const requestedVideoZoom = Number(parameters.get('videoZoom'));
+      sourceVideoZoom.value = String(parameters.has('videoZoom') && Number.isFinite(requestedVideoZoom)
+        ? Math.min(300, Math.max(100, requestedVideoZoom))
         : 100);
       const requestedMode = parameters.get('mode');
       if (requestedMode === 'rigged' || requestedMode === 'hybrid' || requestedMode === 'points') {
@@ -291,6 +833,46 @@
         applyAvatarZoom();
       }
 
+      function clampSourceVideoPan() {
+        const scale = Number(sourceVideoZoom.value) / 100;
+        const maximumX = sourceVideoViewport.clientWidth * (scale - 1) / 2;
+        const maximumY = sourceVideoViewport.clientHeight * (scale - 1) / 2;
+        sourceVideoPanX = Math.min(maximumX, Math.max(-maximumX, sourceVideoPanX));
+        sourceVideoPanY = Math.min(maximumY, Math.max(-maximumY, sourceVideoPanY));
+      }
+
+      function applySourceVideoZoom({persist = true} = {}) {
+        const percentage = Number(sourceVideoZoom.value);
+        const scale = percentage / 100;
+        if (scale <= 1) {
+          sourceVideoPanX = 0;
+          sourceVideoPanY = 0;
+        }
+        clampSourceVideoPan();
+        sourceVideoZoomValue.value = `${percentage}%`;
+        sourceVideo.style.transform = `translate(${sourceVideoPanX}px, ${sourceVideoPanY}px) scale(${scale})`;
+        if (persist) {
+          const url = new URL(window.location.href);
+          url.searchParams.set('videoZoom', String(percentage));
+          window.history.replaceState({}, '', url);
+        }
+      }
+
+      function changeSourceVideoZoom(delta) {
+        const nextZoom = Math.min(
+          Number(sourceVideoZoom.max),
+          Math.max(Number(sourceVideoZoom.min), Number(sourceVideoZoom.value) + delta),
+        );
+        sourceVideoZoom.value = String(nextZoom);
+        applySourceVideoZoom();
+      }
+
+      function centerSourceVideo() {
+        sourceVideoPanX = 0;
+        sourceVideoPanY = 0;
+        applySourceVideoZoom();
+      }
+
       document.getElementById('title').textContent = gloss || 'Seña sin nombre';
       signSearch.value = gloss;
 
@@ -310,8 +892,126 @@
           || availableGlosses.find(value => folded(value).includes(target));
       }
 
+      function setApprovalStatus(message, tone = '') {
+        approvalStatus.textContent = message;
+        if (tone) approvalStatus.dataset.tone = tone;
+        else delete approvalStatus.dataset.tone;
+      }
+
+      function reviewableGlossesForNavigation() {
+        const reviewable = Array.isArray(approvalSnapshot?.reviewableGlosses)
+          ? approvalSnapshot.reviewableGlosses
+          : [];
+        return [...new Set(reviewable
+          .map(value => String(value).trim().toUpperCase())
+          .filter(value => value && availableGlosses.includes(value))
+        )];
+      }
+
+      function updateReviewableNavigation() {
+        const reviewable = reviewableGlossesForNavigation();
+        const hasAnotherSign = reviewable.length > 0
+          && !(reviewable.length === 1 && reviewable[0] === gloss);
+        previousReviewableSign.disabled = !hasAnotherSign;
+        nextReviewableSign.disabled = !hasAnotherSign;
+        const countLabel = `${reviewable.length} pendiente(s) disponible(s)`;
+        previousReviewableSign.title = countLabel;
+        nextReviewableSign.title = countLabel;
+      }
+
+      function selectRelativeReviewableGloss(offset) {
+        const reviewable = reviewableGlossesForNavigation();
+        if (reviewable.length === 0) {
+          setApprovalStatus('No quedan señas disponibles por revisar.', 'success');
+          return;
+        }
+        const currentIndex = reviewable.indexOf(gloss);
+        const startingIndex = currentIndex >= 0
+          ? currentIndex
+          : offset > 0 ? -1 : 0;
+        const nextIndex = (startingIndex + offset + reviewable.length) % reviewable.length;
+        const nextGloss = reviewable[nextIndex];
+        if (nextGloss === gloss) {
+          setApprovalStatus('Esta es la única seña disponible por revisar.');
+          return;
+        }
+        selectGloss(nextGloss);
+      }
+
+      function renderApprovalSnapshot(snapshot) {
+        approvalSnapshot = snapshot;
+        const current = snapshot.current || {};
+        const approved = current.approval === 'approved' && current.eligible === true;
+        const approvedGlosses = Array.isArray(snapshot.approvedGlosses)
+          ? snapshot.approvedGlosses
+          : [];
+        compilationReview.dataset.state = approved ? 'approved' : 'pending';
+        approvalTitle.textContent = approved
+          ? `${gloss} · APROBADA ✓`
+          : `${gloss} · POR REVISAR`;
+        approvalBadge.textContent = approved ? 'APROBADA EN ESTE EDITOR' : 'POR REVISAR';
+        approvalDetail.textContent = approved
+          ? 'Paso 1 completo. Regresa a VOZUAL Editor y pulsa 2. ENVIAR ESTA SEÑA A FIREBASE. Guardar no la envía.'
+          : current.prerequisitesReady
+            ? 'Revísala contra el video y los puntos. Apruébala únicamente cuando el movimiento ya sea correcto.'
+            : current.candidatePublishable
+              ? 'Guarda tus ajustes y aprueba aquí. Luego regresa a VOZUAL Editor y pulsa el botón 2 para enviarla.'
+              : 'Esta seña no tiene una animación preparada para publicar desde esta vista.';
+        toggleApproval.disabled = !approved && !current.canApproveHere;
+        toggleApproval.dataset.approved = String(approved);
+        toggleApproval.textContent = approved
+          ? 'QUITAR APROBACIÓN'
+          : '1. GUARDAR Y APROBAR ESTA SEÑA';
+        const approvedCount = Number.isFinite(Number(snapshot.approvedCount))
+          ? Number(snapshot.approvedCount)
+          : approvedGlosses.length;
+        approvedSummary.textContent = `${approvedCount} seña(s) aprobada(s) en total.`;
+        toggleApprovedList.disabled = approvedCount === 0;
+        toggleApprovedList.textContent = approvedList.hidden
+          ? `VER APROBADAS (${approvedCount})`
+          : `OCULTAR APROBADAS (${approvedCount})`;
+        approvedList.replaceChildren(...approvedGlosses.map(approvedGloss => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = approvedGloss;
+          button.addEventListener('click', () => selectGloss(approvedGloss));
+          return button;
+        }));
+        updateReviewableNavigation();
+      }
+
+      async function loadApprovalState({quiet = false} = {}) {
+        if (!gloss) return;
+        toggleApproval.disabled = true;
+        if (!quiet) setApprovalStatus(`Consultando aprobación de ${gloss}…`);
+        try {
+          const response = await fetch(`./api/sign-approval?gloss=${encodeURIComponent(gloss)}`);
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+          renderApprovalSnapshot(result);
+          if (!quiet) setApprovalStatus('Estado sincronizado con VOZUAL Editor.', 'success');
+        } catch (error) {
+          approvalSnapshot = undefined;
+          compilationReview.dataset.state = 'pending';
+          approvalTitle.textContent = `${gloss} · ESTADO NO DISPONIBLE`;
+          approvalBadge.textContent = 'RECARGAR VISTA';
+          approvalDetail.textContent = 'Reabre la simulación desde VOZUAL Editor para activar la aprobación de publicación.';
+          toggleApproval.disabled = true;
+          previousReviewableSign.disabled = true;
+          nextReviewableSign.disabled = true;
+          setApprovalStatus(`No se pudo consultar la aprobación: ${error.message}`, 'error');
+        }
+      }
+
       function selectSourceVideoForGloss() {
-        const recordingUrl = recordingUrls[gloss];
+        const recording = recordingUrls[gloss];
+        const recordingUrl = typeof recording === 'string' ? recording : recording?.url;
+        sourceVideoStartSeconds = typeof recording === 'object'
+          ? Math.max(0, Number(recording?.startMs || 0) / 1000)
+          : 0;
+        sourceVideoDurationSeconds = typeof recording === 'object'
+          ? Math.max(0, Number(recording?.durationMs || 0) / 1000)
+          : 0;
         if (!recordingUrl) {
           sourceVideo.pause();
           sourceVideo.removeAttribute('src');
@@ -330,10 +1030,59 @@
         return true;
       }
 
+      function sourceVideoWindowSeconds() {
+        if (sourceVideoDurationSeconds > 0) return sourceVideoDurationSeconds;
+        const mediaDuration = Number(sourceVideo.duration);
+        return Number.isFinite(mediaDuration)
+          ? Math.max(0, mediaDuration - sourceVideoStartSeconds)
+          : 0;
+      }
+
+      function sourceVideoTargetSeconds(state) {
+        const windowSeconds = sourceVideoWindowSeconds();
+        const timelineDurationMs = Math.max(0, Number(state?.durationMs || 0));
+        if (windowSeconds > 0 && timelineDurationMs > 0) {
+          const progress = Math.min(
+            1,
+            Math.max(0, Number(state.positionMs || 0) / timelineDurationMs),
+          );
+          return sourceVideoStartSeconds + windowSeconds * progress;
+        }
+        return sourceVideoStartSeconds
+          + Math.max(0, Number(state?.sourcePositionMs || 0)) / 1000;
+      }
+
+      function synchronizeSourceVideo(state, {force = false, pauseAtEnd = false} = {}) {
+        if (sourceVideoPanel.hidden || sourceVideo.readyState < 1 || !state?.active) return;
+        const targetSeconds = sourceVideoTargetSeconds(state);
+        const mediaDuration = Number(sourceVideo.duration);
+        const clampedSeconds = Math.min(
+          Number.isFinite(mediaDuration) ? mediaDuration : targetSeconds,
+          targetSeconds,
+        );
+        const timelineSeconds = Math.max(0, Number(state.durationMs || 0) / 1000);
+        const windowSeconds = sourceVideoWindowSeconds();
+        const requestedRate = timelineSeconds > 0 && windowSeconds > 0
+          ? windowSeconds / timelineSeconds * Number(speed.value)
+          : Number(speed.value);
+        if (Number.isFinite(requestedRate) && requestedRate > 0) {
+          sourceVideo.playbackRate = Math.min(16, Math.max(0.0625, requestedRate));
+        }
+        if (force || Math.abs(sourceVideo.currentTime - clampedSeconds) > 0.07) {
+          sourceVideo.currentTime = clampedSeconds;
+        }
+        const reachedAvatarEnd = Number(state.durationMs || 0) > 0
+          && Number(state.positionMs || 0) >= Number(state.durationMs) - 0.5;
+        if (pauseAtEnd || reachedAvatarEnd || state.paused || paused) {
+          sourceVideo.pause();
+        }
+      }
+
       function replaySourceVideo() {
         if (!selectSourceVideoForGloss()) return;
-        sourceVideo.playbackRate = Number(speed.value);
-        sourceVideo.currentTime = 0;
+        sourceVideo.currentTime = sourceVideoStartSeconds;
+        const state = window.getVozualPlaybackState?.();
+        if (state?.active) synchronizeSourceVideo(state, {force: true});
         sourceVideo.play().catch(() => undefined);
       }
 
@@ -344,12 +1093,14 @@
           return;
         }
         gloss = selected;
+        rigEditorGloss = '';
         signSearch.value = gloss;
         document.getElementById('title').textContent = gloss;
         const url = new URL(window.location.href);
         url.searchParams.set('gloss', gloss);
         window.history.replaceState({}, '', url);
         selectSourceVideoForGloss();
+        loadApprovalState();
         replay();
       }
 
@@ -381,6 +1132,23 @@
           gloss = selected;
           signSearch.value = gloss;
           document.getElementById('title').textContent = gloss;
+          loadApprovalState();
+        }
+      }
+
+      async function loadPreviewLibrary(fallbackClips = []) {
+        try {
+          const response = await fetch('./motions/published_signs.json', {
+            cache: 'no-store',
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const manifest = await response.json();
+          const publishedGlosses = Array.isArray(manifest.publishedGlosses)
+            ? manifest.publishedGlosses
+            : [];
+          populateLibrary(publishedGlosses.length ? publishedGlosses : fallbackClips);
+        } catch {
+          populateLibrary(fallbackClips);
         }
       }
 
@@ -394,6 +1162,7 @@
         window.playVozualClip(gloss, playbackId, Number(speed.value), false);
         replaySourceVideo();
         status.textContent = `REPRODUCIENDO ${gloss} · ${renderModeLabel()} · ${speed.value}×`;
+        window.setTimeout(() => loadRigEditorForGloss(rigEditorGloss !== gloss), 80);
       }
 
       function seekTo(positionMs) {
@@ -406,17 +1175,16 @@
         milliseconds.value = String(exactMs);
         if (!sourceVideoPanel.hidden) {
           sourceVideo.pause();
-          sourceVideo.currentTime = Math.min(
-            Number.isFinite(sourceVideo.duration) ? sourceVideo.duration : exactMs / 1000,
-            exactMs / 1000,
-          );
+          synchronizeSourceVideo(state, {force: true});
         }
         status.textContent = `${gloss} pausada exactamente en ${exactMs} ms · cuadro ${state.frameIndex}.`;
+        syncRigEditorFrame(state.frameIndex);
       }
 
       function updateTimeline() {
         const state = window.getVozualPlaybackState?.();
         if (state?.active) {
+          if (rigEditorGloss !== gloss) loadRigEditorForGloss(true);
           const positionMs = Math.round(state.positionMs);
           const durationMs = Math.max(1, Math.round(state.durationMs));
           seek.max = String(durationMs);
@@ -424,8 +1192,10 @@
           if (!editingTime) {
             seek.value = String(positionMs);
             milliseconds.value = String(positionMs);
+            rigEditorFrame.value = String(Math.max(0, state.frameIndex));
           }
           timeLabel.textContent = `${positionMs} ms / ${durationMs} ms`;
+          synchronizeSourceVideo(state);
         }
         requestAnimationFrame(updateTimeline);
       }
@@ -435,14 +1205,17 @@
           let message;
           try { message = JSON.parse(rawMessage); } catch { return; }
           if (message.type === 'ready') {
-            populateLibrary(Array.isArray(message.clips) ? message.clips : []);
-            recordingsReady.then(() => {
+            const fallbackClips = Array.isArray(message.clips) ? message.clips : [];
+            Promise.all([loadPreviewLibrary(fallbackClips), recordingsReady]).then(() => {
               selectSourceVideoForGloss();
               applyAvatarZoom();
+              applySourceVideoZoom({persist: false});
               replay();
             });
           }
           if (message.type === 'ended' && message.playbackId === playbackId) {
+            const state = window.getVozualPlaybackState?.();
+            if (state?.active) synchronizeSourceVideo(state, {force: true, pauseAtEnd: true});
             status.textContent = `${gloss} terminó. Cambia entre PUNTOS, PERSONAJE o la superposición y reprodúcela otra vez.`;
           }
           if (message.type === 'error') status.textContent = `ERROR: ${message.message || 'No se pudo cargar la seña.'}`;
@@ -452,6 +1225,57 @@
       document.getElementById('show-sign').addEventListener('click', () => selectGloss(signSearch.value));
       document.getElementById('previous-sign').addEventListener('click', () => selectRelativeGloss(-1));
       document.getElementById('next-sign').addEventListener('click', () => selectRelativeGloss(1));
+      previousReviewableSign.addEventListener('click', () => selectRelativeReviewableGloss(-1));
+      nextReviewableSign.addEventListener('click', () => selectRelativeReviewableGloss(1));
+      toggleApprovedList.addEventListener('click', () => {
+        approvedList.hidden = !approvedList.hidden;
+        const approvedCount = approvalSnapshot?.approvedCount || 0;
+        toggleApprovedList.textContent = approvedList.hidden
+          ? `VER APROBADAS (${approvedCount})`
+          : `OCULTAR APROBADAS (${approvedCount})`;
+      });
+      toggleApproval.addEventListener('click', async () => {
+        const approved = approvalSnapshot?.current?.approval === 'approved'
+          && approvalSnapshot?.current?.eligible === true;
+        const nextApproved = !approved;
+        toggleApproval.disabled = true;
+        toggleApproval.setAttribute('aria-busy', 'true');
+        setApprovalStatus(
+          nextApproved
+            ? `Aprobando ${gloss} para publicar…`
+            : `Quitando ${gloss} de la próxima publicación…`,
+        );
+        try {
+          if (nextApproved && rigPreviewDirty) {
+            rigEditorKeyframes = upsertRigEditorKeyframe(rigEditorKeyframes);
+            rigPreviewDirty = false;
+            applyRigEditorKeyframes(rigEditorKeyframes);
+            renderRigKeyframeList();
+          }
+          if (nextApproved && !(await persistRigEditorKeyframes({quietWhenClean: true}))) {
+            throw new Error('No fue posible guardar las correcciones manuales.');
+          }
+          const response = await fetch('./api/sign-approval', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({gloss, approved: nextApproved}),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+          renderApprovalSnapshot(result);
+          setApprovalStatus(
+            nextApproved
+              ? `${gloss} GUARDADA Y APROBADA ✓ Regresa a VOZUAL Editor y pulsa 2. ENVIAR ${gloss} A FIREBASE.`
+              : `${gloss} quedó POR REVISAR y no se publicará.`,
+            'success',
+          );
+        } catch (error) {
+          setApprovalStatus(`NO SE PUDO CAMBIAR LA APROBACIÓN: ${error.message}`, 'error');
+          await loadApprovalState({quiet: true});
+        } finally {
+          toggleApproval.removeAttribute('aria-busy');
+        }
+      });
       signSearch.addEventListener('keydown', event => {
         if (event.key === 'Enter') selectGloss(signSearch.value);
       });
@@ -463,6 +1287,38 @@
         avatarZoom.value = '65';
         applyAvatarZoom();
       });
+      sourceVideoZoom.addEventListener('input', () => applySourceVideoZoom());
+      document.getElementById('source-video-zoom-out').addEventListener('click', () => changeSourceVideoZoom(-10));
+      document.getElementById('source-video-zoom-in').addEventListener('click', () => changeSourceVideoZoom(10));
+      document.getElementById('center-source-video').addEventListener('click', centerSourceVideo);
+      sourceVideoViewport.addEventListener('pointerdown', event => {
+        if (Number(sourceVideoZoom.value) <= 100) return;
+        sourceVideoDrag = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          panX: sourceVideoPanX,
+          panY: sourceVideoPanY,
+        };
+        sourceVideoViewport.setPointerCapture(event.pointerId);
+        sourceVideoViewport.classList.add('is-dragging');
+      });
+      sourceVideoViewport.addEventListener('pointermove', event => {
+        if (!sourceVideoDrag || sourceVideoDrag.pointerId !== event.pointerId) return;
+        sourceVideoPanX = sourceVideoDrag.panX + event.clientX - sourceVideoDrag.startX;
+        sourceVideoPanY = sourceVideoDrag.panY + event.clientY - sourceVideoDrag.startY;
+        applySourceVideoZoom({persist: false});
+      });
+      const finishSourceVideoDrag = event => {
+        if (!sourceVideoDrag || sourceVideoDrag.pointerId !== event.pointerId) return;
+        sourceVideoDrag = undefined;
+        sourceVideoViewport.classList.remove('is-dragging');
+      };
+      sourceVideoViewport.addEventListener('pointerup', finishSourceVideoDrag);
+      sourceVideoViewport.addEventListener('pointercancel', finishSourceVideoDrag);
+      sourceVideoViewport.addEventListener('lostpointercapture', finishSourceVideoDrag);
+      sourceVideoViewport.addEventListener('dblclick', centerSourceVideo);
+      window.addEventListener('resize', () => applySourceVideoZoom({persist: false}));
       pause.addEventListener('click', () => {
         paused = window.setVozualPlaybackPaused?.(!paused) ?? false;
         if (!sourceVideoPanel.hidden) {
@@ -473,6 +1329,10 @@
         status.textContent = paused
           ? `${gloss} está pausada en el cuadro actual.`
           : `CONTINUANDO ${gloss} · ${renderModeLabel()} · ${speed.value}×`;
+        if (paused) {
+          const state = window.getVozualPlaybackState?.();
+          if (state?.active) syncRigEditorFrame(state.frameIndex);
+        }
       });
       seek.addEventListener('pointerdown', () => { editingTime = true; });
       seek.addEventListener('input', () => {
@@ -486,6 +1346,84 @@
         if (event.key === 'Enter') seekTo(milliseconds.value);
       });
       document.getElementById('go-to-time').addEventListener('click', () => seekTo(milliseconds.value));
+      function goToRigEditorFrame(requestedFrame) {
+        const frame = Math.min(
+          rigEditorFrameCount - 1,
+          Math.max(0, Math.round(Number(requestedFrame) || 0)),
+        );
+        const playback = window.getVozualPlaybackState?.();
+        if (playback?.active) {
+          const positionMs = rigEditorFrameCount <= 1
+            ? 0
+            : playback.durationMs * frame / (rigEditorFrameCount - 1);
+          seekTo(positionMs);
+        } else {
+          window.setVozualDebugFrame?.(gloss, frame);
+          syncRigEditorFrame(frame);
+        }
+        rigEditorFrame.value = String(frame);
+        if (!sourceVideoPanel.hidden) {
+          sourceVideo.pause();
+          const synchronizedState = window.getVozualPlaybackState?.();
+          if (synchronizedState?.active) {
+            synchronizeSourceVideo(synchronizedState, {force: true});
+          }
+        }
+      }
+
+      rigEditorFrame.addEventListener('change', () => goToRigEditorFrame(rigEditorFrame.value));
+      rigEditorFrame.addEventListener('keydown', event => {
+        if (event.key === 'Enter') goToRigEditorFrame(rigEditorFrame.value);
+      });
+      rigEditorHand.addEventListener('change', renderRigEditorControls);
+      rigPrecisionFinger.addEventListener('change', renderRigEditorControls);
+      rigEditorFields.forEach(field => {
+        document.getElementById(field.id).addEventListener('input', previewRigEditorControls);
+      });
+      rigSmile.addEventListener('input', previewRigEditorControls);
+      document.getElementById('rig-keyframe-upsert').addEventListener('click', () => {
+        rigEditorKeyframes = upsertRigEditorKeyframe(rigEditorKeyframes);
+        rigPreviewDirty = false;
+        applyRigEditorKeyframes(rigEditorKeyframes);
+        renderRigKeyframeList();
+        rigKeyframeList.value = rigEditorFrame.value;
+        setRigSaveStatus(`Cuadro ${rigEditorFrame.value} preparado. Falta guardar las correcciones de manos y rostro.`, 'warning');
+        renderRigAppState();
+      });
+      document.getElementById('rig-keyframe-delete').addEventListener('click', () => {
+        const frame = Number(rigKeyframeList.value || rigEditorFrame.value);
+        rigEditorKeyframes = rigEditorKeyframes.filter(keyframe => Number(keyframe.frame) !== frame);
+        applyRigEditorKeyframes(rigEditorKeyframes);
+        renderRigKeyframeList();
+        loadRigEditorForGloss(false);
+        setRigSaveStatus(`Corrección del cuadro ${frame} eliminada localmente. Falta guardar.`, 'warning');
+        renderRigAppState();
+      });
+      document.getElementById('rig-hand-neutral').addEventListener('click', () => {
+        rigEditorPose[rigEditorHand.value] = emptyRigEditorHand();
+        renderRigEditorControls();
+        previewRigEditorControls();
+      });
+      rigKeyframeList.addEventListener('change', () => {
+        const keyframe = rigEditorKeyframes.find(candidate => (
+          Number(candidate.frame) === Number(rigKeyframeList.value)
+        ));
+        if (!keyframe) return;
+        rigTransitionFrames.value = String(keyframe.transitionFrames || 6);
+        goToRigEditorFrame(keyframe.frame);
+      });
+      document.getElementById('rig-clear-keyframes').addEventListener('click', () => {
+        rigEditorKeyframes = [];
+        rigEditorPose = emptyRigEditorHands();
+        rigEditorSmile = 0;
+        rigPreviewDirty = false;
+        applyRigEditorKeyframes([]);
+        renderRigKeyframeList();
+        renderRigEditorControls();
+        setRigSaveStatus('Todas las correcciones se quitaron localmente. Pulsa guardar para confirmarlo.', 'warning');
+        renderRigAppState();
+      });
+      rigSaveButton.addEventListener('click', () => persistRigEditorKeyframes());
       toggleSkeleton.addEventListener('click', () => {
         mode.value = mode.value === 'rigged' ? 'hybrid' : 'rigged';
         persistRenderMode();
@@ -499,7 +1437,7 @@
         paused = false;
         window.setVozualPlaybackPaused?.(false);
         sourceVideo.pause();
-        if (sourceVideo.currentSrc) sourceVideo.currentTime = 0;
+        if (sourceVideo.currentSrc) sourceVideo.currentTime = sourceVideoStartSeconds;
         pause.textContent = 'PAUSAR';
         window.playVozualClip?.('IDLE', ++playbackId, 1, false);
         status.textContent = 'PERSONAJE EN REPOSO.';

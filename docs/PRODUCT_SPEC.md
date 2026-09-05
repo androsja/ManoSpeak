@@ -1,8 +1,8 @@
-# Product Specification: ManoSpeak
+# Product Specification: Vozual
 
 ## 1. Product Vision
 
-ManoSpeak is an offline, on-device mobile system intended to convert Colombian Sign
+Vozual is an offline, on-device mobile system intended to convert Colombian Sign
 Language (LSC) into accessible spoken Spanish. It extracts geometric landmarks from the
 camera instead of transmitting raw video to a cloud service.
 

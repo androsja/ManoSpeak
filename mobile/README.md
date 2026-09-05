@@ -1,4 +1,4 @@
-# Mobile Module — ManoSpeak
+# Mobile Module — Vozual
 
 This module contains the React Native code for the on-device user interface, live camera acquisition, frame buffering, and offline speech synthesis (TTS).
 

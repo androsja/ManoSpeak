@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026.09.0",
+  "language": "lsc-CO",
+  "unsupportedOutcome": {
+    "title": "Frase no disponible",
+    "message": "Esta frase todavía no tiene una interpretación en LSC revisada. Puedes intentar otra frase del catálogo.",
+    "retryLabel": "Intentar otra frase"
+  },
+  "entries": []
+}

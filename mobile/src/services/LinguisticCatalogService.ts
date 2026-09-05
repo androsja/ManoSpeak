@@ -1,4 +1,5 @@
 import catalogJson from '../../assets/data/lsc_linguistic_catalog.json';
+import publishedSignsJson from '../../assets/motions/published_signs.json';
 import {normalizeSpeech, type SpeechSign} from './VoiceCommandService';
 
 export type LscVerbType =
@@ -29,6 +30,11 @@ export type LinguisticEntry = {
   review: {
     status: string;
     regionalVariants: string[];
+    ownerApproval?: {
+      status: 'pending' | 'approved';
+      approvedBy: string;
+      approvedAt: string | null;
+    };
   };
 };
 
@@ -45,6 +51,16 @@ export type PublishedLscPlan = {
   unavailableMarkers: string[];
 };
 
+export type InstalledLinguisticSign = {
+  languageId: string;
+  gloss: string;
+  speechAliases: readonly string[];
+  categories: readonly string[];
+  lexicalClass: string;
+  verbType: LscVerbType;
+  requiresSubjectMarker: boolean;
+};
+
 type LinguisticCatalog = {
   version: number;
   language: 'LSC';
@@ -58,6 +74,7 @@ type LinguisticCatalog = {
 
 const CATALOG = catalogJson as LinguisticCatalog;
 const GRAMMAR = CATALOG.grammar ?? {};
+const OWNER_APPROVED_CLIPS = new Set<string>(publishedSignsJson.publishedGlosses);
 
 function uniquePhrases(entry: LinguisticEntry): string[] {
   return Array.from(new Set([
@@ -70,7 +87,12 @@ function uniquePhrases(entry: LinguisticEntry): string[] {
 
 const publishedClips = new Set<string>();
 export const PUBLISHED_LSC_ENTRIES = CATALOG.entries.filter((entry) => {
-  if (!entry.motion.published || entry.review.status === 'blocked') return false;
+  if (
+    !entry.motion.published
+    || entry.review.status === 'blocked'
+    || entry.review.ownerApproval?.status !== 'approved'
+    || !OWNER_APPROVED_CLIPS.has(entry.motion.clip)
+  ) return false;
   // One physical animation can have historical linguistic records with the
   // same clip (for example ÉL and the non-sign article EL). The mobile
   // library and its counter must represent playable animations, not rows.
@@ -132,8 +154,17 @@ function hasExplicitSubjectInCurrentClause(tokens: readonly LscPlanToken[]): boo
   return false;
 }
 
-function candidateAt(words: readonly string[], index: number): SpeechCandidate | undefined {
-  return SPEECH_CANDIDATES.find(({normalized}) => {
+function isInstalled(entry: LinguisticEntry, installedGlosses?: ReadonlySet<string>): boolean {
+  return installedGlosses == null || installedGlosses.has(entry.motion.clip.trim().toUpperCase());
+}
+
+function candidateAt(
+  words: readonly string[],
+  index: number,
+  installedGlosses?: ReadonlySet<string>,
+): SpeechCandidate | undefined {
+  return SPEECH_CANDIDATES.find(({entry, normalized}) => {
+    if (!isInstalled(entry, installedGlosses)) return false;
     const phrase = normalized.split(' ');
     return phrase.every((word, offset) => words[index + offset] === word);
   });
@@ -145,9 +176,13 @@ const NON_SIGN_FUNCTION_WORDS = new Set([
   'tras', 'la', 'las', 'los', 'un', 'una', 'unos', 'unas', 'y', 'o',
 ]);
 
-function isThirdPersonPronounEl(words: readonly string[], index: number): boolean {
+function isThirdPersonPronounEl(
+  words: readonly string[],
+  index: number,
+  installedGlosses?: ReadonlySet<string>,
+): boolean {
   if (words[index] !== 'el') return false;
-  const following = candidateAt(words, index + 1);
+  const following = candidateAt(words, index + 1, installedGlosses);
   // Speech recognition normally removes accents. Keep EL only in the one
   // context where it is a pronoun: immediately before a verb ("él come").
   // In every other context it is the article "el" and has no LSC token.
@@ -178,7 +213,10 @@ export function planPublishedLscGlosses(glosses: readonly string[]): LscPlanToke
  * inserts a person or time marker when an approved clip exists; unavailable
  * grammar is reported for authoring instead of being invented by the avatar.
  */
-export function resolvePublishedLscPlan(text: string): PublishedLscPlan {
+export function resolvePublishedLscPlan(
+  text: string,
+  installedGlosses?: ReadonlySet<string>,
+): PublishedLscPlan {
   const words = normalizeSpeech(text).split(' ').filter(Boolean);
   const tokens: LscPlanToken[] = [];
   const unavailableMarkers: string[] = [];
@@ -188,14 +226,15 @@ export function resolvePublishedLscPlan(text: string): PublishedLscPlan {
       index += 1;
       continue;
     }
-    if (words[index] === 'el' && !isThirdPersonPronounEl(words, index)) {
+    if (words[index] === 'el' && !isThirdPersonPronounEl(words, index, installedGlosses)) {
       index += 1;
       continue;
     }
-    const candidate = candidateAt(words, index);
+    const candidate = candidateAt(words, index, installedGlosses);
     if (!candidate) {
       const temporalGloss = GRAMMAR.temporalMarkers?.[words[index]];
-      if (temporalGloss && !ENTRY_BY_CLIP.has(temporalGloss)) {
+      const temporalEntry = temporalGloss ? ENTRY_BY_CLIP.get(temporalGloss) : undefined;
+      if (temporalGloss && (!temporalEntry || !isInstalled(temporalEntry, installedGlosses))) {
         unavailableMarkers.push(temporalGloss);
       }
       index += 1;
@@ -206,9 +245,9 @@ export function resolvePublishedLscPlan(text: string): PublishedLscPlan {
     const subjectGloss = subjectKey ? GRAMMAR.subjectMarkers?.[subjectKey] : undefined;
     if (candidate.entry.lsc.requiresSubjectMarker && subjectGloss) {
       const subjectEntry = ENTRY_BY_CLIP.get(subjectGloss);
-      if (subjectEntry && !hasExplicitSubjectInCurrentClause(tokens)) {
+      if (subjectEntry && isInstalled(subjectEntry, installedGlosses) && !hasExplicitSubjectInCurrentClause(tokens)) {
         tokens.push(tokenFor(subjectEntry));
-      } else if (!subjectEntry) {
+      } else if (!subjectEntry || !isInstalled(subjectEntry, installedGlosses)) {
         unavailableMarkers.push(subjectGloss);
       }
     }
@@ -220,4 +259,124 @@ export function resolvePublishedLscPlan(text: string): PublishedLscPlan {
 
 export function findPublishedLscEntry(gloss: string): LinguisticEntry | undefined {
   return ENTRY_BY_CLIP.get(gloss);
+}
+
+type InstalledSpeechCandidate = {
+  sign: InstalledLinguisticSign;
+  normalized: string;
+};
+
+function installedSpeechCandidates(
+  signs: readonly InstalledLinguisticSign[],
+): InstalledSpeechCandidate[] {
+  return signs.flatMap(sign => Array.from(new Set([
+    sign.gloss,
+    ...sign.speechAliases,
+  ])).map(phrase => ({
+    sign,
+    normalized: normalizeSpeech(phrase),
+  }))).filter(candidate => candidate.normalized.length > 0).sort(
+    (first, second) => second.normalized.split(' ').length - first.normalized.split(' ').length,
+  );
+}
+
+function installedCandidateAt(
+  words: readonly string[],
+  index: number,
+  candidates: readonly InstalledSpeechCandidate[],
+): InstalledSpeechCandidate | undefined {
+  return candidates.find(candidate => candidate.normalized.split(' ').every(
+    (word, offset) => words[index + offset] === word,
+  ));
+}
+
+function installedToken(sign: InstalledLinguisticSign): LscPlanToken {
+  return {
+    gloss: sign.gloss,
+    source: 'lexical',
+    categories: [...sign.categories],
+    verbType: sign.verbType,
+    requiresSubjectMarker: sign.requiresSubjectMarker,
+  };
+}
+
+function installedPlanHasSubject(
+  tokens: readonly LscPlanToken[],
+  signsByGloss: ReadonlyMap<string, InstalledLinguisticSign>,
+): boolean {
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    const sign = signsByGloss.get(tokens[index].gloss);
+    if (sign?.requiresSubjectMarker) return false;
+    if (
+      SUBJECT_MARKER_GLOSSES.has(tokens[index].gloss)
+      || sign?.lexicalClass === 'pronoun'
+      || sign?.lexicalClass === 'noun'
+    ) return true;
+  }
+  return false;
+}
+
+export function speechVocabularyForInstalledSigns(
+  signs: readonly InstalledLinguisticSign[],
+): SpeechSign[] {
+  return signs.map(sign => ({
+    gloss: sign.gloss,
+    aliases: Array.from(new Set([sign.gloss, ...sign.speechAliases])),
+  }));
+}
+
+/**
+ * Plans speech exclusively from the metadata that arrived with downloaded
+ * signs. This lets a newly approved sign work without shipping a new APK.
+ * LSC receives the reviewed grammar helpers; other languages remain lexical
+ * until their own grammar rules are explicitly implemented and reviewed.
+ */
+export function resolveInstalledSignPlan(
+  text: string,
+  signs: readonly InstalledLinguisticSign[],
+): PublishedLscPlan {
+  const words = normalizeSpeech(text).split(' ').filter(Boolean);
+  const candidates = installedSpeechCandidates(signs);
+  const signsByGloss = new Map(signs.map(sign => [sign.gloss, sign]));
+  const isLsc = signs.length > 0 && signs.every(sign => sign.languageId === 'lsc-co');
+  const tokens: LscPlanToken[] = [];
+  const unavailableMarkers: string[] = [];
+
+  for (let index = 0; index < words.length;) {
+    if (isLsc && NON_SIGN_FUNCTION_WORDS.has(words[index])) {
+      index += 1;
+      continue;
+    }
+    const candidate = installedCandidateAt(words, index, candidates);
+    if (
+      isLsc
+      && words[index] === 'el'
+      && installedCandidateAt(words, index + 1, candidates)?.sign.lexicalClass !== 'verb'
+    ) {
+      index += 1;
+      continue;
+    }
+    if (!candidate) {
+      const temporalGloss = isLsc ? GRAMMAR.temporalMarkers?.[words[index]] : undefined;
+      if (temporalGloss && !signsByGloss.has(temporalGloss)) {
+        unavailableMarkers.push(temporalGloss);
+      }
+      index += 1;
+      continue;
+    }
+
+    if (isLsc && candidate.sign.requiresSubjectMarker) {
+      const subjectKey = GRAMMAR.spanishVerbForms?.[candidate.normalized];
+      const subjectGloss = subjectKey ? GRAMMAR.subjectMarkers?.[subjectKey] : undefined;
+      if (subjectGloss && !installedPlanHasSubject(tokens, signsByGloss)) {
+        const subjectSign = signsByGloss.get(subjectGloss);
+        if (subjectSign) tokens.push(installedToken(subjectSign));
+        else unavailableMarkers.push(subjectGloss);
+      }
+    }
+    tokens.push(installedToken(candidate.sign));
+    index += candidate.normalized.split(' ').length;
+  }
+
+  return {tokens, unavailableMarkers: Array.from(new Set(unavailableMarkers))};
 }

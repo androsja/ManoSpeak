@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Platform, StyleSheet, Text, View} from 'react-native';
 import RNFS from 'react-native-fs';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
+import {readInstalledSignPayload} from '../services/SignLanguageService';
 
 const AVATAR_RUNTIME_URI = Platform.OS === 'ios'
   ? `file://${RNFS.MainBundlePath}/avatar/index.html`
@@ -50,16 +51,31 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase,
     webView.current?.reload();
   }, [onUnavailable]);
 
-  const sendClip = useCallback(() => {
+  useEffect(() => {
     if (!ready) return;
-    // Keep the renderer selection and clip in one command. Android WebView can
-    // defer an isolated visibility update while idle, whereas playback wakes
-    // the render loop immediately.
-    const script = `window.setVozualRenderMode(${JSON.stringify(renderMode)}); window.playVozualClip(${JSON.stringify(clip)}, ${playbackId}, ${playbackSpeed}, ${continuePhrase}); window.tickVozualAnimation?.(); true;`;
-    webView.current?.injectJavaScript(script);
-  }, [clip, continuePhrase, playbackId, playbackSpeed, ready, renderMode]);
-
-  useEffect(sendClip, [sendClip]);
+    let cancelled = false;
+    const send = async () => {
+      let installScript = '';
+      if (clip !== 'IDLE' && clip !== 'PHRASE_WAIT') {
+        const payload = await readInstalledSignPayload(clip);
+        if (cancelled) return;
+        if (!payload) {
+          setRuntimeError(`La seña ${clip} no está descargada.`);
+          onClipEnd();
+          return;
+        }
+        installScript = `window.installVozualMotionBase64(${JSON.stringify(clip)}, ${JSON.stringify(payload.contentBase64)}, ${JSON.stringify(payload.avatarProfile)}); `;
+      }
+      setRuntimeError('');
+      // Keep the renderer selection and clip in one command. Android WebView
+      // can defer an isolated visibility update while idle, whereas playback
+      // wakes the render loop immediately.
+      const script = `${installScript}window.setVozualRenderMode(${JSON.stringify(renderMode)}); window.playVozualClip(${JSON.stringify(clip)}, ${playbackId}, ${playbackSpeed}, ${continuePhrase}); window.tickVozualAnimation?.(); true;`;
+      webView.current?.injectJavaScript(script);
+    };
+    void send();
+    return () => { cancelled = true; };
+  }, [clip, continuePhrase, onClipEnd, playbackId, playbackSpeed, ready, renderMode]);
 
   const sendZoom = useCallback(() => {
     if (!ready) return;

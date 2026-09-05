@@ -1,4 +1,4 @@
-package com.manospeak
+package com.androsja.vozual
 
 import android.app.PendingIntent
 import android.app.PictureInPictureParams
@@ -141,7 +141,7 @@ class MainActivity : ReactActivity() {
    * Returns the name of the main component registered from JavaScript. This is used to schedule
    * rendering of the component.
    */
-  override fun getMainComponentName(): String = "ManoSpeak"
+  override fun getMainComponentName(): String = "Vozual"
 
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]

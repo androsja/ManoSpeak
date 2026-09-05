@@ -1,6 +1,6 @@
-# Agent Configurations — ManoSpeak
+# Agent Configurations — Vozual
 
-This directory contains the custom persona guides, command scripts, and catalog documentation for the **ManoSpeak** agent harness.
+This directory contains the custom persona guides, command scripts, and catalog documentation for the **Vozual** agent harness.
 
 ## Contents
 - **`agents/`:** Custom developer, researcher, and architect personas.
