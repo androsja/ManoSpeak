@@ -13,6 +13,7 @@ jest.mock('@react-native-firebase/firestore', () => ({
 }));
 
 import {
+  filterPublishedSigns,
   hasUnpromptedSignChanges,
   mergeSignLanguageStatuses,
   parsePublishedSign,
@@ -52,6 +53,17 @@ function state(installedSigns: Record<string, InstalledSign> = {}): SignLibraryS
 }
 
 describe('SignLanguageService', () => {
+  it('filters a large catalogue by gloss, aliases, and categories without accents', () => {
+    const signs = [
+      sign,
+      {...sign, id: 'lsc-co-bano', gloss: 'BAÑO', speechAliases: ['necesito ir al sanitario'], categories: ['lugares']},
+    ];
+
+    expect(filterPublishedSigns(signs, 'bano').map(item => item.gloss)).toEqual(['BAÑO']);
+    expect(filterPublishedSigns(signs, 'sanitario').map(item => item.gloss)).toEqual(['BAÑO']);
+    expect(filterPublishedSigns(signs, 'sustantivos').map(item => item.gloss)).toEqual(['AGUA']);
+  });
+
   it('accepts only independently downloadable approved compiled signs', () => {
     expect(sign.gloss).toBe('AGUA');
     expect(() => parsePublishedSign('draft', {

@@ -66,6 +66,7 @@ export type SignLanguageStatus = SignLanguage & {
   signs: PublishedSign[];
   pendingSigns: PublishedSign[];
   removedSigns: InstalledSign[];
+  installedSigns: InstalledSign[];
   installedSignCount: number;
   changeCount: number;
   totalSizeBytes: number;
@@ -218,6 +219,31 @@ function signRevision(signs: readonly PublishedSign[]): string {
     .join('|');
 }
 
+function searchableSignText(sign: PublishedSign): string {
+  return [sign.gloss, ...sign.speechAliases, ...sign.categories]
+    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es-CO');
+}
+
+export function filterPublishedSigns(
+  signs: readonly PublishedSign[],
+  search: string,
+): PublishedSign[] {
+  const normalizedSearch = search
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es-CO');
+  if (!normalizedSearch) return [...signs];
+  const terms = normalizedSearch.split(/\s+/);
+  return signs.filter(sign => {
+    const searchable = searchableSignText(sign);
+    return terms.every(term => searchable.includes(term));
+  });
+}
+
 export function mergeSignLanguageStatuses(
   languages: readonly SignLanguage[],
   signs: readonly PublishedSign[],
@@ -248,6 +274,7 @@ export function mergeSignLanguageStatuses(
       signs: languageSigns,
       pendingSigns,
       removedSigns,
+      installedSigns: installed,
       installedSignCount: installed.length,
       changeCount: pendingSigns.length + removedSigns.length,
       totalSizeBytes: languageSigns.reduce((total, sign) => total + sign.sizeBytes, 0),

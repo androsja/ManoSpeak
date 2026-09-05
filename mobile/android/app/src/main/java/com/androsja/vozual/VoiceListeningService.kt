@@ -35,6 +35,7 @@ class VoiceListeningService : Service() {
   private var lastPartialResults: ArrayList<String>? = null
   private var speechStarted = false
   private var hasReachedReadyState = false
+  private var recognitionLanguageIndex = 0
 
   override fun onCreate() {
     super.onCreate()
@@ -136,7 +137,7 @@ class VoiceListeningService : Service() {
       Log.i(
         TAG,
         "Starting service-owned recognition session=$activeSessionId " +
-          "language=$RECOGNITION_LANGUAGE",
+          "language=${currentRecognitionLanguage()}",
       )
       current.startListening(createRecognitionIntent())
     } catch (error: Exception) {
@@ -223,6 +224,17 @@ class VoiceListeningService : Service() {
           error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE
         ) {
           lastPartialResults = null
+          if (recognitionLanguageIndex < RECOGNITION_LANGUAGES.lastIndex) {
+            val unsupportedLanguage = currentRecognitionLanguage()
+            recognitionLanguageIndex += 1
+            Log.i(
+              TAG,
+              "Local language $unsupportedLanguage unavailable; retrying with " +
+                currentRecognitionLanguage(),
+            )
+            scheduleRecognition(delayMillis = 250L, recreate = false)
+            return
+          }
           sendSpeechEvent(EVENT_ERROR, error = ERROR_OFFLINE_LANGUAGE_UNAVAILABLE)
           stopSelf()
           return
@@ -305,7 +317,7 @@ class VoiceListeningService : Service() {
       putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
       putExtra(
         RecognizerIntent.EXTRA_LANGUAGE,
-        RECOGNITION_LANGUAGE,
+        currentRecognitionLanguage(),
       )
       putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
       putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
@@ -318,6 +330,9 @@ class VoiceListeningService : Service() {
       // factory; this intent also forbids a provider from preferring network.
       putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
     }
+
+  private fun currentRecognitionLanguage(): String =
+    RECOGNITION_LANGUAGES[recognitionLanguageIndex]
 
   private fun sendSpeechEvent(
     event: String,
@@ -367,7 +382,10 @@ class VoiceListeningService : Service() {
     private const val CHANNEL_ID = "vozual_voice_listening"
     private const val NOTIFICATION_ID = 2701
     private const val INITIAL_HANDOFF_DELAY_MILLIS = 350L
-    private const val RECOGNITION_LANGUAGE = "es-CO"
+    // Google's Android on-device provider does not expose es-CO on every
+    // device. These fallbacks remain fully local and preserve Spanish speech
+    // recognition without silently switching to a network recognizer.
+    private val RECOGNITION_LANGUAGES = listOf("es-CO", "es-US", "es-ES")
     const val ERROR_OFFLINE_UNAVAILABLE = "offline_speech_unavailable"
     const val ERROR_OFFLINE_LANGUAGE_UNAVAILABLE = "offline_es_co_unavailable"
   }

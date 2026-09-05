@@ -14,6 +14,7 @@ describe('native speech privacy contract', () => {
     expect(source).toContain('SpeechRecognizer.isOnDeviceRecognitionAvailable(this)');
     expect(source).toContain('SpeechRecognizer.createOnDeviceSpeechRecognizer(this)');
     expect(source).toContain('putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)');
+    expect(source).toContain('listOf("es-CO", "es-US", "es-ES")');
     expect(source).not.toContain('SpeechRecognizer.createSpeechRecognizer(this)');
     expect(source).not.toContain('putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)');
   });
