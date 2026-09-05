@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import {StatusBar, StyleSheet} from 'react-native';
+import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import {AccountActivationScreen} from './src/components/AccountActivationScreen';
 import { ListenerScreen } from './src/components/ListenerScreen';
 import {
@@ -24,7 +25,7 @@ import {
   type InstalledSign,
 } from './src/services/SignLanguageService';
 
-export default function App() {
+function AppContent() {
   const [accessConfig, setAccessConfig] = useState<AppAccessConfig>(DEFAULT_APP_ACCESS_CONFIG);
   const [account, setAccount] = useState<ActivationAccount | null>(null);
   const [accountReady, setAccountReady] = useState(false);
@@ -146,6 +147,14 @@ export default function App() {
         onSignOut={() => closeActivationSession()}
       />
     </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
 

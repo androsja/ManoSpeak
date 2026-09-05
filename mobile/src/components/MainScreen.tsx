@@ -100,12 +100,16 @@ export const MainScreen: React.FC<MainScreenProps> = ({ captureConsent, onExit }
         setSaveError('No fue posible leer las muestras guardadas.');
       })
       .finally(() => setLoadingCount(false));
+    // The service instance is retained in a ref for the component lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!captureComplete || !captureEndReason || captureHandledRef.current) return;
     captureHandledRef.current = true;
     void finishSample();
+    // finishSample intentionally reads the current capture buffers and metadata.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [captureComplete, captureEndReason]);
 
   const finishSample = async () => {

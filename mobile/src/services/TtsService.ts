@@ -20,11 +20,11 @@ export class TtsService {
   private async initTts() {
     try {
       await Tts.getInitStatus().catch((e) => console.log('Init status bypass (iOS):', e));
-    } catch (e) { }
+    } catch { }
 
     try {
       await Tts.setDefaultLanguage('es-CO'); // Colombian Spanish
-    } catch (err) {
+    } catch {
       // Some Android images do not ship the Colombian Spanish voice. This is
       // an expected fallback, so keep it informational instead of surfacing a
       // React Native warning banner over the app UI.
@@ -33,7 +33,7 @@ export class TtsService {
     
     try {
       await Tts.setDefaultRate(0.5); // Normal speed
-    } catch (err) { }
+    } catch { }
     
     console.log('[TTS Service] TTS Engine Initialized.');
   }

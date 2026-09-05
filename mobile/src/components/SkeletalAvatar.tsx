@@ -4,6 +4,10 @@ import RNFS from 'react-native-fs';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
 import {readInstalledSignPayload} from '../services/SignLanguageService';
 
+// WebView 14 currently publishes cross-platform props as an intersection that
+// TypeScript 6 reduces to `never`; the runtime component API remains unchanged.
+const AvatarWebView = WebView as unknown as React.ComponentType<any>;
+
 const AVATAR_RUNTIME_URI = Platform.OS === 'ios'
   ? `file://${RNFS.MainBundlePath}/avatar/index.html`
   : 'file:///android_asset/avatar/index.html';
@@ -121,7 +125,7 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase,
 
   return (
     <View style={styles.container}>
-      <WebView
+      <AvatarWebView
         ref={webView}
         testID="vozual-avatar-webview"
         source={{uri: AVATAR_RUNTIME_URI}}

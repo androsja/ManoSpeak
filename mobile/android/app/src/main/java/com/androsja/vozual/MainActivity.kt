@@ -10,8 +10,10 @@ import android.os.Build
 import android.util.Rational
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.annotation.RequiresApi
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
+import com.facebook.react.ReactApplication
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
@@ -49,7 +51,9 @@ class MainActivity : ReactActivity() {
 
   private fun emitPipState(isInPictureInPictureMode: Boolean) {
     try {
-      reactInstanceManager.currentReactContext
+      (application as? ReactApplication)
+        ?.reactHost
+        ?.currentReactContext
         ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
         ?.emit("onVozualPictureInPictureChanged", isInPictureInPictureMode)
     } catch (_: NullPointerException) {
@@ -70,6 +74,7 @@ class MainActivity : ReactActivity() {
     }
   }
 
+  @RequiresApi(Build.VERSION_CODES.O)
   private fun buildVozualPictureInPictureParams(): PictureInPictureParams {
     val actionTitle = when {
       pipListeningMode == "phrase" && pipMicrophoneActive -> "Terminar frase"

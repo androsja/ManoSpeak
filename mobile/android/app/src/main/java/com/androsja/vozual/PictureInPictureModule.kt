@@ -32,7 +32,7 @@ class PictureInPictureModule(context: ReactApplicationContext) :
       promise.resolve(false)
       return
     }
-    val activity = currentActivity as? MainActivity
+    val activity = reactApplicationContext.currentActivity as? MainActivity
     if (activity == null) {
       promise.reject("NO_ACTIVITY", "VOZUAL no tiene una ventana activa.")
       return
@@ -93,7 +93,7 @@ class PictureInPictureModule(context: ReactApplicationContext) :
       promise.resolve(false)
       return
     }
-    val activity = currentActivity as? MainActivity
+    val activity = reactApplicationContext.currentActivity as? MainActivity
     promise.resolve(activity?.isInPictureInPictureMode == true)
   }
 
@@ -108,7 +108,10 @@ class PictureInPictureModule(context: ReactApplicationContext) :
 
   @ReactMethod
   fun setListeningMode(mode: String, microphoneActive: Boolean) {
-    (currentActivity as? MainActivity)?.updateVozualPipAction(mode, microphoneActive)
+    (reactApplicationContext.currentActivity as? MainActivity)?.updateVozualPipAction(
+      mode,
+      microphoneActive,
+    )
   }
 
   @ReactMethod

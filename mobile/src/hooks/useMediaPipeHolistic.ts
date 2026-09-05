@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import {useCallback, useMemo, useRef, useState} from 'react';
 import {
   useCameraPermission,
   useFrameProcessor,
@@ -10,8 +10,6 @@ import { useRunOnJS } from 'react-native-worklets-core';
 import { FrameBuffer } from '../services/FrameBuffer';
 import { LandmarkNormalizer } from '../services/LandmarkNormalizer';
 
-// Initialize the plugin natively using VisionCamera v4 API
-const mediaPipePlugin = VisionCameraProxy.initFrameProcessorPlugin('media_pipe_holistic', {});
 const HAND_LANDMARK_START = 33;
 const HAND_LANDMARK_END = 75;
 const MIN_DETECTED_HAND_LANDMARKS = 8;
@@ -42,6 +40,13 @@ interface UseMediaPipeHolisticResult {
 }
 
 export const useMediaPipeHolistic = (capacity: number = 144): UseMediaPipeHolisticResult => {
+  // Resolve the native host object when the hook is created. This also keeps
+  // initialization deterministic in tests and after React Native reloads.
+  const mediaPipePlugin = useMemo(
+    () =>
+      VisionCameraProxy.initFrameProcessorPlugin('media_pipe_holistic', {}),
+    [],
+  );
   const { hasPermission, requestPermission } = useCameraPermission();
   const frameBufferRef = useRef<FrameBuffer>(new FrameBuffer(capacity));
   const rawFrameBufferRef = useRef<FrameBuffer>(new FrameBuffer(capacity));

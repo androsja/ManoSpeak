@@ -10,12 +10,12 @@ import {
   Pressable,
   PermissionsAndroid,
   Platform,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import RNFS from 'react-native-fs';
 import {
   mergeSpeechSegments,
@@ -151,13 +151,13 @@ export function ListenerScreen({
   onManageSignLanguages,
   onSignOut,
 }: ListenerScreenProps) {
-  const phraseContinuationTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
-  const phraseFinalizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
-  const deferredSpeechTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const phraseContinuationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const phraseFinalizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const deferredSpeechTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const deferredSpeechPrefix = useRef('');
-  const iosRecognitionRestartTimer = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const iosRecognitionRestartTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const startActivityRecognitionRef = useRef<() => Promise<void>>(async () => undefined);
-  const iosLastSpeechEvent = useRef<SpeechEvent | undefined>();
+  const iosLastSpeechEvent = useRef<SpeechEvent | undefined>(undefined);
   const iosFinalResultHandled = useRef(false);
   const recognitionGeneration = useRef(0);
   const recognitionReadyRef = useRef(false);

@@ -8,13 +8,6 @@ function makeZeroFrame(): number[][] {
   return Array.from({ length: 543 }, () => [0.0, 0.0, 0.0]);
 }
 
-/** Set a single landmark in a cloned frame. */
-function setLm(frame: number[][], idx: number, x: number, y: number, z: number): number[][] {
-  const f = frame.map(lm => [...lm]);
-  f[idx] = [x, y, z];
-  return f;
-}
-
 const PRECISION = 6; // decimal places for numerical parity with Python
 
 function expectClose(actual: number, expected: number, decimals = PRECISION): void {
@@ -268,7 +261,6 @@ describe('LandmarkNormalizer.normalizeFrame', () => {
 
       const centroidX = (1 + 3 + 2) / 3;         // 2.0
       const centroidY = (0 + 0 + 4) / 3;         // 1.3333...
-      const centroidZ = 0.0;
       const scale = Math.sqrt(4 + 16 + 0);        // sqrt(20)
 
       const result = LandmarkNormalizer.normalizeFrame(frame);

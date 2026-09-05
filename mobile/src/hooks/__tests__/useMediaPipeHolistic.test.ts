@@ -4,7 +4,7 @@ const mockSetHandsDetected = jest.fn();
 
 jest.mock('../../services/LandmarkNormalizer', () => ({
   LandmarkNormalizer: {
-    normalizeFrame: mockNormalizeFrame,
+    normalizeFrame: (...args: unknown[]) => mockNormalizeFrame(...args),
   },
 }));
 
@@ -16,7 +16,9 @@ jest.mock('react-native-vision-camera', () => ({
   useFrameProcessor: jest.fn().mockImplementation((processor) => processor),
   runAtTargetFps: jest.fn().mockImplementation((_fps, processor) => processor()),
   VisionCameraProxy: {
-    initFrameProcessorPlugin: jest.fn().mockReturnValue({ call: mockPluginCall }),
+    initFrameProcessorPlugin: jest.fn().mockImplementation(() => ({
+      call: (...args: unknown[]) => mockPluginCall(...args),
+    })),
   },
 }));
 
@@ -28,6 +30,7 @@ jest.mock('react', () => ({
   useRef: jest.fn(),
   useState: jest.fn().mockImplementation((initialValue) => [initialValue, mockSetHandsDetected]),
   useCallback: jest.fn().mockImplementation((callback) => callback),
+  useMemo: jest.fn().mockImplementation((factory) => factory()),
 }));
 
 import { useCameraPermission, runAtTargetFps } from 'react-native-vision-camera';

@@ -125,7 +125,7 @@ describe('MainScreen UI Rendering', () => {
     expect(tree).toBeDefined();
     
     // Find the title element in the children
-    const containerChildren = tree.props.children;
+    const containerChildren = (tree.props as {children?: React.ReactNode}).children;
     expect(containerChildren).toBeDefined();
     expect(Array.isArray(containerChildren)).toBe(true);
   });

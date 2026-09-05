@@ -321,10 +321,10 @@ function frameSegments(bindings: ArmBinding[]): Array<[number, number]> {
 export function PipSkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase, renderMode, onClipEnd}: Props) {
   const [frame, setFrame] = useState<MotionFrame>();
   const [ready, setReady] = useState(false);
-  const displayedFrame = useRef<MotionFrame>();
-  const restReference = useRef<MotionFrame>();
+  const displayedFrame = useRef<MotionFrame | undefined>(undefined);
+  const restReference = useRef<MotionFrame | undefined>(undefined);
   const bindings = useRef<ArmBinding[]>(neutralBindings());
-  const animationTick = useRef<((now: number) => void)>();
+  const animationTick = useRef<((now: number) => void) | undefined>(undefined);
 
   const display = (nextFrame: MotionFrame) => {
     displayedFrame.current = nextFrame;

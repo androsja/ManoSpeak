@@ -16,7 +16,6 @@ import {
   presentCapturedHandLandmarkFrames,
   presentConfiguredHandLandmarkFrames,
   presentFistHandLandmarkFrames,
-  presentFullyOpenHandLandmarkFrames,
   presentIndexOnlyHandLandmarkFrames,
   presentMoneyRubHandLandmarkFrames,
   riggedElbowPivotTarget,

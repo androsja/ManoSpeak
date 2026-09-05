@@ -1,0 +1,16 @@
+diff --git a/node_modules/onnxruntime-react-native/android/build.gradle b/node_modules/onnxruntime-react-native/android/build.gradle
+index 41b4359..fa79fff 100644
+--- a/node_modules/onnxruntime-react-native/android/build.gradle
++++ b/node_modules/onnxruntime-react-native/android/build.gradle
+@@ -247,7 +247,10 @@ dependencies {
+     extractLibs "com.microsoft.onnxruntime:onnxruntime-android:latest.integration@aar"
+   }
+
+-  if (VersionNumber.parse(REACT_NATIVE_VERSION) < VersionNumber.parse("0.71")) {
++  def reactNativeVersionComponents = REACT_NATIVE_VERSION.tokenize('.')
++  def usesLegacyReactNativeHeaders = reactNativeVersionComponents[0].toInteger() == 0 &&
++          reactNativeVersionComponents[1].toInteger() < 71
++  if (usesLegacyReactNativeHeaders) {
+     extractLibs "com.facebook.fbjni:fbjni:+:headers"
+     extractLibs "com.facebook.fbjni:fbjni:+"
+   }

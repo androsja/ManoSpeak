@@ -1,13 +1,13 @@
-const files = new Map<string, string>();
+const mockFiles = new Map<string, string>();
 
 jest.mock('react-native-fs', () => ({
   DocumentDirectoryPath: '/tmp',
   readFile: jest.fn((path: string) => {
-    const value = files.get(path);
+    const value = mockFiles.get(path);
     return value === undefined ? Promise.reject(new Error('ENOENT')) : Promise.resolve(value);
   }),
   writeFile: jest.fn((path: string, value: string) => {
-    files.set(path, value);
+    mockFiles.set(path, value);
     return Promise.resolve();
   }),
 }));
@@ -22,7 +22,7 @@ import {
 } from '../BillingSandboxService';
 
 describe('BillingSandboxService', () => {
-  beforeEach(() => files.clear());
+  beforeEach(() => mockFiles.clear());
 
   it('keeps sandbox purchases separated by account', async () => {
     await activateBillingSandboxEntitlement(
