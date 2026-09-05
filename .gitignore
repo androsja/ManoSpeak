@@ -51,3 +51,5 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 *.egg-info/
+# Android upload signing credentials must remain outside version control.
+vozual-upload.jks
