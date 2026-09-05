@@ -2,6 +2,13 @@
 set -Eeuo pipefail
 
 mobile_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+credentials_file="$mobile_root/.env.release.local"
+if [[ -f "$credentials_file" ]]; then
+  set -a
+  # This file is local-only and ignored by Git; never print its contents.
+  source "$credentials_file"
+  set +a
+fi
 report_path="$mobile_root/build/reports/android-release-check.txt"
 current_step='environment validation'
 

@@ -5,6 +5,7 @@ yarn-error.log
 .metro-health-check*
 
 # Android build artifacts
+.env.release.local
 android/.gradle/
 android/build/
 android/app/build/
