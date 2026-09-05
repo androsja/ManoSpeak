@@ -19,8 +19,11 @@ const DRAFT_PREVIEW_MESSAGE =
   'Vista previa de desarrollo: esta animación todavía no tiene validación lingüística LSC.';
 
 /**
- * Keeps the production trust boundary closed while allowing developers to
- * inspect downloaded draft motion assets. Release callers must pass false.
+ * Firebase-installed signs have already passed the editor's approved,
+ * compiled and published gate. They are therefore playable in release builds
+ * as individual signs and ordered sign sequences. The phrase catalog remains
+ * the stronger path for reviewed fixed expressions; development-only draft
+ * preview is retained for assets that have not passed publication.
  */
 export function resolveRuntimeLscPlayback(
   text: string,
@@ -32,6 +35,15 @@ export function resolveRuntimeLscPlayback(
     return {
       status: 'reviewed',
       glosses: [...reviewed.entry.lsc.glossSequence],
+      message: '',
+    };
+  }
+
+  const publishedPlan = resolveInstalledSignPlan(text, installedSigns);
+  if (publishedPlan.tokens.length > 0 && publishedPlan.unavailableMarkers.length === 0) {
+    return {
+      status: 'reviewed',
+      glosses: publishedPlan.tokens.map(token => token.gloss),
       message: '',
     };
   }

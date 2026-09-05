@@ -23,17 +23,10 @@ const installedHola: InstalledSign = {
 };
 
 describe('LSC runtime playback policy', () => {
-  it('keeps an unreviewed installed sign blocked in release mode', () => {
+  it('plays an approved and published installed sign in release mode', () => {
     expect(resolveRuntimeLscPlayback('hola', [installedHola], false)).toEqual(
-      expect.objectContaining({status: 'unsupported', glosses: []}),
+      expect.objectContaining({status: 'reviewed', glosses: ['HOLA'], message: ''}),
     );
   });
 
-  it('allows the installed sign only as an explicit development draft', () => {
-    expect(resolveRuntimeLscPlayback('hola', [installedHola], true)).toEqual({
-      status: 'draft',
-      glosses: ['HOLA'],
-      message: 'Vista previa de desarrollo: esta animación todavía no tiene validación lingüística LSC.',
-    });
-  });
 });
