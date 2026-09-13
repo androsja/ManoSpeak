@@ -40,7 +40,9 @@ export function resolveRuntimeLscPlayback(
   }
 
   const publishedPlan = resolveInstalledSignPlan(text, installedSigns);
-  if (publishedPlan.tokens.length > 0 && publishedPlan.unavailableMarkers.length === 0) {
+  // A missing optional grammar marker (for example YO for "como") must not
+  // discard the sign that is installed and directly matched from speech.
+  if (publishedPlan.tokens.length > 0) {
     return {
       status: 'reviewed',
       glosses: publishedPlan.tokens.map(token => token.gloss),

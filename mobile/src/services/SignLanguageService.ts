@@ -13,6 +13,7 @@ const LIBRARY_ROOT = `${RNFS.DocumentDirectoryPath}/vozual-sign-languages`;
 const LIBRARY_STATE_PATH = `${LIBRARY_ROOT}/library.json`;
 const LIBRARY_STATE_BACKUP_PATH = `${LIBRARY_STATE_PATH}.backup`;
 const SETUP_COMPLETE_PATH = `${LIBRARY_ROOT}/setup-complete`;
+const LIBRARY_PATH_MARKER = '/vozual-sign-languages/';
 const SAFE_PATH_SEGMENT = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/;
 
 export type SignLanguage = {
@@ -33,6 +34,11 @@ export type PublishedSign = {
   assetDocumentPath: string;
   sha256: string;
   profileSha256: string;
+  // This digest covers the complete independently published release,
+  // including speech aliases. Motion bytes alone cannot detect a vocabulary
+  // update because an editor can change a spoken form without changing the
+  // animation file.
+  releaseSha256: string;
   speechAliases: string[];
   categories: string[];
   lexicalClass: string;
@@ -58,6 +64,10 @@ export type InstalledSign = Pick<PublishedSign,
   | 'verbType'
   | 'requiresSubjectMarker'
 > & {
+  // Older local libraries did not persist the semantic release digest. Keep
+  // this optional for migration; its absence intentionally triggers one
+  // refresh from Firebase so aliases cannot remain stale on a device.
+  releaseSha256?: string;
   profileSha256?: string;
   avatarProfile?: Record<string, unknown>;
   installedAt: string;
@@ -96,6 +106,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function currentLibraryPath(storedPath: string): string {
+  const markerIndex = storedPath.indexOf(LIBRARY_PATH_MARKER);
+  if (markerIndex < 0) return storedPath;
+  const relativePath = storedPath.slice(markerIndex + LIBRARY_PATH_MARKER.length);
+  const pathSegments = relativePath.split('/');
+  if (
+    pathSegments.length === 0
+    || pathSegments.some(segment => !segment || segment === '.' || segment === '..')
+  ) return storedPath;
+  return `${LIBRARY_ROOT}/${relativePath}`;
+}
+
+function normalizeInstalledSigns(value: unknown): Record<string, InstalledSign> {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(Object.entries(value).map(([id, sign]) => {
+    if (!isRecord(sign) || typeof sign.localPath !== 'string') {
+      return [id, sign as InstalledSign];
+    }
+    return [id, {
+      ...sign,
+      localPath: currentLibraryPath(sign.localPath),
+    } as InstalledSign];
+  }));
+}
+
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== 'string' || !value.trim()) {
     throw new Error(`Sign metadata has an invalid ${field}.`);
@@ -108,6 +143,14 @@ function positiveInteger(value: unknown, field: string): number {
     throw new Error(`Sign metadata has an invalid ${field}.`);
   }
   return value;
+}
+
+function sha256Digest(value: unknown, field: string): string {
+  const digest = requiredString(value, field).toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(digest)) {
+    throw new Error(`Sign metadata has an invalid ${field}.`);
+  }
+  return digest;
 }
 
 function stringArray(value: unknown, field: string): string[] {
@@ -149,14 +192,8 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
   if (!assetDocumentPath.startsWith(`signs/${id}/versions/`)) {
     throw new Error(`Sign ${id} has an invalid asset document path.`);
   }
-  const sha256 = requiredString(data.sha256, 'sha256').toLowerCase();
-  if (!/^[a-f0-9]{64}$/.test(sha256)) {
-    throw new Error(`Sign ${id} has an invalid SHA-256.`);
-  }
-  const profileSha256 = requiredString(data.profileSha256, 'profileSha256').toLowerCase();
-  if (!/^[a-f0-9]{64}$/.test(profileSha256)) {
-    throw new Error(`Sign ${id} has an invalid profile SHA-256.`);
-  }
+  const sha256 = sha256Digest(data.sha256, 'sha256');
+  const profileSha256 = sha256Digest(data.profileSha256, 'profileSha256');
   if (data.approved !== true || data.compiled !== true || data.published !== true) {
     throw new Error(`Sign ${id} is not approved, compiled, and published.`);
   }
@@ -174,6 +211,7 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
     assetDocumentPath,
     sha256,
     profileSha256,
+    releaseSha256: sha256Digest(data.releaseSha256, 'releaseSha256'),
     speechAliases: stringArray(data.speechAliases, 'speechAliases'),
     categories: stringArray(data.categories, 'categories'),
     lexicalClass: requiredString(data.lexicalClass, 'lexicalClass'),
@@ -189,9 +227,7 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
 function normalizeState(value: unknown): SignLibraryState {
   if (!isRecord(value)) return {...EMPTY_LIBRARY_STATE};
   return {
-    installedSigns: isRecord(value.installedSigns)
-      ? value.installedSigns as Record<string, InstalledSign>
-      : {},
+    installedSigns: normalizeInstalledSigns(value.installedSigns),
     followedLanguageIds: Array.isArray(value.followedLanguageIds)
       ? value.followedLanguageIds.map(String)
       : [],
@@ -260,7 +296,7 @@ function immutableAssetPath(languageDirectory: string, sign: PublishedSign): str
 
 function signRevision(signs: readonly PublishedSign[]): string {
   return signs
-    .map(sign => `${sign.id}:${sign.version}:${sign.sha256}:${sign.profileSha256}`)
+    .map(sign => `${sign.id}:${sign.version}:${sign.sha256}:${sign.profileSha256}:${sign.releaseSha256}`)
     .sort()
     .join('|');
 }
@@ -308,6 +344,7 @@ export function mergeSignLanguageStatuses(
       return !local
         || local.version !== sign.version
         || local.sha256 !== sign.sha256
+        || local.releaseSha256 !== sign.releaseSha256
         // Libraries installed before visual profiles became independently
         // downloadable keep using the equivalent profile bundled in the APK.
         // A future profile edit still increments the sign version and updates it.
@@ -475,6 +512,11 @@ export async function installSignLanguageChanges(
         || asset.published !== true
         || asset.sha256 !== sign.sha256
         || asset.profileSha256 !== sign.profileSha256
+        // The root sign document owns the semantic release digest (including
+        // voice aliases). Older immutable motion documents predate that
+        // field, so accept a missing asset-level value while still rejecting
+        // a present value that disagrees with the signed release metadata.
+        || (asset.releaseSha256 !== undefined && asset.releaseSha256 !== sign.releaseSha256)
         || asset.sizeBytes !== sign.sizeBytes
         || typeof asset.contentBase64 !== 'string'
         || !isRecord(asset.avatarProfile)
@@ -500,6 +542,7 @@ export async function installSignLanguageChanges(
         sizeBytes: item.sign.sizeBytes,
         sha256: item.sign.sha256,
         profileSha256: item.sign.profileSha256,
+        releaseSha256: item.sign.releaseSha256,
         avatarProfile: item.avatarProfile,
         speechAliases: item.sign.speechAliases,
         categories: item.sign.categories,

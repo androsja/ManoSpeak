@@ -521,6 +521,13 @@ export function ListenerScreen({
     setTranscript(text);
     const resolution = resolveRuntimeLscPlayback(text, installedSigns, __DEV__);
     const words = resolution.glosses as KnownWord[];
+    speechDebug('speech-resolution', {
+      text,
+      final: isFinal,
+      status: resolution.status,
+      glosses: words,
+      message: resolution.message,
+    });
     setDraftPreviewActive(resolution.status === 'draft');
     setPlannedLsc(words.join(' · '));
     setErrorMessage(resolution.message);
@@ -556,6 +563,12 @@ export function ListenerScreen({
       combinedText === currentText ? [currentText] : [combinedText, currentText],
       knownWords,
     );
+    speechDebug('speech-text-selected', {
+      alternatives: event.value ?? [],
+      currentText,
+      bestText,
+      final: isFinal,
+    });
     if (listeningModeRef.current === 'phrase' && !isFinal) {
       if (bestText) {
         phrasePartialTextRef.current = bestText;

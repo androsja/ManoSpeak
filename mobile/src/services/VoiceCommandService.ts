@@ -30,7 +30,52 @@ export function mergeSpeechSegments(prefix: string, next: string): string {
     return normalizedNext;
   }
   if (normalizedPrefix.startsWith(`${normalizedNext} `)) return normalizedPrefix;
+
+  const prefixTokens = normalizedPrefix.split(' ');
+  const nextTokens = normalizedNext.split(' ');
+  const maximumOverlap = Math.min(prefixTokens.length, nextTokens.length);
+
+  for (let overlap = maximumOverlap; overlap > 0; overlap -= 1) {
+    const prefixSuffix = prefixTokens.slice(-overlap);
+    const nextPrefix = nextTokens.slice(0, overlap);
+    if (prefixSuffix.every((token, index) => token === nextPrefix[index])) {
+      return [...prefixTokens, ...nextTokens.slice(overlap)].join(' ');
+    }
+  }
+
   return `${normalizedPrefix} ${normalizedNext}`;
+}
+
+export type IncrementalSpeechMatchUpdate<T extends string> = {
+  newWords: T[];
+  nextRecognizedWords: T[];
+};
+
+/**
+ * Advances the signs already emitted for one recognizer utterance.
+ * A final result closes the utterance so the same phrase can be emitted again.
+ */
+export function advanceIncrementalSpeechMatches<T extends string>(
+  previous: readonly T[],
+  current: readonly T[],
+  isFinal: boolean,
+): IncrementalSpeechMatchUpdate<T> {
+  const extendsPrevious = previous.every(
+    (word, index) => current[index] === word,
+  );
+  const newWords =
+    extendsPrevious && current.length > previous.length
+      ? current.slice(previous.length)
+      : [];
+
+  let nextRecognizedWords = [...previous];
+  if (isFinal || current.length === 0) {
+    nextRecognizedWords = [];
+  } else if (newWords.length > 0) {
+    nextRecognizedWords = [...current];
+  }
+
+  return {newWords: [...newWords], nextRecognizedWords};
 }
 
 export function speechContainsWord(text: string, word: string): boolean {

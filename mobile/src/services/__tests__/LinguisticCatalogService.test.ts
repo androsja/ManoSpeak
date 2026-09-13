@@ -94,4 +94,23 @@ describe('LinguisticCatalogService', () => {
     expect(resolveInstalledSignPlan('hasta luego', signs).tokens.map(token => token.gloss))
       .toEqual(['ADIOS']);
   });
+
+  it('maps every approved voice alias to its installed sign', () => {
+    const signs = PUBLISHED_LSC_ENTRIES.map(entry => ({
+      languageId: 'lsc-co',
+      gloss: entry.motion.clip,
+      speechAliases: [],
+      categories: entry.categories,
+      lexicalClass: entry.lexicalClass,
+      verbType: entry.lsc.verbType,
+      requiresSubjectMarker: entry.lsc.requiresSubjectMarker,
+    }));
+
+    PUBLISHED_LSC_SPEECH_VOCABULARY.forEach(({gloss, aliases = []}) => {
+      aliases.forEach(alias => {
+        expect(resolveInstalledSignPlan(alias, signs).tokens.map(token => token.gloss))
+          .toContain(gloss);
+      });
+    });
+  });
 });

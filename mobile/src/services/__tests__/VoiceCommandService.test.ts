@@ -1,4 +1,5 @@
 import {
+  advanceIncrementalSpeechMatches,
   extractKnownSpeechWords,
   mergeSpeechSegments,
   normalizeSpeech,
@@ -7,6 +8,49 @@ import {
   shouldDeferPartialSpeechMatch,
   speechContainsWord,
 } from '../VoiceCommandService';
+
+describe('advanceIncrementalSpeechMatches', () => {
+  it('allows an identical final utterance after the previous utterance ends', () => {
+    const partial = advanceIncrementalSpeechMatches<string>(
+      [],
+      ['HOLA'],
+      false,
+    );
+    expect(partial).toEqual({
+      newWords: ['HOLA'],
+      nextRecognizedWords: ['HOLA'],
+    });
+
+    const firstFinal = advanceIncrementalSpeechMatches(
+      partial.nextRecognizedWords,
+      ['HOLA', '¿CÓMO ESTÁS?'],
+      true,
+    );
+    expect(firstFinal).toEqual({
+      newWords: ['¿CÓMO ESTÁS?'],
+      nextRecognizedWords: [],
+    });
+
+    const repeatedFinal = advanceIncrementalSpeechMatches(
+      firstFinal.nextRecognizedWords,
+      ['HOLA', '¿CÓMO ESTÁS?'],
+      true,
+    );
+    expect(repeatedFinal).toEqual({
+      newWords: ['HOLA', '¿CÓMO ESTÁS?'],
+      nextRecognizedWords: [],
+    });
+  });
+
+  it('clears partial matches when the final result repeats them', () => {
+    expect(
+      advanceIncrementalSpeechMatches(['HOLA'], ['HOLA'], true),
+    ).toEqual({
+      newWords: [],
+      nextRecognizedWords: [],
+    });
+  });
+});
 
 describe('VoiceCommandService', () => {
   it('normalizes accents and punctuation', () => {
@@ -63,6 +107,9 @@ describe('VoiceCommandService', () => {
   it('joins consecutive recognizer segments for a longer expression', () => {
     expect(mergeSpeechSegments('cómo', 'estás')).toBe('como estas');
     expect(mergeSpeechSegments('cómo', 'cómo estás')).toBe('como estas');
+    expect(mergeSpeechSegments('hola cómo', 'cómo estás')).toBe('hola como estas');
+    expect(mergeSpeechSegments('hola cómo estás', 'cómo estás')).toBe('hola como estas');
+    expect(mergeSpeechSegments('hola', 'buenas tardes')).toBe('hola buenas tardes');
   });
 
   it('maps verb conjugations to one canonical sign clip', () => {
