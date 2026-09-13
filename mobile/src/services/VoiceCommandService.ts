@@ -169,6 +169,21 @@ export function shouldDeferPartialSpeechMatch(
   return false;
 }
 
+/**
+ * A final phrase must resolve an exact alias even when it is also the prefix
+ * of a longer expression. For example, "como" must play COMER after the
+ * person finishes the phrase; only continuous recognition can wait briefly
+ * for a possible follow-up such as "cómo estás".
+ */
+export function shouldDeferSpeechMatch(
+  text: string,
+  knownWords: SpeechVocabulary,
+  isFinal: boolean,
+  isContinuous: boolean,
+): boolean {
+  return shouldDeferPartialSpeechMatch(text, knownWords) && (!isFinal || isContinuous);
+}
+
 export function selectKnownSpeechAlternative(
   alternatives: readonly string[] | undefined,
   knownWords: SpeechVocabulary,

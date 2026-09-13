@@ -19,9 +19,9 @@ describe('Android release configuration', () => {
     'utf8',
   );
 
-  it('targets stable Android API 37', () => {
-    expect(rootGradle).toContain('compileSdkVersion = 37');
-    expect(rootGradle).toContain('targetSdkVersion = 37');
+  it('targets the installed stable Android API 36', () => {
+    expect(rootGradle).toContain('compileSdkVersion = 36');
+    expect(rootGradle).toContain('targetSdkVersion = 36');
   });
 
   it('fails closed instead of falling back to debug signing', () => {

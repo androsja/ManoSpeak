@@ -5,6 +5,7 @@ import {
   normalizeSpeech,
   resolvePictureInPictureTransition,
   selectKnownSpeechAlternative,
+  shouldDeferSpeechMatch,
   shouldDeferPartialSpeechMatch,
   speechContainsWord,
 } from '../VoiceCommandService';
@@ -102,6 +103,18 @@ describe('VoiceCommandService', () => {
     expect(shouldDeferPartialSpeechMatch('cómo', vocabulary)).toBe(true);
     expect(extractKnownSpeechWords('¿cómo estás?', vocabulary)).toEqual(['¿CÓMO ESTÁS?']);
     expect(shouldDeferPartialSpeechMatch('cómo estás', vocabulary)).toBe(false);
+  });
+
+  it('resolves a final alias even when it can start a longer expression', () => {
+    const vocabulary = [
+      {gloss: 'COMER', aliases: ['como']},
+      {gloss: '¿CÓMO ESTÁS?', aliases: ['como estas']},
+    ];
+
+    expect(shouldDeferPartialSpeechMatch('yo como', vocabulary)).toBe(true);
+    expect(shouldDeferSpeechMatch('yo como', vocabulary, false, false)).toBe(true);
+    expect(shouldDeferSpeechMatch('yo como', vocabulary, true, false)).toBe(false);
+    expect(shouldDeferSpeechMatch('yo como', vocabulary, true, true)).toBe(true);
   });
 
   it('joins consecutive recognizer segments for a longer expression', () => {

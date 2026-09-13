@@ -21,7 +21,7 @@ import {
   mergeSpeechSegments,
   resolvePictureInPictureTransition,
   selectKnownSpeechAlternative,
-  shouldDeferPartialSpeechMatch,
+  shouldDeferSpeechMatch,
 } from '../services/VoiceCommandService';
 import type {InstalledSign} from '../services/SignLanguageService';
 import {
@@ -599,7 +599,12 @@ export function ListenerScreen({
       }
       return;
     }
-    if (shouldDeferPartialSpeechMatch(phraseText, knownWords)) {
+    if (shouldDeferSpeechMatch(
+      phraseText,
+      knownWords,
+      isFinal,
+      listeningModeRef.current === 'continuous',
+    )) {
       setTranscript(phraseText);
       if (isFinal && listeningModeRef.current === 'continuous') {
         if (deferredSpeechTimer.current) clearTimeout(deferredSpeechTimer.current);
