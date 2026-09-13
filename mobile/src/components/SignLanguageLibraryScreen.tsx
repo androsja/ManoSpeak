@@ -66,6 +66,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState(ALL_CATEGORIES);
   const [visibleLimit, setVisibleLimit] = useState(CATALOG_PAGE_SIZE);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
 
   const catalogLanguage = languages.find(language => language.id === catalogLanguageId);
   const installedSignIds = useMemo(
@@ -98,6 +99,17 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
     () => new Set(catalogLanguage?.pendingSigns.map(sign => sign.id) ?? []),
     [catalogLanguage],
   );
+  const possiblePhrases = useMemo(() => {
+    const signs = languages.find(language => language.selected)?.signs ?? languages[0]?.signs ?? [];
+    const publishedPhrases = signs
+      .flatMap(sign => sign.speechAliases)
+      .map(phrase => phrase.trim())
+      .filter(phrase => phrase.split(/\s+/).length >= 2);
+    return Array.from(new Set(publishedPhrases));
+  }, [languages]);
+  const possiblePhrase = possiblePhrases.length > 0
+    ? possiblePhrases[suggestionIndex % possiblePhrases.length]
+    : 'No hay frases disponibles';
 
   const load = async () => {
     setLoading(true);
@@ -381,6 +393,21 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
           <Text style={styles.secondaryText}>REINTENTAR</Text>
         </TouchableOpacity>
       ) : null}
+      {!loading && !error && languages.length > 0 ? (
+        <View style={styles.suggestionCard}>
+          <Text style={styles.suggestionEyebrow}>PRUEBA UNA FRASE</Text>
+          <Text style={styles.suggestionPhrase}>“{possiblePhrase}”</Text>
+          <Text style={styles.suggestionHint}>Usa palabras disponibles en esta lengua.</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Mostrar otra frase posible"
+            onPress={() => setSuggestionIndex(index => index + 1)}
+            style={styles.suggestionButton}
+          >
+            <Text style={styles.suggestionButtonText}>OTRA FRASE ↻</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <TouchableOpacity
         style={isSkipping ? styles.skipButton : styles.continueButton}
         onPress={() => onContinue(languages)}
@@ -439,6 +466,12 @@ const styles = StyleSheet.create({
   noResults: {color: '#94A3B8', fontSize: 15, lineHeight: 22, paddingVertical: 28, textAlign: 'center'},
   error: {color: '#FCA5A5', fontSize: 15, marginBottom: 18},
   empty: {color: '#94A3B8', fontSize: 15, marginBottom: 18},
+  suggestionCard: {backgroundColor: '#17243A', borderColor: '#28415D', borderRadius: 16, borderWidth: 1, marginTop: 'auto', marginBottom: 14, padding: 16},
+  suggestionEyebrow: {color: '#38BDF8', fontSize: 11, fontWeight: '900', letterSpacing: 1},
+  suggestionPhrase: {color: '#F8FAFC', fontSize: 20, fontWeight: '800', marginTop: 9},
+  suggestionHint: {color: '#94A3B8', fontSize: 12, marginTop: 6},
+  suggestionButton: {alignSelf: 'flex-start', borderColor: '#38BDF8', borderRadius: 9, borderWidth: 1, marginTop: 12, paddingHorizontal: 12, paddingVertical: 8},
+  suggestionButtonText: {color: '#7DD3FC', fontSize: 11, fontWeight: '900'},
   secondary: {alignItems: 'center', borderColor: '#38BDF8', borderRadius: 12, borderWidth: 1, padding: 14},
   secondaryText: {color: '#38BDF8', fontWeight: '800'},
   continueButton: {alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 12, marginTop: 'auto', padding: 16},

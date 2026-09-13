@@ -8,6 +8,7 @@ export type AccessPolicy = {
   quotaBlocked: boolean;
   canUsePictureInPicture: boolean;
   canUsePhraseMode: boolean;
+  canUseContinuousMode: boolean;
 };
 
 export function resolveAccessPolicy(
@@ -36,5 +37,6 @@ export function resolveAccessPolicy(
     canUsePhraseMode: !config.monetizationEnabled
       || !config.phraseModeRequiresPlus
       || paidAccessActive,
+    canUseContinuousMode: !config.monetizationEnabled || paidAccessActive,
   };
 }

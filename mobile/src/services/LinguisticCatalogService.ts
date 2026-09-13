@@ -113,6 +113,12 @@ export const PUBLISHED_LSC_SIGN_COUNT = PUBLISHED_LSC_ENTRIES.length;
 const ENTRY_BY_CLIP = new Map(
   PUBLISHED_LSC_ENTRIES.map((entry) => [entry.motion.clip, entry]),
 );
+const ENTRY_BY_NORMALIZED_CLIP = new Map(
+  CATALOG.entries.map((entry) => [normalizeSpeech(entry.motion.clip), entry]),
+);
+function catalogEntryForGloss(gloss: string): LinguisticEntry | undefined {
+  return ENTRY_BY_CLIP.get(gloss) ?? ENTRY_BY_NORMALIZED_CLIP.get(normalizeSpeech(gloss));
+}
 const SUBJECT_MARKER_GLOSSES = new Set(Object.values(GRAMMAR.subjectMarkers ?? {}));
 
 type SpeechCandidate = {
@@ -222,15 +228,17 @@ export function resolvePublishedLscPlan(
   const unavailableMarkers: string[] = [];
 
   for (let index = 0; index < words.length;) {
-    if (NON_SIGN_FUNCTION_WORDS.has(words[index])) {
-      index += 1;
-      continue;
-    }
-    if (words[index] === 'el' && !isThirdPersonPronounEl(words, index, installedGlosses)) {
-      index += 1;
-      continue;
-    }
+    // A multi-word alias may begin with a Spanish function word, e.g.
+    // "hasta luego" → ADIÓS. Always try the complete vocabulary first.
     const candidate = candidateAt(words, index, installedGlosses);
+    if (!candidate && NON_SIGN_FUNCTION_WORDS.has(words[index])) {
+      index += 1;
+      continue;
+    }
+    if (!candidate && words[index] === 'el' && !isThirdPersonPronounEl(words, index, installedGlosses)) {
+      index += 1;
+      continue;
+    }
     if (!candidate) {
       const temporalGloss = GRAMMAR.temporalMarkers?.[words[index]];
       const temporalEntry = temporalGloss ? ENTRY_BY_CLIP.get(temporalGloss) : undefined;
@@ -272,6 +280,9 @@ function installedSpeechCandidates(
   return signs.flatMap(sign => Array.from(new Set([
     sign.gloss,
     ...sign.speechAliases,
+    ...(catalogEntryForGloss(sign.gloss)?.spanish
+      ? uniquePhrases(catalogEntryForGloss(sign.gloss) as LinguisticEntry)
+      : []),
   ])).map(phrase => ({
     sign,
     normalized: normalizeSpeech(phrase),
@@ -321,7 +332,13 @@ export function speechVocabularyForInstalledSigns(
 ): SpeechSign[] {
   return signs.map(sign => ({
     gloss: sign.gloss,
-    aliases: Array.from(new Set([sign.gloss, ...sign.speechAliases])),
+    aliases: Array.from(new Set([
+      sign.gloss,
+      ...sign.speechAliases,
+      ...(catalogEntryForGloss(sign.gloss)
+        ? uniquePhrases(catalogEntryForGloss(sign.gloss) as LinguisticEntry)
+        : []),
+    ])),
   }));
 }
 
@@ -343,12 +360,18 @@ export function resolveInstalledSignPlan(
   const unavailableMarkers: string[] = [];
 
   for (let index = 0; index < words.length;) {
-    if (isLsc && NON_SIGN_FUNCTION_WORDS.has(words[index])) {
+    const candidate = installedCandidateAt(words, index, candidates);
+    if (
+      !candidate
+      && isLsc
+      && NON_SIGN_FUNCTION_WORDS.has(words[index])
+    ) {
       index += 1;
       continue;
     }
-    const candidate = installedCandidateAt(words, index, candidates);
     if (
+      !candidate
+      &&
       isLsc
       && words[index] === 'el'
       && installedCandidateAt(words, index + 1, candidates)?.sign.lexicalClass !== 'verb'

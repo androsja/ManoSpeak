@@ -118,7 +118,7 @@ android {
         applicationId "com.androsja.vozual"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
+        versionCode 3
         versionName "1.1"
     }
 
@@ -226,9 +226,8 @@ tasks.register("verifyUploadSigningIdentity") {
     }
 }
 
-// AGP does not create a release JVM-test variant for this React Native app.
-// Keep the conventional gate name and validate the release variant directly.
-tasks.register("testReleaseUnitTest") {
+// Validate release invariants without shadowing AGP's generated test task.
+tasks.register("verifyReleaseUnitTestConfiguration") {
     group = "verification"
     description = "Validates security-critical release build-type invariants."
     doLast {

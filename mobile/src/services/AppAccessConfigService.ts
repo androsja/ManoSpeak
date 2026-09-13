@@ -36,7 +36,7 @@ export const DEFAULT_APP_ACCESS_CONFIG: AppAccessConfig = {
   freeMonthlyMinutes: 60,
   freeAllSigns: true,
   pipRequiresPlus: true,
-  phraseModeRequiresPlus: true,
+  phraseModeRequiresPlus: false,
   freeUsageMeasurement: 'active_translation_seconds',
   usageWarningMinutes: [15, 5, 1],
   // OAuth client identifiers are public configuration, not secrets. Keeping
@@ -109,7 +109,9 @@ export async function loadAppAccessConfig(): Promise<AppAccessConfig> {
       ),
       freeAllSigns: getBoolean(remoteConfig, 'free_all_signs'),
       pipRequiresPlus: getBoolean(remoteConfig, 'pip_requires_plus'),
-      phraseModeRequiresPlus: getBoolean(remoteConfig, 'phrase_mode_requires_plus'),
+      // Por frase is the free entry mode; Remote Config must not be able to
+      // accidentally lock it behind Plus.
+      phraseModeRequiresPlus: false,
       freeUsageMeasurement: 'active_translation_seconds',
       usageWarningMinutes: parseUsageWarningMinutes(
         getString(remoteConfig, 'usage_warning_minutes'),

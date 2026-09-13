@@ -33,9 +33,9 @@ describe('LinguisticCatalogService', () => {
   });
 
   it('does not expose a linguistically reviewed sign before personal approval', () => {
-    expect(findPublishedLscEntry('GRACIAS')).toBeUndefined();
-    expect(planPublishedLscGlosses(['GRACIAS'])).toEqual([]);
-    expect(resolvePublishedLscPlan('muchas gracias').tokens).toEqual([]);
+    expect(findPublishedLscEntry('PERDÓN')).toBeUndefined();
+    expect(planPublishedLscGlosses(['PERDÓN'])).toEqual([]);
+    expect(resolvePublishedLscPlan('perdón').tokens).toEqual([]);
   });
 
   it('recognizes voice forms only for personally approved clips', () => {
@@ -77,5 +77,21 @@ describe('LinguisticCatalogService', () => {
     }]);
     expect(resolveInstalledSignPlan('esta seña nueva', signs).tokens.map(token => token.gloss))
       .toEqual(['NUEVA']);
+  });
+
+  it('maps every catalog alias to an installed sign even when its gloss omits accents', () => {
+    const signs = [{
+      languageId: 'lsc-co',
+      gloss: 'ADIOS',
+      speechAliases: ['adios'],
+      categories: ['saludos_cortesia'],
+      lexicalClass: 'fixed_expression',
+      verbType: 'none' as const,
+      requiresSubjectMarker: false,
+    }];
+
+    expect(speechVocabularyForInstalledSigns(signs)[0].aliases).toContain('hasta luego');
+    expect(resolveInstalledSignPlan('hasta luego', signs).tokens.map(token => token.gloss))
+      .toEqual(['ADIOS']);
   });
 });

@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import RNFS from 'react-native-fs';
 import {
+  advanceIncrementalSpeechMatches,
   mergeSpeechSegments,
   resolvePictureInPictureTransition,
   selectKnownSpeechAlternative,
@@ -67,8 +68,8 @@ const DEFAULT_AVATAR_ZOOM = 1;
 const CONTINUOUS_PREFIX_WAIT_MS = 1200;
 type ListeningMode = 'continuous' | 'phrase';
 const LISTENING_MODES: Array<{value: ListeningMode; label: string; detail: string}> = [
-  {value: 'continuous', label: 'EN VIVO', detail: 'Escucha continuamente y traduce al instante'},
   {value: 'phrase', label: 'POR FRASE', detail: 'Escucha primero y reproduce después'},
+  {value: 'continuous', label: 'EN VIVO', detail: 'Escucha continuamente y traduce al instante'},
 ];
 const AVATAR_RENDER_MODES: Array<{value: AvatarRenderMode; label: string}> = [
   {value: 'points', label: 'PUNTOS'},
@@ -92,6 +93,9 @@ const OFFLINE_SPEECH_ERRORS = new Set([
 ]);
 const OFFLINE_SPEECH_MESSAGE = 'El reconocimiento local de español (Colombia) no está disponible. Descarga el idioma en los ajustes del teléfono y vuelve a intentarlo.';
 const MICROPHONE_PERMISSION_ERROR = 'microphone_permission_denied';
+function speechDebug(event: string, details?: unknown): void {
+  if (__DEV__) console.info(`[VozualSpeech] ${event}`, details ?? '');
+}
 function speechErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error !== null && 'message' in error) {
@@ -173,7 +177,7 @@ export function ListenerScreen({
   const lastRecognitionActivity = useRef(0);
   const nativeStartInFlight = useRef(false);
   const listeningRef = useRef(false);
-  const listeningModeRef = useRef<ListeningMode>('continuous');
+  const listeningModeRef = useRef<ListeningMode>('phrase');
   const phrasePartialTextRef = useRef('');
   const playingRef = useRef(false);
   const phraseInProgressRef = useRef(false);
@@ -186,7 +190,7 @@ export function ListenerScreen({
   const signQueue = useRef<KnownWord[]>([]);
   const recognizedWords = useRef<KnownWord[]>([]);
   const [listening, setListening] = useState(false);
-  const [listeningMode, setListeningMode] = useState<ListeningMode>('continuous');
+  const [listeningMode, setListeningMode] = useState<ListeningMode>('phrase');
   const [phraseFinalizing, setPhraseFinalizing] = useState(false);
   const [recognitionReady, setRecognitionReady] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -229,9 +233,7 @@ export function ListenerScreen({
     : 'Di una frase para comenzar';
   const knownWords = useMemo(() => {
     const reviewed = playableLscPhraseVocabulary(installedSigns);
-    return __DEV__
-      ? [...reviewed, ...speechVocabularyForInstalledSigns(installedSigns)]
-      : reviewed;
+    return [...reviewed, ...speechVocabularyForInstalledSigns(installedSigns)];
   }, [installedSigns]);
   const installedSignCount = installedSigns.length;
   // Development builds exercise the complete Plus flow without contacting a
@@ -398,9 +400,10 @@ export function ListenerScreen({
         if (active && Number.isFinite(storedZoom) && storedZoom >= AVATAR_ZOOM_MIN && storedZoom <= AVATAR_ZOOM_MAX) {
           setAvatarZoom(storedZoom);
         }
-        if (active && (preferences.listeningMode === 'continuous' || preferences.listeningMode === 'phrase')) {
-          listeningModeRef.current = preferences.listeningMode;
-          setListeningMode(preferences.listeningMode);
+        // The current test build exposes only the free phrase mode.
+        if (active) {
+          listeningModeRef.current = 'phrase';
+          setListeningMode('phrase');
         }
       })
       // A first launch has no preference file. Playback remains at 1×.
@@ -429,6 +432,10 @@ export function ListenerScreen({
       openBillingSandbox('El modo Por frase es una función de VOZUAL Plus. Puedes simular su compra aquí.');
       return;
     }
+    if (mode === 'continuous' && !accessPolicy.canUseContinuousMode) {
+      openBillingSandbox('El modo En vivo es una función de VOZUAL Plus. Puedes simular su compra aquí.');
+      return;
+    }
     listeningModeRef.current = mode;
     phrasePartialTextRef.current = '';
     setListeningMode(mode);
@@ -440,7 +447,7 @@ export function ListenerScreen({
       JSON.stringify({speed: playbackSpeed, zoom: avatarZoom, listeningMode: mode}),
       'utf8',
     ).catch(() => undefined);
-  }, [accessPolicy.canUsePhraseMode, avatarZoom, openBillingSandbox, phraseFinalizing, playbackSpeed]);
+  }, [accessPolicy.canUseContinuousMode, accessPolicy.canUsePhraseMode, avatarZoom, openBillingSandbox, phraseFinalizing, playbackSpeed]);
 
   useEffect(() => {
     pictureInPicture?.setAvatarPresentation(avatarRenderMode, avatarZoom, playbackSpeed);
@@ -510,18 +517,20 @@ export function ListenerScreen({
     startSign(word, phraseInProgressRef.current);
   }, [startSign]);
 
-  const handleText = useCallback((text: string) => {
+  const handleText = useCallback((text: string, isFinal = false) => {
     setTranscript(text);
     const resolution = resolveRuntimeLscPlayback(text, installedSigns, __DEV__);
     const words = resolution.glosses as KnownWord[];
     setDraftPreviewActive(resolution.status === 'draft');
     setPlannedLsc(words.join(' · '));
     setErrorMessage(resolution.message);
-    const previous = recognizedWords.current;
-    const extendsPrevious = previous.every((word, index) => words[index] === word);
-    if (extendsPrevious && words.length > previous.length) {
-      const newWords = words.slice(previous.length);
-      recognizedWords.current = words;
+    const {newWords, nextRecognizedWords} = advanceIncrementalSpeechMatches(
+      recognizedWords.current,
+      words,
+      isFinal,
+    );
+    recognizedWords.current = nextRecognizedWords;
+    if (newWords.length > 0) {
       if (pictureInPictureModeRef.current) {
         pictureInPicture?.enqueueSigns(newWords);
         setPlayingSign(true);
@@ -529,8 +538,6 @@ export function ListenerScreen({
         signQueue.current.push(...newWords);
         playNextSign();
       }
-    } else if (words.length === 0) {
-      recognizedWords.current = [];
     }
   }, [installedSigns, playNextSign]);
 
@@ -564,7 +571,7 @@ export function ListenerScreen({
       ? bestText || phrasePartialTextRef.current
       : bestText;
     if (!phraseText) {
-      handleText('');
+      handleText('', isFinal);
       if (listeningModeRef.current === 'phrase' && isFinal) {
         if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
         phraseFinalizeTimer.current = undefined;
@@ -588,7 +595,9 @@ export function ListenerScreen({
           const pendingText = deferredSpeechPrefix.current;
           deferredSpeechTimer.current = undefined;
           deferredSpeechPrefix.current = '';
-          if (pendingText && listeningRef.current) handleText(pendingText);
+          if (pendingText && listeningRef.current) {
+            handleText(pendingText, true);
+          }
         }, CONTINUOUS_PREFIX_WAIT_MS);
       }
       return;
@@ -602,7 +611,7 @@ export function ListenerScreen({
         matches.join(', '),
       );
     }
-    handleText(phraseText);
+    handleText(phraseText, isFinal);
     if (listeningModeRef.current === 'phrase' && isFinal) {
       if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
       phraseFinalizeTimer.current = undefined;
@@ -624,6 +633,12 @@ export function ListenerScreen({
   }, []);
 
   const startActivityRecognition = useCallback(async () => {
+    speechDebug('start-request', {
+      platform: Platform.OS,
+      mode: listeningModeRef.current,
+      listening: listeningRef.current,
+      ready: recognitionReadyRef.current,
+    });
     if (
       !listeningRef.current ||
       nativePipSpeechActiveRef.current ||
@@ -695,6 +710,7 @@ export function ListenerScreen({
     }
     try {
       await pictureInPicture.startListeningService();
+      speechDebug('android-service-requested');
       nativeStartInFlight.current = false;
 
       // Android can keep the foreground recognizer alive while React Native
@@ -850,7 +866,7 @@ export function ListenerScreen({
       setListening(false);
       setPhraseFinalizing(false);
       if (fallbackText) {
-        handleText(fallbackText);
+        handleText(fallbackText, true);
         phrasePartialTextRef.current = '';
       } else {
         setErrorMessage('No entendí la frase. Toca HABLAR para intentarlo nuevamente.');
@@ -1107,10 +1123,12 @@ export function ListenerScreen({
       if (iosSpeechRecognizer) {
         const emitter = new NativeEventEmitter(iosSpeechRecognizer);
         const startSubscription = emitter.addListener('onVozualIosSpeechStart', () => {
+          speechDebug('ios-start');
           nativeStartInFlight.current = false;
           recognitionReadyRef.current = true;
           iosLastSpeechEvent.current = undefined;
           iosFinalResultHandled.current = false;
+          recognizedWords.current = [];
           lastRecognitionActivity.current = Date.now();
           setRecognitionReady(true);
           setErrorMessage('');
@@ -1135,6 +1153,7 @@ export function ListenerScreen({
           },
         );
         const errorSubscription = emitter.addListener('onVozualIosSpeechError', (event: SpeechEvent) => {
+          speechDebug('ios-error', event.error);
           nativeStartInFlight.current = false;
           if (listeningModeRef.current === 'phrase') {
             finalizeIosSpeechResult();
@@ -1154,6 +1173,7 @@ export function ListenerScreen({
         const endSubscription = emitter.addListener(
           'onVozualIosSpeechEnd',
           (event: IosNativeSpeechEndEvent) => {
+            speechDebug('ios-end', event);
             nativeStartInFlight.current = false;
             if (listeningModeRef.current === 'phrase') {
               finalizeIosSpeechResult();
@@ -1184,6 +1204,7 @@ export function ListenerScreen({
     }
     const emitter = DeviceEventEmitter;
     const startSubscription = emitter.addListener('onSpeechStart', () => {
+      speechDebug('android-start');
       if (nativePipSpeechActiveRef.current) return;
       nativeStartInFlight.current = false;
       recognitionReadyRef.current = true;
@@ -1207,11 +1228,13 @@ export function ListenerScreen({
       markRecognitionUnavailable();
     });
     const errorSubscription = emitter.addListener('onSpeechError', (event: SpeechEvent) => {
+      speechDebug('android-error', event.error);
       if (nativePipSpeechActiveRef.current) return;
       markRecognitionUnavailable();
       if (event.error) setErrorMessage('');
     });
     const endSubscription = emitter.addListener('onSpeechEnd', () => {
+      speechDebug('android-end', {listening: listeningRef.current, mode: listeningModeRef.current});
       if (nativePipSpeechActiveRef.current) return;
       // Android recognition is phrase-based: it normally ends after silence
       // even when the user still wants continuous listening.
@@ -1224,6 +1247,12 @@ export function ListenerScreen({
     const pipSpeechSubscription = emitter.addListener(
       'onVozualPipSpeechEvent',
       (event: PipSpeechEvent) => {
+        speechDebug('android-service-event', {
+          type: event.type,
+          error: event.error,
+          results: event.value ?? [],
+          listening: listeningRef.current,
+        });
         if (!listeningRef.current || !nativePipSpeechActiveRef.current) {
           pictureInPicture?.reportPlaybackEvent('ignored-speech-event', event.type ?? '');
           return;
@@ -1444,26 +1473,6 @@ export function ListenerScreen({
       </View>
 
       {!compactMode && <View style={styles.panel}>
-        <Text style={styles.modeHeading}>MODO DE TRADUCCIÓN</Text>
-        <View style={styles.listeningModeControl}>
-          {LISTENING_MODES.map((mode) => (
-            <Pressable
-              key={mode.value}
-              accessibilityRole="button"
-              accessibilityState={{selected: listeningMode === mode.value, disabled: listening || playingSign || phraseFinalizing}}
-              accessibilityLabel={`${mode.label}. ${mode.detail}`}
-              onPress={() => chooseListeningMode(mode.value)}
-              disabled={listening || playingSign || phraseFinalizing}
-              style={[
-                styles.listeningModeOption,
-                listeningMode === mode.value && styles.listeningModeOptionActive,
-                (listening || playingSign || phraseFinalizing) && styles.listeningModeOptionDisabled,
-              ]}
-            >
-              <Text style={[styles.listeningModeLabel, listeningMode === mode.value && styles.listeningModeLabelActive]}>{mode.label}</Text>
-            </Pressable>
-          ))}
-        </View>
         <Pressable
           accessibilityRole="button"
           style={[styles.button, listening && styles.buttonActive, (phraseFinalizing || (!listening && playingSign)) && styles.buttonDisabled]}
@@ -1479,17 +1488,6 @@ export function ListenerScreen({
                 ? (playingSign ? 'REPRODUCIENDO SEÑAS…' : listening ? 'TERMINAR FRASE' : 'HABLAR')
                 : listening ? 'DETENER ESCUCHA' : 'ACTIVAR MICRÓFONO'}
             </Text>}
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Abrir VOZUAL en una ventana flotante sobre otras aplicaciones"
-          style={[styles.floatingButton, !avatarReady && styles.floatingButtonDisabled]}
-          onPress={enterFloatingMode}
-          disabled={!avatarReady}
-        >
-          <Text style={[styles.floatingButtonText, !avatarReady && styles.floatingButtonTextDisabled]}>
-            {avatarReady ? 'ABRIR VENTANA FLOTANTE' : 'CARGANDO AVATAR…'}
-          </Text>
         </Pressable>
         {phraseFinalizing ? (
           <View style={styles.microphoneProgress} accessibilityLabel="Preparando traducción">
