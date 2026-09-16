@@ -42,6 +42,7 @@ import {
   RiggedHandDepthLayer,
   RiggedHandEditKeyframe,
   RiggedHandEditPose,
+  RiggedFacialEdit,
   RiggedFingerName,
   RiggedHandFingerStates,
   RiggedHandPresentation,
@@ -54,6 +55,7 @@ import {
   riggedPalmScaleFactor,
   riggedWristDepth,
   riggedHandsEditPoseAtFrame,
+  riggedFacialEditAtFrame,
   riggedSmileEditAtFrame,
   shouldDriveFlatPalmSegment,
   shouldDriveConfiguredExtendedFingerSegment,
@@ -175,6 +177,11 @@ type AvatarProfile = {
   rigRightHandBackDepth?: number;
   rigLeftForearmFollowUpperArmRoll?: boolean;
   rigRightForearmFollowUpperArmRoll?: boolean;
+  rigLeftForearmAxialRollDegrees?: number;
+  rigRightForearmAxialRollDegrees?: number;
+  /** Adds a small lateral gap between the index and middle MCPs. */
+  rigLeftIndexMiddleSpread?: number;
+  rigRightIndexMiddleSpread?: number;
   rigLeftForearmMinimumScreenLength?: number;
   rigRightForearmMinimumScreenLength?: number;
   rigLeftHandTrackingRepair?: RiggedHandTrackingRepair;
@@ -204,12 +211,17 @@ declare global {
       currentFrame: number;
       keyframes: RiggedHandEditKeyframe[];
       smile: number;
+      face: RiggedFacialEdit;
       pose: {left: RiggedHandEditPose; right: RiggedHandEditPose};
+      indexMiddleSpread: number;
+      forearmAxialRollDegrees: number;
     } | undefined;
     setVozualRigHandKeyframes: (
       clip: string,
       keyframes: RiggedHandEditKeyframe[],
     ) => boolean;
+    setVozualRigFingerSpread: (clip: string, spread: number) => boolean;
+    setVozualForearmAxialRoll: (clip: string, degrees: number) => boolean;
     getVozualRigDiagnostics: () => Record<string, unknown>;
     ReactNativeWebView?: {postMessage: (message: string) => void};
   }
@@ -273,6 +285,10 @@ scene.add(avatarKeyLight);
 // The purchased character is optional and never replaces the landmark data.
 // PUNTOS and CARICATURA remain available as exact comparison/fallback modes.
 let riggedAvatar: THREE.Group | undefined;
+let riggedMouthContractionTargets: Array<{
+  mesh: THREE.SkinnedMesh;
+  index: number;
+}> | undefined;
 let riggedBones = new Map<string, THREE.Bone>();
 let riggedBoneRests = new Map<string, {
   direction: THREE.Vector3;
@@ -323,6 +339,10 @@ const riggedSmileBones = [
   'DEF-lip.T.R.001', 'DEF-lip.B.R.001',
   'DEF-cheek.B.L', 'DEF-cheek.B.R',
 ];
+const riggedMouthCornerSkinBones = [
+  'DEF-cheek.B.L.001', 'DEF-cheek.B.R.001',
+  'DEF-cheek.T.L.001', 'DEF-cheek.T.R.001',
+];
 const riggedLeftLidBones = [
   'DEF-lid.T.L', 'DEF-lid.T.L.001', 'DEF-lid.T.L.002', 'DEF-lid.T.L.003',
   'DEF-lid.B.L', 'DEF-lid.B.L.001', 'DEF-lid.B.L.002', 'DEF-lid.B.L.003',
@@ -362,6 +382,7 @@ const riggedSyntheticFaceBones = [
   ...riggedRightInnerBrowBones,
   ...riggedUpperLipBones,
   ...riggedLowerLipBones,
+  ...riggedMouthCornerSkinBones,
   ...riggedJawBones,
   ...riggedChinBones,
   ...riggedLowerMouthInteriorBones,
@@ -1271,6 +1292,17 @@ function placeRiggedPalm(
   const targetMetacarpals = [5, 9, 13, 17].map(index =>
     riggedHandTargetPoint(side, hand[index], hand[0], wristWorldZ),
   );
+  const configuredSpread = side === 'L'
+    ? activeProfile?.rigLeftIndexMiddleSpread
+    : activeProfile?.rigRightIndexMiddleSpread;
+  if (configuredSpread && Number.isFinite(configuredSpread)) {
+    const lateral = targetMetacarpals[3].clone().sub(targetMetacarpals[0]);
+    if (lateral.lengthSq() > 0.000001) {
+      lateral.normalize().multiplyScalar(THREE.MathUtils.clamp(configuredSpread, 0, 0.08));
+      targetMetacarpals[0].addScaledVector(lateral, -0.5);
+      targetMetacarpals[1].addScaledVector(lateral, 0.5);
+    }
+  }
   const targetPalmCenter = averageRiggedPoints(targetMetacarpals);
   const targetIndexSide = averageRiggedPoints(targetMetacarpals.slice(0, 2));
   const targetPinkySide = averageRiggedPoints(targetMetacarpals.slice(2));
@@ -1607,6 +1639,66 @@ function widenRiggedEye(side: 'L' | 'R', intensity: number) {
   });
 }
 
+function ensureRiggedMouthContractionTargets() {
+  if (riggedMouthContractionTargets) return riggedMouthContractionTargets;
+  const targets: Array<{mesh: THREE.SkinnedMesh; index: number}> = [];
+  const body = riggedAvatar?.getObjectByName('NUG_Base_Body');
+  if (!body) {
+    riggedMouthContractionTargets = targets;
+    return targets;
+  }
+  // The purchased GLB has no facial morph targets. Its body mesh does contain
+  // the complete lip and mouth-corner surface, so create one relative target
+  // for that small region. This moves the full mouth surface rather than only
+  // the lip bones, including the wide crease at each corner.
+  body.traverse(object => {
+    const mesh = object as THREE.SkinnedMesh;
+    if (!mesh.isSkinnedMesh) return;
+    const geometry = mesh.geometry;
+    if ((geometry.morphAttributes.position?.length ?? 0) > 0) return;
+    const positions = geometry.getAttribute('position');
+    if (!positions) return;
+    const deltas = new Float32Array(positions.count * 3);
+    let affectedVertices = 0;
+    for (let index = 0; index < positions.count; index += 1) {
+      const x = positions.getX(index);
+      const y = positions.getY(index);
+      const z = positions.getZ(index);
+      // Avatar-local bounds measured from the lip-weighted vertices in this
+      // exact GLB. The smooth falloff stops the deformation at the philtrum,
+      // chin, and cheeks instead of pulling the whole face inward.
+      const verticalDistance = Math.abs(y - 1.531) / 0.028;
+      const depthDistance = Math.abs(z - 0.098) / 0.026;
+      if (Math.abs(x) > 0.052 || verticalDistance >= 1 || depthDistance >= 1) continue;
+      const envelope = (1 - verticalDistance * verticalDistance)
+        * (1 - depthDistance * depthDistance);
+      if (envelope <= 0.01) continue;
+      // Bring both complete halves of the mouth toward its centre. This is
+      // deliberately applied to the surface, not a cosmetic overlay.
+      deltas[index * 3] = -x * 0.58 * envelope;
+      affectedVertices += 1;
+    }
+    if (affectedVertices < 20) return;
+    const targetIndex = geometry.morphAttributes.position?.length ?? 0;
+    geometry.morphAttributes.position = [
+      ...(geometry.morphAttributes.position ?? []),
+      new THREE.Float32BufferAttribute(deltas, 3),
+    ];
+    geometry.morphTargetsRelative = true;
+    mesh.updateMorphTargets();
+    targets.push({mesh, index: targetIndex});
+  });
+  riggedMouthContractionTargets = targets;
+  return targets;
+}
+
+function applyRiggedMouthContraction(intensity: number) {
+  ensureRiggedMouthContractionTargets().forEach(({mesh, index}) => {
+    if (!mesh.morphTargetInfluences) return;
+    mesh.morphTargetInfluences[index] = intensity;
+  });
+}
+
 function applyCapturedRiggedFace(frame: MotionFrame) {
   if (!activeFaceReference) return;
   const presentation = capturedFacePresentation(
@@ -1698,16 +1790,124 @@ function applyCapturedRiggedFace(frame: MotionFrame) {
   rotateRiggedHeadAndFace(headOrientation);
 }
 
-function applyRiggedLivelyFace(frame?: MotionFrame) {
-  restoreRiggedSyntheticFacePose();
-  if (frame) applyCapturedRiggedFace(frame);
-  const manualSmile = riggedSmileEditAtFrame(
-    activeProfile?.rigHandKeyframes,
-    Math.max(0, activeFrameIndex),
-  );
-  if (manualSmile > 0) {
-    const vertical = 0.062 * manualSmile;
-    const horizontal = 0.03 * manualSmile;
+/** Applies face controls authored in Vozual Editor after the captured facial pose. */
+function applyRiggedFacialEdit(face: RiggedFacialEdit) {
+  if (face.eyeWidening > 0) {
+    widenRiggedEye('L', face.eyeWidening);
+    widenRiggedEye('R', face.eyeWidening);
+  }
+  const pursedO = face.mouthPucker > 0.001;
+  if (face.mouthOpening > 0) {
+    riggedUpperLipBones.forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(0, 0.035 * face.mouthOpening, 0));
+    });
+    riggedLowerLipBones.forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(0, -0.055 * face.mouthOpening, 0));
+    });
+    // A rounded O is produced by the lips, not by dropping the jaw. Keeping
+    // the jaw near rest avoids exposing the teeth through a tiny aperture.
+    if (!pursedO) {
+      riggedJawBones.forEach(name => {
+        offsetRiggedBoneInWorld(name, new THREE.Vector3(0, -0.022 * face.mouthOpening, 0));
+      });
+      riggedChinBones.forEach(name => {
+        offsetRiggedBoneInWorld(name, new THREE.Vector3(0, -0.018 * face.mouthOpening, 0));
+      });
+      riggedLowerMouthInteriorBones.forEach(name => {
+        offsetRiggedBoneInWorld(name, new THREE.Vector3(0, -0.03 * face.mouthOpening, 0));
+      });
+    }
+  }
+  if (pursedO) {
+    // This rig supplies lip bones but no mouth morph targets. Approximate an
+    // O by contracting both halves of the mouth, not only its corners,
+    // bringing the upper and lower lip together, and projecting the lip ring
+    // forward. Teeth stay visible in the rig and disappear only when the lips
+    // physically cover them.
+    riggedUpperLipBones.forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        0,
+        -0.042 * face.mouthPucker,
+        0.028 * face.mouthPucker,
+      ));
+    });
+    riggedLowerLipBones.forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        0,
+        0.05 * face.mouthPucker,
+        0.028 * face.mouthPucker,
+      ));
+    });
+    ['DEF-lip.T.L', 'DEF-lip.B.L'].forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        -0.032 * face.mouthPucker,
+        0,
+        0.01 * face.mouthPucker,
+      ));
+    });
+    ['DEF-lip.T.R', 'DEF-lip.B.R'].forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        0.032 * face.mouthPucker,
+        0,
+        0.01 * face.mouthPucker,
+      ));
+    });
+    ['DEF-lip.T.L.001', 'DEF-lip.B.L.001'].forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        -0.075 * face.mouthPucker,
+        0,
+        0.012 * face.mouthPucker,
+      ));
+    });
+    ['DEF-lip.T.R.001', 'DEF-lip.B.R.001'].forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        0.075 * face.mouthPucker,
+        0,
+        0.012 * face.mouthPucker,
+      ));
+    });
+    // The cheek controls carry the skin at both mouth corners. Without them,
+    // only the lip edge contracts and the mouth crease stays too wide.
+    ['DEF-cheek.B.L', 'DEF-cheek.B.L.001'].forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        -0.04 * face.mouthPucker,
+        0.006 * face.mouthPucker,
+        0.008 * face.mouthPucker,
+      ));
+    });
+    ['DEF-cheek.B.R', 'DEF-cheek.B.R.001'].forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        0.04 * face.mouthPucker,
+        0.006 * face.mouthPucker,
+        0.008 * face.mouthPucker,
+      ));
+    });
+    ['DEF-cheek.T.L.001'].forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        -0.02 * face.mouthPucker,
+        0,
+        0.004 * face.mouthPucker,
+      ));
+    });
+    ['DEF-cheek.T.R.001'].forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(
+        0.02 * face.mouthPucker,
+        0,
+        0.004 * face.mouthPucker,
+      ));
+    });
+  }
+  if (face.browRaise > 0) {
+    riggedLeftInnerBrowBones.forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(0, 0.035 * face.browRaise, 0));
+    });
+    riggedRightInnerBrowBones.forEach(name => {
+      offsetRiggedBoneInWorld(name, new THREE.Vector3(0, 0.035 * face.browRaise, 0));
+    });
+  }
+  if (face.smile > 0) {
+    const vertical = 0.062 * face.smile;
+    const horizontal = 0.03 * face.smile;
     ['DEF-lip.T.L.001', 'DEF-lip.B.L.001', 'DEF-cheek.B.L'].forEach(name => {
       offsetRiggedBoneInWorld(name, new THREE.Vector3(horizontal, vertical, 0));
     });
@@ -1715,6 +1915,17 @@ function applyRiggedLivelyFace(frame?: MotionFrame) {
       offsetRiggedBoneInWorld(name, new THREE.Vector3(-horizontal, vertical, 0));
     });
   }
+  applyRiggedMouthContraction(face.mouthPucker);
+}
+
+function applyRiggedLivelyFace(frame?: MotionFrame) {
+  restoreRiggedSyntheticFacePose();
+  if (frame) applyCapturedRiggedFace(frame);
+  const manualFace = riggedFacialEditAtFrame(
+    activeProfile?.rigHandKeyframes,
+    Math.max(0, activeFrameIndex),
+  );
+  applyRiggedFacialEdit(manualFace);
   const now = performance.now();
   const idle = riggedHandsAtRest
     && !activeMotion
@@ -1984,7 +2195,7 @@ const MONEY_RUB_FINGER_POSE: ReadonlyArray<
 readonly [string, readonly number[], number]
 > = [
   PINCHED_FINGER_POSE[0],
-  PINCHED_FINGER_POSE[1],
+  ['f_middle', [78, 98, 74], 2],
   ['f_ring', THUMB_UP_FINGER_CURLS[2][1], 0],
   ['f_pinky', THUMB_UP_FINGER_CURLS[3][1], 0],
 ];
@@ -2089,10 +2300,9 @@ function applyRiggedPinchedHand(side: 'L' | 'R') {
 }
 
 /**
- * Presents DINERO with a stable model-local handshape. Index and middle stay
- * together against the thumb, ring and little finger stay compact, and only
- * the thumb oscillates. Avoiding per-frame landmark solves prevents the axial
- * twist visible when the captured fingertips overlap or jump in depth.
+ * Presents DINERO with a stable model-local handshape. The index meets the
+ * thumb while the other fingers stay folded. The thumb oscillates in a short
+ * repeated rub, avoiding the axial twist caused by captured fingertip jumps.
  */
 function applyRiggedMoneyRubHand(side: 'L' | 'R', rubPhase: number) {
   const mirrored = side === 'L' ? 1 : -1;
@@ -2115,11 +2325,11 @@ function applyRiggedMoneyRubHand(side: 'L' | 'R', rubPhase: number) {
   });
 
   const safePhase = THREE.MathUtils.clamp(rubPhase, -1, 1);
-  const thumbAdduction = (42 + safePhase * 8) * mirrored;
+  const thumbAdduction = (50 + safePhase * 12) * mirrored;
   const thumbCurls = [
-    PINCHED_THUMB_CURL[0],
-    PINCHED_THUMB_CURL[1] + safePhase * 9,
-    PINCHED_THUMB_CURL[2] - safePhase * 5,
+    34,
+    60 + safePhase * 15,
+    38 - safePhase * 10,
   ];
   thumbCurls.forEach((curl, jointIndex) => {
     const bone = riggedBone(`DEF-thumb.0${jointIndex + 1}.${side}`);
@@ -2229,6 +2439,27 @@ function applyRiggedConfiguredClosedFingers(
       bone.updateMatrix();
       bone.updateWorldMatrix(false, true);
     });
+  });
+  riggedAvatar?.updateMatrixWorld(true);
+}
+
+function applyRiggedFingerSplay(side: 'L' | 'R') {
+  const spread = side === 'L'
+    ? activeProfile?.rigLeftIndexMiddleSpread
+    : activeProfile?.rigRightIndexMiddleSpread;
+  if (!spread || spread <= 0) return;
+  const degrees = THREE.MathUtils.clamp(spread * 600, 0, 48);
+  const sign = side === 'L' ? 1 : -1;
+  (['index', 'middle'] as const).forEach((finger, index) => {
+    const bone = riggedBone(`DEF-f_${finger}.01.${side}`);
+    const rest = bone ? riggedBoneRests.get(bone.name) : undefined;
+    if (!bone || !rest) return;
+    const angle = THREE.MathUtils.degToRad((index === 0 ? 1 : -1) * sign * degrees);
+    bone.quaternion.copy(rest.localQuaternion).multiply(
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, angle, 'XYZ')),
+    ).normalize();
+    bone.updateMatrix();
+    bone.updateWorldMatrix(false, true);
   });
   riggedAvatar?.updateMatrixWorld(true);
 }
@@ -2344,6 +2575,24 @@ function applyRiggedHandEditPose(
   riggedAvatar?.updateMatrixWorld(true);
 }
 
+function applyProfileForearmAxialRoll(side: 'L' | 'R') {
+  const degrees = side === 'L'
+    ? activeProfile?.rigLeftForearmAxialRollDegrees
+    : activeProfile?.rigRightForearmAxialRollDegrees;
+  if (!degrees) return;
+  const forearm = riggedBone(`DEF-forearm.${side}`);
+  const endpoint = riggedBoneEndpoint(`DEF-forearm.${side}`);
+  if (!forearm || !forearm.parent || !endpoint) return;
+  const axis = endpoint.sub(forearm.getWorldPosition(new THREE.Vector3()));
+  if (axis.lengthSq() < 0.000001) return;
+  const rotation = new THREE.Quaternion().setFromAxisAngle(axis.normalize(), THREE.MathUtils.degToRad(THREE.MathUtils.clamp(degrees, -180, 180)));
+  const desired = rotation.multiply(forearm.getWorldQuaternion(new THREE.Quaternion())).normalize();
+  const parent = forearm.parent.getWorldQuaternion(new THREE.Quaternion());
+  forearm.quaternion.copy(parent.invert().multiply(desired)).normalize();
+  forearm.updateMatrix();
+  forearm.updateWorldMatrix(false, true);
+}
+
 function driveRiggedPalmAndFingers(
   side: 'L' | 'R',
   hand: Point[],
@@ -2375,7 +2624,7 @@ function driveRiggedPalmAndFingers(
     const progress = activeMotion && activeMotion.frames.length > 1
       ? Math.max(0, activeFrameIndex) / (activeMotion.frames.length - 1)
       : 0;
-    applyRiggedMoneyRubHand(side, Math.sin(progress * Math.PI * 6));
+    applyRiggedMoneyRubHand(side, Math.sin(progress * Math.PI * 8));
   }
   const compactFist = !configuredStates && (
     activeRiggedHandPresentations[side] === 'fist'
@@ -2475,6 +2724,9 @@ function driveRiggedPalmAndFingers(
     Math.max(0, activeFrameIndex),
   );
   applyRiggedHandEditPose(side, side === 'L' ? editorPose.left : editorPose.right);
+  // Apply the authored splay last: captured retargeting and per-frame curl
+  // edits both rotate the MCP bones and would otherwise flatten the gap.
+  applyRiggedFingerSplay(side);
 }
 
 function driveRiggedHand(
@@ -2615,6 +2867,7 @@ function driveRiggedHand(
   // branch lets the body occlude otherwise correct fingers during crossings.
   wristTarget.z = profileRiggedWristDepth(side, actualElbow.z, wristTarget.z);
   placeRiggedForearmBetween(side, actualElbow, wristTarget, effectiveForearmLength);
+  applyProfileForearmAxialRoll(side);
   riggedAvatar?.updateMatrixWorld(true);
 
   if (!driveCapturedHandPose || !valid(hand[0])) {
@@ -3963,6 +4216,8 @@ window.installVozualMotionBase64 = (
   const normalizedClip = clip.trim().toUpperCase();
   if (!normalizedClip || !contentBase64) return false;
   if (avatarProfile && typeof avatarProfile === 'object' && !Array.isArray(avatarProfile)) {
+    // The editor-authored profile is the sole source of truth for every sign.
+    // Never replace or reshape a sign-specific hand pose at runtime.
     avatarProfiles.set(normalizedClip, avatarProfile);
   }
   installedMotionBytes.set(normalizedClip, decodeBase64Bytes(contentBase64));
@@ -4313,7 +4568,10 @@ window.getVozualRigHandEditorState = (clip: string) => {
     currentFrame,
     keyframes,
     smile: riggedSmileEditAtFrame(keyframes, currentFrame),
+    face: riggedFacialEditAtFrame(keyframes, currentFrame),
     pose: riggedHandsEditPoseAtFrame(keyframes, currentFrame),
+    indexMiddleSpread: Number(avatarProfiles.get(normalizedClip)?.rigLeftIndexMiddleSpread ?? 0),
+    forearmAxialRollDegrees: Number(avatarProfiles.get(normalizedClip)?.rigLeftForearmAxialRollDegrees ?? 0),
   };
 };
 
@@ -4336,6 +4594,32 @@ window.setVozualRigHandKeyframes = (
     activeProfile = nextProfile;
     if (displayedFrame) setFrame(displayedFrame);
   }
+  return true;
+};
+
+window.setVozualRigFingerSpread = (clip: string, spread: number) => {
+  const normalizedClip = clip.trim().toUpperCase();
+  const previousProfile = avatarProfiles.get(normalizedClip);
+  if (!previousProfile) return false;
+  const nextProfile: AvatarProfile = {
+    ...previousProfile,
+    rigLeftIndexMiddleSpread: THREE.MathUtils.clamp(Number(spread) || 0, 0, 0.08),
+  };
+  avatarProfiles.set(normalizedClip, nextProfile);
+  if (activeProfile === previousProfile) {
+    activeProfile = nextProfile;
+    if (displayedFrame) setFrame(displayedFrame);
+  }
+  return true;
+};
+
+window.setVozualForearmAxialRoll = (clip: string, degrees: number) => {
+  const normalizedClip = clip.trim().toUpperCase();
+  const previousProfile = avatarProfiles.get(normalizedClip);
+  if (!previousProfile) return false;
+  const nextProfile: AvatarProfile = {...previousProfile, rigLeftForearmAxialRollDegrees: THREE.MathUtils.clamp(Number(degrees) || 0, -180, 180)};
+  avatarProfiles.set(normalizedClip, nextProfile);
+  if (activeProfile === previousProfile) { activeProfile = nextProfile; if (displayedFrame) setFrame(displayedFrame); }
   return true;
 };
 

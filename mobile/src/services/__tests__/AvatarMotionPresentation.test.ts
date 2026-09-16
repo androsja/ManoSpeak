@@ -25,6 +25,7 @@ import {
   riggedApproachPalmScaleEnvelope,
   riggedApproachPalmScaleFactor,
   riggedHandsEditPoseAtFrame,
+  riggedFacialEditAtFrame,
   riggedSmileEditAtFrame,
   riggedWristDepth,
   shouldDriveFlatPalmSegment,
@@ -360,6 +361,39 @@ describe('avatar motion presentation', () => {
     expect(riggedSmileEditAtFrame(keyframes, 16)).toBe(0);
   });
 
+  it('smoothly applies a complete authored facial marker', () => {
+    const keyframes = [{
+      frame: 8,
+      transitionFrames: 4,
+      mouthPucker: 0.6,
+      mouthOpening: 0.2,
+      eyeWidening: 0.18,
+      browRaise: 0.24,
+    }];
+
+    expect(riggedFacialEditAtFrame(keyframes, 3)).toEqual({
+      smile: 0,
+      mouthPucker: 0,
+      mouthOpening: 0,
+      eyeWidening: 0,
+      browRaise: 0,
+    });
+    expect(riggedFacialEditAtFrame(keyframes, 6)).toEqual({
+      smile: 0,
+      mouthPucker: 0.3,
+      mouthOpening: 0.1,
+      eyeWidening: 0.09,
+      browRaise: 0.12,
+    });
+    expect(riggedFacialEditAtFrame(keyframes, 8)).toEqual({
+      smile: 0,
+      mouthPucker: 0.6,
+      mouthOpening: 0.2,
+      eyeWidening: 0.18,
+      browRaise: 0.24,
+    });
+  });
+
   it('bounds hand alignment offsets without changing depth', () => {
     expect(riggedHandPositionOffset({
       horizontalOffset: 1.4,
@@ -658,7 +692,7 @@ describe('avatar motion presentation', () => {
     expect(profiles.COMER.rigContactWindows).toEqual([{startFrame: 18, endFrame: 35}]);
   });
 
-  it('keeps DINERO index and middle together while the thumb rubs them', () => {
+  it('keeps DINERO thumb in repeated contact with the index fingertip', () => {
     const motion = require('../../../assets/motions/dinero.motion.json') as SignMotion;
     const hands = motion.frames.map(frame => frame.bodyHands.slice(33, 54));
     const presented = presentMoneyRubHandLandmarkFrames(hands);
@@ -671,15 +705,7 @@ describe('avatar motion presentation', () => {
       const thumbToIndexDistance = Math.hypot(...hand[8].map(
         (value, axis) => value - hand[4][axis],
       ));
-      const thumbToMiddleDistance = Math.hypot(...hand[12].map(
-        (value, axis) => value - hand[4][axis],
-      ));
-      const joinedFingertipDistance = Math.hypot(...hand[12].map(
-        (value, axis) => value - hand[8][axis],
-      ));
       expect(thumbToIndexDistance).toBeLessThan(palmWidth * 0.04);
-      expect(thumbToMiddleDistance).toBeLessThan(palmWidth * 0.04);
-      expect(joinedFingertipDistance).toBeLessThan(palmWidth * 0.01);
       expect(hand[1]).toEqual(hands[frameIndex][1]);
       expect(hand[5]).toEqual(hands[frameIndex][5]);
       expect(hand[9]).toEqual(hands[frameIndex][9]);
@@ -691,10 +717,7 @@ describe('avatar motion presentation', () => {
         (value, axis) => value - hand[0][axis],
       );
       const palmLength = Math.hypot(...palmDirection);
-      const joinedTip = hand[8].map((value, axis) => (
-        (value + hand[12][axis]) / 2
-      ));
-      const tipDelta = joinedTip.map((value, axis) => value - hand[4][axis]);
+      const tipDelta = hand[8].map((value, axis) => value - hand[4][axis]);
       rubbingOffsets.push(tipDelta.reduce(
         (sum, value, axis) => sum + value * palmDirection[axis] / palmLength,
         0,
@@ -718,7 +741,7 @@ describe('avatar motion presentation', () => {
     const directionChanges = rubbingOffsets.slice(1).filter((value, index) => (
       value * rubbingOffsets[index] < 0
     ));
-    expect(directionChanges.length).toBeGreaterThanOrEqual(5);
+    expect(directionChanges.length).toBeGreaterThanOrEqual(7);
 
     const profiles = require('../../../assets/motions/avatar_profile_overrides.json');
     expect(profiles.DINERO.rigLeftHandShape).toBe('money-rub');

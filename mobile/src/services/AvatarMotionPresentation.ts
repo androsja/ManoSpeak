@@ -123,8 +123,24 @@ export type RiggedHandEditKeyframe = {
   frame: number;
   transitionFrames?: number;
   smile?: number;
+  /** Closes and rounds the lips. Use it for a small visible mouth shape such as “O”. */
+  mouthPucker?: number;
+  /** Opens the mouth vertically without changing its horizontal shape. */
+  mouthOpening?: number;
+  /** Opens both eyes slightly wider than the captured resting expression. */
+  eyeWidening?: number;
+  /** Lifts both inner eyebrows for an authored non-manual marker. */
+  browRaise?: number;
   left?: RiggedHandEditPoseInput;
   right?: RiggedHandEditPoseInput;
+};
+
+export type RiggedFacialEdit = {
+  smile: number;
+  mouthPucker: number;
+  mouthOpening: number;
+  eyeWidening: number;
+  browRaise: number;
 };
 
 export type RiggedHandsEditPose = {
@@ -135,8 +151,7 @@ export type RiggedHandsEditPose = {
 export type NormalizedRiggedHandEditKeyframe = RiggedHandsEditPose & {
   frame: number;
   transitionFrames: number;
-  smile: number;
-};
+} & RiggedFacialEdit;
 
 const RIGGED_EDIT_FINGERS: readonly RiggedFingerName[] = [
   'thumb', 'index', 'middle', 'ring', 'pinky',
@@ -153,7 +168,7 @@ function normalizedRiggedHandEditPose(
   pose: RiggedHandEditPoseInput | undefined,
 ): RiggedHandEditPose {
   return {
-    elbowRotation: boundedEditValue(pose?.elbowRotation, -90, 90),
+    elbowRotation: boundedEditValue(pose?.elbowRotation, -180, 180),
     wristPitch: boundedEditValue(pose?.wristPitch, -180, 180),
     wristYaw: boundedEditValue(pose?.wristYaw, -180, 180),
     wristRoll: boundedEditValue(pose?.wristRoll, -180, 180),
@@ -236,6 +251,10 @@ export function normalizeRiggedHandEditKeyframes(
         Math.max(1, Math.round(Number(keyframe.transitionFrames ?? 6))),
       ),
       smile: boundedEditValue(keyframe.smile, 0, 1),
+      mouthPucker: boundedEditValue(keyframe.mouthPucker, 0, 1),
+      mouthOpening: boundedEditValue(keyframe.mouthOpening, 0, 1),
+      eyeWidening: boundedEditValue(keyframe.eyeWidening, 0, 1),
+      browRaise: boundedEditValue(keyframe.browRaise, 0, 1),
       left: normalizedRiggedHandEditPose(keyframe.left),
       right: normalizedRiggedHandEditPose(keyframe.right),
     });
@@ -313,13 +332,21 @@ export function riggedHandsEditPoseAtFrame(
   return {left: previous.left, right: previous.right};
 }
 
-/** Evaluates an additional editor-authored smile on the shared smooth timeline. */
-export function riggedSmileEditAtFrame(
+/** Evaluates authored facial controls on the same smooth keyframe timeline as hands. */
+export function riggedFacialEditAtFrame(
   keyframes: RiggedHandEditKeyframe[] | undefined,
   frame: number,
-): number {
+): RiggedFacialEdit {
   const normalized = normalizeRiggedHandEditKeyframes(keyframes);
-  let previous = {frame: 0, transitionFrames: 1, smile: 0};
+  let previous: Pick<NormalizedRiggedHandEditKeyframe, 'frame' | 'transitionFrames'> & RiggedFacialEdit = {
+    frame: 0,
+    transitionFrames: 1,
+    smile: 0,
+    mouthPucker: 0,
+    mouthOpening: 0,
+    eyeWidening: 0,
+    browRaise: 0,
+  };
   const currentFrame = Math.max(0, Number.isFinite(frame) ? frame : 0);
   for (const target of normalized) {
     if (currentFrame >= target.frame) {
@@ -330,13 +357,41 @@ export function riggedSmileEditAtFrame(
       previous.frame,
       target.frame - target.transitionFrames,
     );
-    if (currentFrame <= transitionStart) return previous.smile;
+    if (currentFrame <= transitionStart) {
+      return {
+        smile: previous.smile,
+        mouthPucker: previous.mouthPucker,
+        mouthOpening: previous.mouthOpening,
+        eyeWidening: previous.eyeWidening,
+        browRaise: previous.browRaise,
+      };
+    }
     const linear = (currentFrame - transitionStart)
       / Math.max(1, target.frame - transitionStart);
     const smooth = linear * linear * (3 - 2 * linear);
-    return previous.smile + (target.smile - previous.smile) * smooth;
+    return {
+      smile: previous.smile + (target.smile - previous.smile) * smooth,
+      mouthPucker: previous.mouthPucker + (target.mouthPucker - previous.mouthPucker) * smooth,
+      mouthOpening: previous.mouthOpening + (target.mouthOpening - previous.mouthOpening) * smooth,
+      eyeWidening: previous.eyeWidening + (target.eyeWidening - previous.eyeWidening) * smooth,
+      browRaise: previous.browRaise + (target.browRaise - previous.browRaise) * smooth,
+    };
   }
-  return previous.smile;
+  return {
+    smile: previous.smile,
+    mouthPucker: previous.mouthPucker,
+    mouthOpening: previous.mouthOpening,
+    eyeWidening: previous.eyeWidening,
+    browRaise: previous.browRaise,
+  };
+}
+
+/** Legacy helper retained for callers that only need the authored smile. */
+export function riggedSmileEditAtFrame(
+  keyframes: RiggedHandEditKeyframe[] | undefined,
+  frame: number,
+): number {
+  return riggedFacialEditAtFrame(keyframes, frame).smile;
 }
 
 export type RiggedHandDepthLayer = 'front' | 'back';
@@ -1856,10 +1911,10 @@ export function questionQOpeningProgress(
 }
 
 /**
- * Builds the DINERO handshape as the joined index and middle fingertips
- * touching the thumb pad. The captured clip contains large fingertip tracking
- * jumps, so a clip-wide palm-local contact point replaces those three chains.
- * The thumb slides tangentially across the stationary fingertip pair while
+ * Builds the DINERO handshape as the index fingertip touching the thumb pad.
+ * The captured clip contains large fingertip tracking jumps, so a clip-wide
+ * palm-local contact point replaces those two chains. The thumb slides
+ * tangentially across the stationary index fingertip while
  * wrist, palm, phalanx lengths, frame count and timing remain tied to the
  * original capture.
  */
@@ -1871,7 +1926,6 @@ export function presentMoneyRubHandLandmarkFrames(
   const contactChains = [
     THUMB_CHAIN,
     POINTING_INDEX_CHAIN,
-    LONG_FINGER_CHAINS[1],
   ] as const;
   const localContactPoints = anatomical.flatMap((hand, frameIndex) => {
     const basis = bases[frameIndex];
@@ -1880,11 +1934,10 @@ export function presentMoneyRubHandLandmarkFrames(
       || !isValid(hand[0])
       || !isValid(hand[4])
       || !isValid(hand[8])
-      || !isValid(hand[12])
     ) return [];
     const palmWidth = distance(hand[5], hand[17]);
     if (palmWidth < 1e-8) return [];
-    const contactPoint = averagePoint(hand[4], hand[8], hand[12]);
+    const contactPoint = averagePoint(hand[4], hand[8]);
     const offset = subtract(contactPoint, hand[0]);
     return [[
       dot(offset, basis.lateral) / palmWidth,
@@ -1945,17 +1998,16 @@ export function presentMoneyRubHandLandmarkFrames(
       });
     }
 
-    // Three rubs across the 1.2-second DINERO capture read clearly at normal
-    // playback speed. Only the thumb target moves; index and middle remain
-    // joined so the gesture cannot read as a two-finger pinch.
+    // Four short rubs across the 1.2-second capture make the thumb repeatedly
+    // feel the index fingertip. The index remains the stable contact point.
     const progress = hands.length > 1 ? frameIndex / (hands.length - 1) : 0;
-    const rubOffset = Math.sin(progress * Math.PI * 6) * palmWidth * 0.025;
+    const rubOffset = Math.sin(progress * Math.PI * 8) * palmWidth * 0.032;
     const thumbTarget: MotionPoint = [
       contactPoint[0] + basis.longitudinal[0] * rubOffset,
       contactPoint[1] + basis.longitudinal[1] * rubOffset,
       contactPoint[2] + basis.longitudinal[2] * rubOffset,
     ];
-    const targets: MotionPoint[] = [thumbTarget, contactPoint, contactPoint];
+    const targets: MotionPoint[] = [thumbTarget, contactPoint];
 
     contactChains.forEach((chain, chainIndex) => {
       if (!chain.every(index => isValid(hand[index]))) return;

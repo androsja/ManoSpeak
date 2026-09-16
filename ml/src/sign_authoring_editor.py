@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import os
 import random
 import shutil
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
+import unicodedata
+from collections.abc import Callable, Iterable
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote
 
 import cv2
 import numpy as np
@@ -25,7 +30,14 @@ if __package__ in (None, ""):
     from src.authoring_pipeline import generate_preview
     from src.linguistic_catalog import (
         editor_metadata,
+        find_entry,
+        is_mobile_compilation_eligible,
+        load_catalog,
+        owner_approval_status,
+        owner_review_fingerprint,
         preview_renderable_plan,
+        set_owner_approval,
+        set_owner_review_fingerprint,
         unpublish_entry,
         upsert_editor_entry,
         write_published_motion_manifest,
@@ -51,7 +63,14 @@ else:
     from .authoring_pipeline import generate_preview
     from .linguistic_catalog import (
         editor_metadata,
+        find_entry,
+        is_mobile_compilation_eligible,
+        load_catalog,
+        owner_approval_status,
+        owner_review_fingerprint,
         preview_renderable_plan,
+        set_owner_approval,
+        set_owner_review_fingerprint,
         unpublish_entry,
         upsert_editor_entry,
         write_published_motion_manifest,
@@ -75,13 +94,434 @@ else:
     )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+AVATAR_PROFILE_OVERRIDES_PATH = (
+    REPO_ROOT / "mobile/assets/motions/avatar_profile_overrides.json"
+)
+FINGER_NAMES = ("thumb", "index", "middle", "ring", "pinky")
+FINGER_LABELS = {
+    "thumb": "Pulgar",
+    "index": "Índice",
+    "middle": "Medio",
+    "ring": "Anular",
+    "pinky": "Meñique",
+}
+FINGER_STATE_OPTIONS = ("capturado", "extendido", "cerrado")
+FINGER_STATE_TO_PROFILE = {
+    "capturado": "captured",
+    "extendido": "extended",
+    "cerrado": "closed",
+}
+PROFILE_TO_FINGER_STATE = {
+    value: key for key, value in FINGER_STATE_TO_PROFILE.items()
+}
+
+DURATION_MODE_MATCH_RECORDING = "IGUAL A LA GRABACIÓN"
+DURATION_MODE_CUSTOM = "PERSONALIZADA"
+DURATION_MODE_OPTIONS = (
+    DURATION_MODE_MATCH_RECORDING,
+    DURATION_MODE_CUSTOM,
+)
+MIN_SIGN_DURATION_SECONDS = 0.5
+MAX_SIGN_DURATION_SECONDS = 15.0
+
+RIG_EDIT_FINGERS = ("thumb", "index", "middle", "ring", "pinky")
+
+
+def _resolved_avatar_duration_seconds(
+    recording_duration_seconds: float,
+    requested_avatar_duration_seconds: float,
+    mode: str,
+) -> float:
+    """Resolve and validate the final avatar duration selected by the author."""
+
+    values = (recording_duration_seconds, requested_avatar_duration_seconds)
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("Sign durations must be finite numbers.")
+    if not MIN_SIGN_DURATION_SECONDS <= recording_duration_seconds <= MAX_SIGN_DURATION_SECONDS:
+        raise ValueError("Recording duration must be between 0.5 and 15 seconds.")
+    if mode == DURATION_MODE_MATCH_RECORDING:
+        return recording_duration_seconds
+    if mode != DURATION_MODE_CUSTOM:
+        raise ValueError("Unsupported avatar duration mode.")
+    if not MIN_SIGN_DURATION_SECONDS <= requested_avatar_duration_seconds <= MAX_SIGN_DURATION_SECONDS:
+        raise ValueError("Avatar duration must be between 0.5 and 15 seconds.")
+    return requested_avatar_duration_seconds
+
+
+def _normalized_rig_hand_keyframes(value: object) -> list[dict[str, object]]:
+    """Validate browser-authored avatar keyframes before they touch source assets."""
+
+    if not isinstance(value, list) or len(value) > 256:
+        raise ValueError("Avatar keyframes must be a list with at most 256 entries.")
+
+    def bounded_number(raw: object, minimum: float, maximum: float) -> float:
+        if isinstance(raw, bool):
+            raise ValueError("Avatar edit values must be numeric.")
+        try:
+            number = float(raw)
+        except (TypeError, ValueError) as error:
+            raise ValueError("Avatar edit values must be numeric.") from error
+        if not math.isfinite(number) or not minimum <= number <= maximum:
+            raise ValueError("A hand edit value is outside its supported range.")
+        return number
+
+    def normalized_pose(raw: object) -> dict[str, object]:
+        pose = raw if isinstance(raw, dict) else {}
+        fingers = pose.get("fingers", {})
+        if not isinstance(fingers, dict):
+            raise ValueError("Finger edits must be a JSON object.")
+        finger_joints = pose.get("fingerJoints", {})
+        if not isinstance(finger_joints, dict):
+            raise ValueError("Finger joint edits must be a JSON object.")
+
+        def normalized_joints(finger: str) -> list[float]:
+            raw_joints = finger_joints.get(finger, [0.0, 0.0, 0.0])
+            if not isinstance(raw_joints, list):
+                raise ValueError("Each finger joint edit must be a JSON list.")
+            return [
+                bounded_number(
+                    raw_joints[joint] if joint < len(raw_joints) else 0.0,
+                    -1.0,
+                    1.0,
+                )
+                for joint in range(3)
+            ]
+        return {
+            "elbowRotation": bounded_number(
+                pose.get("elbowRotation", 0.0), -180.0, 180.0
+            ),
+            "wristPitch": bounded_number(pose.get("wristPitch", 0.0), -180.0, 180.0),
+            "wristYaw": bounded_number(pose.get("wristYaw", 0.0), -180.0, 180.0),
+            "wristRoll": bounded_number(pose.get("wristRoll", 0.0), -180.0, 180.0),
+            "horizontalOffset": bounded_number(
+                pose.get("horizontalOffset", 0.0), -1.0, 1.0
+            ),
+            "verticalOffset": bounded_number(
+                pose.get("verticalOffset", 0.0), -1.0, 1.0
+            ),
+            "depthOffset": bounded_number(pose.get("depthOffset", 0.0), -1.0, 1.0),
+            "fist": bounded_number(pose.get("fist", 0.0), 0.0, 1.0),
+            "fingers": {
+                finger: bounded_number(fingers.get(finger, 0.0), -1.0, 1.0)
+                for finger in RIG_EDIT_FINGERS
+            },
+            "fingerJoints": {
+                finger: normalized_joints(finger) for finger in RIG_EDIT_FINGERS
+            },
+        }
+
+    keyframes_by_frame: dict[int, dict[str, object]] = {}
+    for raw_keyframe in value:
+        if not isinstance(raw_keyframe, dict):
+            raise ValueError("Each hand keyframe must be a JSON object.")
+        frame_value = bounded_number(raw_keyframe.get("frame"), 0.0, 65535.0)
+        transition_value = bounded_number(
+            raw_keyframe.get("transitionFrames", 6), 1.0, 120.0
+        )
+        frame = int(round(frame_value))
+        keyframes_by_frame[frame] = {
+            "frame": frame,
+            "transitionFrames": int(round(transition_value)),
+            "smile": bounded_number(raw_keyframe.get("smile", 0.0), 0.0, 1.0),
+            "mouthPucker": bounded_number(raw_keyframe.get("mouthPucker", 0.0), 0.0, 1.0),
+            "mouthOpening": bounded_number(raw_keyframe.get("mouthOpening", 0.0), 0.0, 1.0),
+            "eyeWidening": bounded_number(raw_keyframe.get("eyeWidening", 0.0), 0.0, 1.0),
+            "browRaise": bounded_number(raw_keyframe.get("browRaise", 0.0), 0.0, 1.0),
+            "left": normalized_pose(raw_keyframe.get("left")),
+            "right": normalized_pose(raw_keyframe.get("right")),
+        }
+    return [keyframes_by_frame[frame] for frame in sorted(keyframes_by_frame)]
+
+
+def _merge_rig_hand_keyframes(
+    profiles: object,
+    gloss: str,
+    keyframes: list[dict[str, object]],
+) -> dict[str, object]:
+    """Update one sign without replacing any of its other avatar corrections."""
+
+    updated = dict(profiles) if isinstance(profiles, dict) else {}
+    stored_profile = updated.get(gloss, {})
+    profile = dict(stored_profile) if isinstance(stored_profile, dict) else {}
+    if keyframes:
+        profile["rigHandKeyframes"] = keyframes
+    else:
+        profile.pop("rigHandKeyframes", None)
+    if profile:
+        updated[gloss] = profile
+    else:
+        updated.pop(gloss, None)
+    return updated
 
 
 class _MobilePreviewRequestHandler(SimpleHTTPRequestHandler):
     """Serve the local mobile runtime without writing browser requests to stdout."""
 
+    def __init__(
+        self,
+        *args: object,
+        profile_path: Path | None = None,
+        runtime_profile_path: Path | None = None,
+        catalog_path: Path | None = None,
+        manifest_path: Path | None = None,
+        candidate_gloss: str | None = None,
+        candidate_motion_path: Path | None = None,
+        published_motion_path: Path | None = None,
+        reviewed_change_callback: Callable[[str], None] | None = None,
+        **kwargs: object,
+    ) -> None:
+        self.profile_path = profile_path
+        self.runtime_profile_path = runtime_profile_path
+        self.catalog_path = catalog_path
+        self.manifest_path = manifest_path
+        self.candidate_gloss = candidate_gloss
+        self.candidate_motion_path = candidate_motion_path
+        self.published_motion_path = published_motion_path
+        self.reviewed_change_callback = reviewed_change_callback
+        super().__init__(*args, **kwargs)
+
     def log_message(self, _format: str, *_args: object) -> None:
         return
+
+    def _send_json(self, status: int, payload: dict[str, object]) -> None:
+        serialized = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(serialized)))
+        self.end_headers()
+        self.wfile.write(serialized)
+
+    @staticmethod
+    def _write_json(path: Path, payload: dict[str, object]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.writing")
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, path)
+
+    def _notify_reviewed_change(self, gloss: str) -> None:
+        """Tell the desktop editor that the open simulation saved its final state."""
+
+        callback = getattr(self, "reviewed_change_callback", None)
+        if callable(callback):
+            callback(gloss)
+
+    def _compilation_review_payload(self, gloss: str) -> dict[str, object]:
+        """Describe the real owner-approved build set for the browser preview."""
+
+        if self.catalog_path is None:
+            raise ValueError("Esta vista no fue abierta desde VOZUAL Editor.")
+        normalized_gloss = gloss.strip().upper()
+        catalog = load_catalog(self.catalog_path)
+        entries = catalog["entries"]
+        current = next(
+            (
+                entry
+                for entry in entries
+                if str(entry.get("gloss", "")).strip().upper() == normalized_gloss
+            ),
+            None,
+        )
+        if current is None:
+            raise ValueError(f"{normalized_gloss} no está registrada en el catálogo.")
+
+        published = bool(current.get("motion", {}).get("published"))
+        linguistic_review = str(current.get("review", {}).get("status", "draft"))
+        linguistic_ready = linguistic_review in {"approved", "legacy_approved"}
+        candidate_motion_path = getattr(self, "candidate_motion_path", None)
+        candidate_publishable = (
+            normalized_gloss == str(getattr(self, "candidate_gloss", "")).strip().upper()
+            and isinstance(candidate_motion_path, Path)
+            and candidate_motion_path.is_file()
+            and isinstance(getattr(self, "published_motion_path", None), Path)
+        )
+        prerequisites_ready = published and linguistic_review in {
+            "approved",
+            "legacy_approved",
+        }
+        approved_glosses = sorted(
+            str(entry.get("gloss", "")).strip().upper()
+            for entry in entries
+            if is_mobile_compilation_eligible(entry)
+        )
+        reviewable_glosses = sorted(
+            str(entry.get("gloss", "")).strip().upper()
+            for entry in entries
+            if entry.get("motion", {}).get("published")
+            and entry.get("review", {}).get("status")
+            in {"approved", "legacy_approved"}
+            and not is_mobile_compilation_eligible(entry)
+        )
+        return {
+            "ok": True,
+            "current": {
+                "gloss": normalized_gloss,
+                "approval": owner_approval_status(current),
+                "eligible": is_mobile_compilation_eligible(current),
+                "prerequisitesReady": prerequisites_ready,
+                "candidatePublishable": candidate_publishable,
+                "canApproveHere": linguistic_ready and (
+                    published or candidate_publishable
+                ),
+                "published": published,
+                "linguisticReview": linguistic_review,
+            },
+            "approvedGlosses": approved_glosses,
+            "approvedCount": len(approved_glosses),
+            "reviewableGlosses": reviewable_glosses,
+            "reviewableCount": len(reviewable_glosses),
+        }
+
+    def _publish_preview_candidate(self, gloss: str) -> None:
+        """Publish the exact candidate already loaded in this review server."""
+
+        if self.catalog_path is None:
+            raise ValueError("Esta vista no fue abierta desde VOZUAL Editor.")
+        normalized_gloss = gloss.strip().upper()
+        if normalized_gloss != str(getattr(self, "candidate_gloss", "")).strip().upper():
+            raise ValueError(f"{normalized_gloss} no es la seña preparada en esta vista.")
+        candidate_motion_path = getattr(self, "candidate_motion_path", None)
+        published_motion_path = getattr(self, "published_motion_path", None)
+        if (
+            not isinstance(candidate_motion_path, Path)
+            or not candidate_motion_path.is_file()
+            or not isinstance(published_motion_path, Path)
+        ):
+            raise ValueError(f"{normalized_gloss} no tiene una animación lista para publicar.")
+
+        catalog = load_catalog(self.catalog_path)
+        current = next(
+            (
+                entry
+                for entry in catalog["entries"]
+                if str(entry.get("gloss", "")).strip().upper() == normalized_gloss
+            ),
+            None,
+        )
+        if current is None:
+            raise ValueError(f"{normalized_gloss} no está registrada en el catálogo.")
+        review_status = str(current.get("review", {}).get("status", "draft"))
+        if review_status not in {"approved", "legacy_approved"}:
+            raise ValueError(
+                f"{normalized_gloss} necesita revisión lingüística antes de publicarse."
+            )
+
+        published_motion_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(candidate_motion_path, published_motion_path)
+        current.setdefault("motion", {})["published"] = True
+        current["motion"].setdefault("clip", normalized_gloss)
+        self._write_json(self.catalog_path, catalog)
+
+    def do_GET(self) -> None:  # noqa: N802 - inherited HTTP method name
+        request_path, _, query = self.path.partition("?")
+        if request_path != "/api/sign-approval":
+            super().do_GET()
+            return
+        try:
+            query_values = parse_qs(query, keep_blank_values=True)
+            gloss = str(query_values.get("gloss", [""])[0]).strip().upper()
+            if not gloss or len(gloss) > 100:
+                raise ValueError("Se necesita el nombre de una seña válida.")
+            self._send_json(200, self._compilation_review_payload(gloss))
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+            self._send_json(400, {"ok": False, "error": str(error)})
+
+    def do_POST(self) -> None:  # noqa: N802 - inherited HTTP method name
+        request_path = self.path.split("?", 1)[0]
+        if request_path not in {
+            "/api/rig-hand-keyframes",
+            "/api/sign-approval",
+        }:
+            self._send_json(404, {"ok": False, "error": "Unknown editor endpoint."})
+            return
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < content_length <= 1_000_000:
+                raise ValueError("The editor request has an invalid size.")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise ValueError("The editor request must be a JSON object.")
+            gloss = str(payload.get("gloss", "")).strip().upper()
+            if not gloss or len(gloss) > 100:
+                raise ValueError("A valid sign name is required.")
+            if request_path == "/api/sign-approval":
+                approved = payload.get("approved")
+                if not isinstance(approved, bool):
+                    raise ValueError("La aprobación debe ser verdadera o falsa.")
+                review_payload = self._compilation_review_payload(gloss)
+                current = review_payload["current"]
+                if (
+                    approved
+                    and isinstance(current, dict)
+                    and not current.get("prerequisitesReady")
+                ):
+                    if not current.get("canApproveHere"):
+                        raise ValueError(
+                            f"{gloss} todavía no puede publicarse desde esta vista."
+                        )
+                    self._publish_preview_candidate(gloss)
+                if self.catalog_path is None:
+                    raise ValueError("Esta vista no fue abierta desde VOZUAL Editor.")
+                set_owner_approval(gloss, approved, self.catalog_path)
+                write_published_motion_manifest(self.catalog_path, self.manifest_path)
+                self._notify_reviewed_change(gloss)
+                self._send_json(200, self._compilation_review_payload(gloss))
+                return
+            keyframes = _normalized_rig_hand_keyframes(payload.get("keyframes"))
+            raw_spread = payload.get("indexMiddleSpread")
+            spread = None if raw_spread is None else max(0.0, min(0.08, float(raw_spread)))
+            raw_roll = payload.get("forearmAxialRollDegrees")
+            roll = None if raw_roll is None else max(-180.0, min(180.0, float(raw_roll)))
+            if self.profile_path is None or self.runtime_profile_path is None:
+                raise ValueError("This preview was not opened from the VOZUAL editor.")
+
+            try:
+                source_profiles = json.loads(self.profile_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                source_profiles = {}
+            updated_source = _merge_rig_hand_keyframes(
+                source_profiles, gloss, keyframes
+            )
+            if spread is not None:
+                source_profile = dict(updated_source.get(gloss, {}))
+                source_profile["rigLeftIndexMiddleSpread"] = round(spread, 3)
+                updated_source[gloss] = source_profile
+            if spread is not None or roll is not None:
+                profile = dict(updated_source.get(gloss, {}))
+                if spread is not None:
+                    profile["rigLeftIndexMiddleSpread"] = round(spread, 3)
+                if roll is not None:
+                    profile["rigLeftForearmAxialRollDegrees"] = round(roll, 1)
+                updated_source[gloss] = profile
+            self._write_json(self.profile_path, updated_source)
+
+            try:
+                runtime_profiles = json.loads(
+                    self.runtime_profile_path.read_text(encoding="utf-8")
+                )
+            except (OSError, json.JSONDecodeError):
+                runtime_profiles = {}
+            updated_runtime = _merge_rig_hand_keyframes(
+                runtime_profiles, gloss, keyframes
+            )
+            if spread is not None:
+                runtime_profile = dict(updated_runtime.get(gloss, {}))
+                runtime_profile["rigLeftIndexMiddleSpread"] = round(spread, 3)
+                updated_runtime[gloss] = runtime_profile
+            if spread is not None or roll is not None:
+                profile = dict(updated_runtime.get(gloss, {}))
+                if spread is not None:
+                    profile["rigLeftIndexMiddleSpread"] = round(spread, 3)
+                if roll is not None:
+                    profile["rigLeftForearmAxialRollDegrees"] = round(roll, 1)
+                updated_runtime[gloss] = profile
+            self._write_json(self.runtime_profile_path, updated_runtime)
+            self._notify_reviewed_change(gloss)
+            self._send_json(200, {"ok": True, "gloss": gloss, "keyframes": keyframes})
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+            self._send_json(400, {"ok": False, "error": str(error)})
 
 
 class SignAuthoringEditor:
@@ -91,7 +531,7 @@ class SignAuthoringEditor:
         root.geometry("760x820")
         root.configure(bg="#07111f")
         self.video_path = tk.StringVar()
-        self.gloss = tk.StringVar(value="GRACIAS")
+        self.gloss = tk.StringVar(value="")
         self.speech_aliases = tk.StringVar(value="")
         self.speech_aliases_input: tk.Text | None = None
         self._updating_speech_aliases_input = False
@@ -110,10 +550,29 @@ class SignAuthoringEditor:
         self.suggestion_category = tk.StringVar(value=CATEGORY_ALL)
         self.suggestion_label = tk.StringVar(value="Leyendo señas pendientes…")
         self.current_suggestion: SignCatalogEntry | None = None
+        self.firebase_published_glosses: set[str] | None = None
+        self.firebase_suggestion_status_loading = False
+        self.recording_duration_seconds = tk.DoubleVar(value=1.2)
         self.duration_seconds = tk.DoubleVar(value=1.2)
+        self.avatar_duration_mode = tk.StringVar(
+            value=DURATION_MODE_MATCH_RECORDING
+        )
+        self.duration_summary = tk.StringVar(
+            value="El avatar usará los mismos 1.2 s de la grabación."
+        )
+        self.avatar_duration_spinbox: tk.Spinbox | None = None
         self.anchor = tk.StringVar(value="chin")
         self.contact_palm = tk.StringVar(value="camera")
         self.release_palm = tk.StringVar(value="up")
+        self.left_finger_states = {
+            finger: tk.StringVar(value="capturado") for finger in FINGER_NAMES
+        }
+        self.right_finger_states = {
+            finger: tk.StringVar(value="capturado") for finger in FINGER_NAMES
+        }
+        self.loaded_finger_states = self._default_finger_state_snapshot()
+        self.left_index_middle_spread = tk.DoubleVar(value=0.025)
+        self.loaded_index_middle_spread = 0.025
         self.forward = tk.DoubleVar(value=0.45)
         self.return_to_rest = tk.BooleanVar(value=True)
         self.entry_height_cm = tk.DoubleVar(value=0.0)
@@ -133,6 +592,7 @@ class SignAuthoringEditor:
         # Facial values are normalized morph amounts (0 = neutral, 1 = full).
         # They live on the same timeline as the wrist adjustments.
         self.face_jaw_open = tk.DoubleVar(value=0.0)
+        self.face_mouth_pucker = tk.DoubleVar(value=0.0)
         self.face_eye_wide = tk.DoubleVar(value=0.0)
         self.face_brow_raise = tk.DoubleVar(value=0.0)
         self.status = tk.StringVar(
@@ -151,6 +611,7 @@ class SignAuthoringEditor:
         self.mobile_preview_url: str | None = None
         self.mobile_preview_gloss: str | None = None
         self.mobile_preview_root: Path | None = None
+        self.embedded_preview_nonce: str | None = None
         self.mobile_preview_signatures: dict[
             str, tuple[tuple[str, int, int], ...]
         ] = {}
@@ -159,7 +620,12 @@ class SignAuthoringEditor:
         self.created_sign_list: tk.Listbox | None = None
         self.library_filter = tk.StringVar(value="pending")
         self.library_filter_button: tk.Button | None = None
-        self.publish_pending_button: tk.Button | None = None
+        self.owner_approval_button: tk.Checkbutton | None = None
+        self.publish_approved_button: tk.Button | None = None
+        self.owner_approval_checked = tk.BooleanVar(value=False)
+        self.owner_approval_label = tk.StringVar(
+            value="APROBACIÓN PERSONAL: carga o selecciona una seña."
+        )
         self.mobile_library_status = tk.StringVar(value="APP MÓVIL: leyendo biblioteca…")
         self.library_selection_status = tk.StringVar(
             value="Selecciona una seña para editarla o publicarla."
@@ -180,6 +646,7 @@ class SignAuthoringEditor:
             self.motion_lateral_cm,
             self.motion_depth_cm,
             self.face_jaw_open,
+            self.face_mouth_pucker,
             self.face_eye_wide,
             self.face_brow_raise,
             self.timeline_seconds,
@@ -187,11 +654,15 @@ class SignAuthoringEditor:
             variable.trace_add("write", lambda *_args: self._write_live_avatar_state())
         self._build()
         self.root.protocol("WM_DELETE_WINDOW", self._close_editor)
+        self.recording_duration_seconds.trace_add(
+            "write", self._recording_duration_changed
+        )
         self.speech_aliases.trace_add("write", self._refresh_speech_aliases_input)
         self._set_default_speech_aliases(self.gloss.get())
         self._update_linguistic_summary()
         self._restore_latest_recording()
         self._refresh_created_signs()
+        self._refresh_firebase_suggestion_statuses()
 
     def _build(self) -> None:
         background = "#07111f"
@@ -490,7 +961,7 @@ class SignAuthoringEditor:
         tk.Label(self.linguistic_details, text="CATEGORÍA", fg=muted, bg=card, font=("Arial", 8, "bold")).grid(row=0, column=0, sticky="w")
         tk.Label(self.linguistic_details, text="CLASE", fg=muted, bg=card, font=("Arial", 8, "bold")).grid(row=0, column=1, sticky="w", padx=(6, 0))
         tk.Label(self.linguistic_details, text="VERBO LSC", fg=muted, bg=card, font=("Arial", 8, "bold")).grid(row=0, column=2, sticky="w", padx=(6, 0))
-        tk.Label(self.linguistic_details, text="REVISIÓN", fg=muted, bg=card, font=("Arial", 8, "bold")).grid(row=0, column=3, sticky="w", padx=(6, 0))
+        tk.Label(self.linguistic_details, text="REVISIÓN LSC", fg=muted, bg=card, font=("Arial", 8, "bold")).grid(row=0, column=3, sticky="w", padx=(6, 0))
         tk.Entry(
             self.linguistic_details,
             textvariable=self.linguistic_categories,
@@ -622,18 +1093,20 @@ class SignAuthoringEditor:
         suggestion_card.grid_columnconfigure(1, weight=1)
         duration_box = tk.Frame(fields, bg=card)
         duration_box.grid(row=3, column=0, sticky="ew", pady=(9, 0))
+        duration_box.grid_columnconfigure(0, weight=1)
+        duration_box.grid_columnconfigure(1, weight=1)
         tk.Label(
             duration_box,
-            text="DURACIÓN DE LA SEÑA (SEG)",
+            text="TIEMPO PARA GRABAR (SEG)",
             fg=muted,
             bg=card,
             font=("Arial", 9, "bold"),
-        ).pack(anchor="w", pady=(0, 5))
+        ).grid(row=0, column=0, sticky="w", pady=(0, 5))
         tk.Spinbox(
             duration_box,
-            textvariable=self.duration_seconds,
-            from_=0.5,
-            to=5.0,
+            textvariable=self.recording_duration_seconds,
+            from_=MIN_SIGN_DURATION_SECONDS,
+            to=MAX_SIGN_DURATION_SECONDS,
             increment=0.1,
             bg=card_soft,
             fg=text,
@@ -641,27 +1114,94 @@ class SignAuthoringEditor:
             relief="flat",
             font=("Arial", 11, "bold"),
             width=7,
-        ).pack(side="left", ipady=2)
+        ).grid(row=1, column=0, sticky="w", ipady=2)
         tk.Label(
             duration_box,
-            text="Se usa para grabar y reproducir.",
+            text="Puedes hacer la seña lentamente frente a la cámara.",
             fg=muted,
             bg=card,
             font=("Arial", 8),
-        ).pack(side="left", padx=(10, 0))
+            wraplength=260,
+            justify="left",
+        ).grid(row=2, column=0, sticky="w", pady=(4, 0))
+
+        avatar_duration_box = tk.Frame(duration_box, bg=card)
+        avatar_duration_box.grid(
+            row=0,
+            column=1,
+            rowspan=3,
+            sticky="nsew",
+            padx=(14, 0),
+        )
+        avatar_duration_box.grid_columnconfigure(0, weight=1)
+        tk.Label(
+            avatar_duration_box,
+            text="DURACIÓN FINAL DEL AVATAR",
+            fg=muted,
+            bg=card,
+            font=("Arial", 9, "bold"),
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+        avatar_duration_combo = ttk.Combobox(
+            avatar_duration_box,
+            textvariable=self.avatar_duration_mode,
+            values=DURATION_MODE_OPTIONS,
+            state="readonly",
+            font=("Arial", 9, "bold"),
+            width=23,
+        )
+        avatar_duration_combo.grid(row=1, column=0, sticky="ew", padx=(0, 7))
+        avatar_duration_combo.bind(
+            "<<ComboboxSelected>>", self._avatar_duration_mode_changed
+        )
+        self.avatar_duration_spinbox = tk.Spinbox(
+            avatar_duration_box,
+            textvariable=self.duration_seconds,
+            from_=MIN_SIGN_DURATION_SECONDS,
+            to=MAX_SIGN_DURATION_SECONDS,
+            increment=0.1,
+            bg=card_soft,
+            fg=text,
+            disabledbackground=card_soft,
+            disabledforeground=muted,
+            buttonbackground=card_soft,
+            relief="flat",
+            font=("Arial", 11, "bold"),
+            width=7,
+            command=self._update_duration_controls,
+        )
+        self.avatar_duration_spinbox.grid(row=1, column=1, sticky="e", ipady=2)
+        self.avatar_duration_spinbox.bind(
+            "<KeyRelease>", self._avatar_duration_mode_changed
+        )
+        self.avatar_duration_spinbox.bind(
+            "<FocusOut>", self._avatar_duration_mode_changed
+        )
+        tk.Label(
+            avatar_duration_box,
+            textvariable=self.duration_summary,
+            fg=accent,
+            bg=card,
+            font=("Arial", 8, "bold"),
+            wraplength=300,
+            justify="left",
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        self._update_duration_controls()
 
         review_card = tk.Frame(frame, bg=card, padx=18, pady=16)
         review_card.grid(row=1, column=1, sticky="nsew", padx=(7, 0), pady=(14, 0))
         tk.Label(
             review_card,
-            text="REVISAR Y PUBLICAR",
+            text="FINALIZAR Y ENVIAR A LA APP",
             fg=text,
             bg=card,
             font=("Arial", 16, "bold"),
         ).pack(anchor="w")
         tk.Label(
             review_card,
-            text="Aquí verás qué está haciendo VOZUAL y cuál es el siguiente paso.",
+            text=(
+                "Guardar conserva los cambios en este Mac. Solo el botón ENVIAR A "
+                "FIREBASE los publica para que el celular pueda descargarlos."
+            ),
             fg=muted,
             bg=card,
             font=("Arial", 9),
@@ -702,7 +1242,10 @@ class SignAuthoringEditor:
         ).pack(anchor="w")
         tk.Label(
             created_card,
-            text="Aquí solo aparece la cola de publicación. Busca una seña existente cuando necesites editarla.",
+            text=(
+                "Selecciona una seña y completa dos pasos: 1) revisarla y aprobarla; "
+                "2) enviarla a Firebase."
+            ),
             fg=muted,
             bg=card_soft,
             font=("Arial", 8),
@@ -748,7 +1291,6 @@ class SignAuthoringEditor:
         action_row = tk.Frame(created_card, bg=card_soft)
         action_row.pack(fill="x", pady=(8, 0))
         action_row.grid_columnconfigure(0, weight=1)
-        action_row.grid_columnconfigure(1, weight=1)
         tk.Button(
             action_row,
             text="CARGAR Y EDITAR",
@@ -760,23 +1302,52 @@ class SignAuthoringEditor:
             relief="flat",
             font=("Arial", 9, "bold"),
             cursor="pointinghand",
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 4), ipady=4)
-        self.publish_pending_button = tk.Button(
-            action_row,
-            text="PUBLICAR PENDIENTES EN APP MÓVIL",
-            command=self._publish_all_signs,
-            bg=accent,
-            fg=background,
-            activebackground="#63e5df",
-            activeforeground=background,
+        ).grid(row=0, column=0, sticky="ew", ipady=4)
+        approval_card = tk.Frame(created_card, bg="#0d1928", padx=8, pady=7)
+        approval_card.pack(fill="x", pady=(7, 0))
+        self.owner_approval_button = tk.Checkbutton(
+            approval_card,
+            text="1. YA REVISÉ ESTA SEÑA Y LA APRUEBO",
+            variable=self.owner_approval_checked,
+            command=self._toggle_owner_approval,
+            bg="#0d1928",
+            fg="#f5f8fc",
+            activebackground="#0d1928",
+            activeforeground="#20d6ce",
+            selectcolor="#26384e",
+            disabledforeground="#6f8094",
+            anchor="w",
             relief="flat",
-            font=("Arial", 9, "bold"),
-            cursor="pointinghand",
+            font=("Arial", 8, "bold"),
+            state="disabled",
         )
-        self.publish_pending_button.grid(row=0, column=1, sticky="ew", padx=(4, 0), ipady=4)
+        self.owner_approval_button.pack(fill="x")
+        tk.Label(
+            approval_card,
+            textvariable=self.owner_approval_label,
+            fg="#9fb0c4",
+            bg="#0d1928",
+            font=("Arial", 8),
+            wraplength=360,
+            justify="left",
+        ).pack(anchor="w", pady=(3, 0))
+        self.publish_approved_button = tk.Button(
+            created_card,
+            text="2. ENVIAR A FIREBASE · CARGA UNA SEÑA",
+            command=self._publish_current_sign_to_firebase,
+            bg="#20d6ce",
+            fg="#07111f",
+            activebackground="#63e5df",
+            activeforeground="#07111f",
+            relief="flat",
+            font=("Arial", 8, "bold"),
+            cursor="pointinghand",
+            state="disabled",
+        )
+        self.publish_approved_button.pack(fill="x", pady=(4, 0), ipady=2)
         self.library_filter_button = tk.Button(
             created_card,
-            text="BUSCAR UNA SEÑA PUBLICADA",
+            text="BUSCAR CUALQUIER SEÑA",
             command=self._open_library_search,
             bg="#172638",
             fg="#172638",
@@ -855,7 +1426,7 @@ class SignAuthoringEditor:
         self.mobile_preview_button.pack(fill="x", ipady=6, pady=(0, 5))
         self.preview_button = tk.Button(
             result,
-            text="VISTA 3D CON BLENDER (OPCIONAL)  ·  GENERA O CARGA UNA SEÑA",
+            text="VISTA 3D INTERNA",
             command=self._generate_preview,
             bg=danger,
             fg="#172638",
@@ -864,31 +1435,6 @@ class SignAuthoringEditor:
             font=("Arial", 9, "bold"),
             relief="flat",
         )
-        self.preview_button.pack(fill="x", ipady=5, pady=(0, 5))
-        tk.Button(
-            result,
-            text="EDITAR PARÁMETROS POR SEGUNDO  ⚙",
-            command=self._open_advanced_dialog,
-            bg="#26384e",
-            fg="#172638",
-            activebackground="#344b65",
-            activeforeground=text,
-            relief="flat",
-            font=("Arial", 9, "bold"),
-            cursor="pointinghand",
-        ).pack(fill="x", ipady=5)
-        tk.Label(
-            result,
-            text=(
-                "SIMULAR APP MÓVIL usa el mismo motor de Android. Blender es una "
-                "vista distinta y no sirve para aprobar la publicación."
-            ),
-            fg="#6f8298",
-            bg=card,
-            wraplength=380,
-            justify="left",
-            font=("Arial", 8),
-        ).pack(side="bottom", anchor="w")
 
         self._build_advanced_dialog(background, card, card_soft, text, muted, warning)
         self._configure_readable_buttons()
@@ -966,6 +1512,81 @@ class SignAuthoringEditor:
         self._combo(controls, "Contacto corporal", self.anchor, ("none", "chin", "mouth", "forehead", "cheek", "chest"), 0)
         self._combo(controls, "Palma al tocar", self.contact_palm, ("camera", "up", "down", "in", "out"), 1)
         self._combo(controls, "Palma al terminar", self.release_palm, ("camera", "up", "down", "in", "out"), 2)
+
+        finger_panel = tk.LabelFrame(
+            inspector,
+            text="FORMA DE LOS DEDOS EN EL PERSONAJE",
+            fg=accent,
+            bg=card_soft,
+            font=("Arial", 9, "bold"),
+            padx=8,
+            pady=7,
+        )
+        finger_panel.pack(fill="x", pady=(14, 0))
+        tk.Label(
+            finger_panel,
+            text=(
+                "Usa CAPTURADO normalmente. Corrige un dedo solo cuando el "
+                "video lo oculta o lo interpreta mal. El ajuste se aplica "
+                "durante toda esta seña y no modifica los puntos originales."
+            ),
+            fg=muted,
+            bg=card_soft,
+            font=("Arial", 8),
+            wraplength=430,
+            justify="left",
+        ).grid(row=0, column=0, columnspan=6, sticky="w", pady=(0, 6))
+        tk.Label(finger_panel, text="Mano", fg=muted, bg=card_soft).grid(
+            row=1, column=0, sticky="w", padx=(0, 6)
+        )
+        for column, finger in enumerate(FINGER_NAMES, start=1):
+            tk.Label(
+                finger_panel,
+                text=FINGER_LABELS[finger],
+                fg=muted,
+                bg=card_soft,
+                font=("Arial", 8),
+            ).grid(row=1, column=column, sticky="ew", padx=2)
+            finger_panel.grid_columnconfigure(column, weight=1)
+        for row, (side_label, variables) in enumerate(
+            (("Izquierda", self.left_finger_states), ("Derecha", self.right_finger_states)),
+            start=2,
+        ):
+            tk.Label(
+                finger_panel,
+                text=side_label,
+                fg=text,
+                bg=card_soft,
+                font=("Arial", 8, "bold"),
+            ).grid(row=row, column=0, sticky="w", padx=(0, 6), pady=2)
+            for column, finger in enumerate(FINGER_NAMES, start=1):
+                ttk.Combobox(
+                    finger_panel,
+                    textvariable=variables[finger],
+                    values=FINGER_STATE_OPTIONS,
+                    state="readonly",
+                    width=9,
+                ).grid(row=row, column=column, sticky="ew", padx=2, pady=2)
+
+        tk.Label(
+            finger_panel,
+            text="Separación índice–medio (abanico leve)",
+            fg=muted,
+            bg=card_soft,
+            font=("Arial", 8, "bold"),
+        ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        tk.Scale(
+            finger_panel,
+            variable=self.left_index_middle_spread,
+            from_=0.0,
+            to=0.08,
+            resolution=0.005,
+            orient="horizontal",
+            bg=card_soft,
+            fg=text,
+            highlightthickness=0,
+            troughcolor="#26374b",
+        ).grid(row=4, column=2, columnspan=4, sticky="ew", padx=2, pady=(4, 0))
 
         tk.Label(inspector, text="Distancia hacia adelante", fg=muted, bg=card_soft, font=("Arial", 9, "bold")).pack(anchor="w", pady=(14, 0))
         tk.Scale(inspector, variable=self.forward, from_=0.0, to=1.0, resolution=0.05, orient="horizontal", bg=card_soft, fg=text, highlightthickness=0, troughcolor="#26374b").pack(fill="x")
@@ -1113,6 +1734,7 @@ class SignAuthoringEditor:
         for column, (label, variable, explanation) in enumerate(
             (
                 ("Apertura de boca", self.face_jaw_open, "0 neutral · 1 abierta"),
+                ("Boca redonda (O)", self.face_mouth_pucker, "0 neutral · 1 labios redondos"),
                 ("Ojos abiertos", self.face_eye_wide, "0 normal · 1 más abiertos"),
                 ("Cejas arriba", self.face_brow_raise, "0 neutral · 1 elevadas"),
             )
@@ -1220,6 +1842,102 @@ class SignAuthoringEditor:
             font=("Arial", 10, "bold"),
         ).pack(fill="x", ipady=8, pady=(8, 0))
 
+    def _duration_values(self) -> tuple[float, float]:
+        """Return validated recording and final avatar durations."""
+
+        try:
+            recording_duration = float(self.recording_duration_seconds.get())
+            requested_avatar_duration = float(self.duration_seconds.get())
+        except (tk.TclError, TypeError, ValueError) as error:
+            raise ValueError("Escribe duraciones válidas en segundos.") from error
+        try:
+            avatar_duration = _resolved_avatar_duration_seconds(
+                recording_duration,
+                requested_avatar_duration,
+                self.avatar_duration_mode.get(),
+            )
+        except ValueError as error:
+            raise ValueError(
+                "Las duraciones deben estar entre 0.5 y 15 segundos."
+            ) from error
+        if self.avatar_duration_mode.get() == DURATION_MODE_MATCH_RECORDING:
+            self.duration_seconds.set(recording_duration)
+        return recording_duration, avatar_duration
+
+    def _recording_duration_changed(self, *_args: object) -> None:
+        """Keep the default avatar duration linked to the recording time."""
+
+        self._update_duration_controls()
+
+    def _avatar_duration_mode_changed(self, _event: object | None = None) -> None:
+        self._update_duration_controls()
+
+    def _update_duration_controls(self) -> None:
+        mode = self.avatar_duration_mode.get()
+        if self.avatar_duration_spinbox is not None:
+            self.avatar_duration_spinbox.configure(
+                state="disabled"
+                if mode == DURATION_MODE_MATCH_RECORDING
+                else "normal"
+            )
+        try:
+            recording_duration = float(self.recording_duration_seconds.get())
+            if mode == DURATION_MODE_MATCH_RECORDING:
+                self.duration_seconds.set(recording_duration)
+            avatar_duration = float(self.duration_seconds.get())
+        except (tk.TclError, TypeError, ValueError):
+            self.duration_summary.set("Completa ambos tiempos en segundos.")
+            return
+        if mode == DURATION_MODE_MATCH_RECORDING:
+            self.duration_summary.set(
+                f"El avatar usará los mismos {recording_duration:.1f} s de la grabación."
+            )
+        else:
+            self.duration_summary.set(
+                f"Grabación {recording_duration:.1f} s → avatar {avatar_duration:.1f} s. "
+                "Se conserva todo el movimiento."
+            )
+
+    @staticmethod
+    def _duration_settings_from_reference(
+        reference: dict[str, object],
+        final_duration_seconds: float,
+    ) -> tuple[float, str]:
+        """Recover source timing and whether an imported sign was compressed."""
+
+        recording_duration = final_duration_seconds
+        capture = reference.get("capture", {})
+        if isinstance(capture, dict):
+            try:
+                source_frame_count = float(capture.get("sourceFrameCount", 0.0))
+                source_fps = float(capture.get("sourceFps", 0.0))
+                source_duration_ms = float(capture.get("sourceDurationMs", 0.0))
+            except (TypeError, ValueError):
+                source_frame_count = source_fps = source_duration_ms = 0.0
+            if source_frame_count > 0.0 and source_fps > 0.0:
+                recording_duration = source_frame_count / source_fps
+            elif source_duration_ms > 0.0:
+                recording_duration = source_duration_ms / 1000.0
+        recording_duration = round(recording_duration, 1)
+        tolerance = max(0.11, final_duration_seconds * 0.03)
+        if abs(recording_duration - final_duration_seconds) <= tolerance:
+            return round(final_duration_seconds, 1), DURATION_MODE_MATCH_RECORDING
+        return recording_duration, DURATION_MODE_CUSTOM
+
+    def _load_duration_settings(
+        self,
+        reference: dict[str, object],
+        final_duration_seconds: float,
+    ) -> None:
+        recording_duration, mode = self._duration_settings_from_reference(
+            reference,
+            final_duration_seconds,
+        )
+        self.avatar_duration_mode.set(mode)
+        self.recording_duration_seconds.set(recording_duration)
+        self.duration_seconds.set(round(final_duration_seconds, 1))
+        self._update_duration_controls()
+
     def _open_advanced_dialog(self) -> None:
         duration = max(0.05, float(self.duration_seconds.get()))
         self.timeline_scale.configure(to=duration)
@@ -1251,6 +1969,7 @@ class SignAuthoringEditor:
             "lateral_cm": float(self.motion_lateral_cm.get()),
             "depth_cm": float(self.motion_depth_cm.get()),
             "jaw_open": float(self.face_jaw_open.get()),
+            "mouth_pucker": float(self.face_mouth_pucker.get()),
             "eye_wide": float(self.face_eye_wide.get()),
             "brow_raise": float(self.face_brow_raise.get()),
             "active_hand": self.reference_active_hand,
@@ -1302,7 +2021,7 @@ class SignAuthoringEditor:
                     name: float(before.get(name, 0.0)) + (float(after.get(name, 0.0)) - float(before.get(name, 0.0))) * fraction
                     for name in (
                         "height_cm", "lateral_cm", "depth_cm",
-                        "jaw_open", "eye_wide", "brow_raise",
+                        "jaw_open", "mouth_pucker", "eye_wide", "brow_raise",
                     )
                 },
             }
@@ -1312,6 +2031,7 @@ class SignAuthoringEditor:
         self.motion_lateral_cm.set(float(point["lateral_cm"]))
         self.motion_depth_cm.set(float(point["depth_cm"]))
         self.face_jaw_open.set(float(point.get("jaw_open", 0.0)))
+        self.face_mouth_pucker.set(float(point.get("mouth_pucker", 0.0)))
         self.face_eye_wide.set(float(point.get("eye_wide", 0.0)))
         self.face_brow_raise.set(float(point.get("brow_raise", 0.0)))
 
@@ -1394,6 +2114,7 @@ class SignAuthoringEditor:
             self.motion_lateral_cm,
             self.motion_depth_cm,
             self.face_jaw_open,
+            self.face_mouth_pucker,
             self.face_eye_wide,
             self.face_brow_raise,
         ):
@@ -1414,6 +2135,7 @@ class SignAuthoringEditor:
             "lateral_cm": float(self.motion_lateral_cm.get()),
             "depth_cm": float(self.motion_depth_cm.get()),
             "jaw_open": float(self.face_jaw_open.get()),
+            "mouth_pucker": float(self.face_mouth_pucker.get()),
             "eye_wide": float(self.face_eye_wide.get()),
             "brow_raise": float(self.face_brow_raise.get()),
         }
@@ -1452,6 +2174,7 @@ class SignAuthoringEditor:
         self.motion_lateral_cm.set(float(point["lateral_cm"]))
         self.motion_depth_cm.set(float(point["depth_cm"]))
         self.face_jaw_open.set(float(point.get("jaw_open", 0.0)))
+        self.face_mouth_pucker.set(float(point.get("mouth_pucker", 0.0)))
         self.face_eye_wide.set(float(point.get("eye_wide", 0.0)))
         self.face_brow_raise.set(float(point.get("brow_raise", 0.0)))
 
@@ -1465,7 +2188,7 @@ class SignAuthoringEditor:
             if any(
                 abs(float(point[name])) > 30.0
                 for name in ("height_cm", "lateral_cm", "depth_cm")
-            ) or any(not 0.0 <= float(point[name]) <= 1.0 for name in ("jaw_open", "eye_wide", "brow_raise")):
+            ) or any(not 0.0 <= float(point[name]) <= 1.0 for name in ("jaw_open", "mouth_pucker", "eye_wide", "brow_raise")):
                 raise ValueError
             return point
         except (tk.TclError, ValueError):
@@ -1523,7 +2246,7 @@ class SignAuthoringEditor:
         titles = {
             1: "GRABA UNA TOMA",
             2: "CREA LA ANIMACIÓN",
-            3: "REVISA Y PUBLICA",
+            3: "REVISA Y APRUEBA",
         }
         self.stage_progress.set(stage)
         self.stage_summary.set(titles[stage])
@@ -1583,39 +2306,162 @@ class SignAuthoringEditor:
             self.created_sign_paths[gloss] = (recipe_path, landmark_path)
             if self.library_filter.get() == "pending" and gloss in published_glosses:
                 continue
-            state = "PUBLICADA" if gloss in published_glosses else "PENDIENTE"
+            state = "APROBADA ✓" if gloss in published_glosses else "POR REVISAR"
             label = f"{state}  ·  {gloss}"
             self.created_sign_labels[label] = gloss
             self.created_sign_list.insert(tk.END, label)
-        pending_count = len(self.created_sign_paths) - len(
-            set(self.created_sign_paths) & published_glosses
-        )
         if self.library_filter_button is not None:
             self.library_filter_button.configure(
                 text=f"BUSCAR ENTRE {len(self.created_sign_paths)} SEÑAS"
-            )
-        if self.publish_pending_button is not None:
-            self.publish_pending_button.configure(
-                text=(
-                    f"PUBLICAR {pending_count} PENDIENTES EN APP MÓVIL"
-                    if pending_count else "APP MÓVIL AL DÍA ✓"
-                )
             )
         self.mobile_library_status.set(
             self._mobile_library_summary(
                 published_glosses, set(self.created_sign_paths)
             )
         )
+        loaded_gloss = getattr(self, "loaded_review_gloss", None)
         if self.created_sign_list.size() > 0:
-            self.created_sign_list.selection_set(0)
-            self._on_created_sign_selection()
+            loaded_index = next(
+                (
+                    index
+                    for index, label in enumerate(
+                        self.created_sign_list.get(0, tk.END)
+                    )
+                    if self.created_sign_labels.get(label) == loaded_gloss
+                ),
+                None,
+            )
+            if loaded_index is not None:
+                self.created_sign_list.selection_set(loaded_index)
+                self._on_created_sign_selection()
+            elif loaded_gloss:
+                self.created_sign_list.selection_clear(0, tk.END)
+                self.library_selection_status.set(
+                    f"ABIERTA PARA EDITAR: {loaded_gloss}. La lista muestra otras "
+                    "señas pendientes."
+                )
+                self._refresh_owner_approval_control(loaded_gloss)
+            else:
+                self.created_sign_list.selection_set(0)
+                self._on_created_sign_selection()
         else:
             self.library_selection_status.set(
                 "No hay señas pendientes. Usa BUSCAR ENTRE SEÑAS para abrir una publicada."
                 if self.created_sign_paths
                 else "No hay señas guardadas todavía."
             )
+            self._refresh_owner_approval_control()
         self._refresh_sign_suggestions()
+
+    def _owner_approval_target(self) -> tuple[str, Path, Path] | None:
+        """Prefer the sign loaded for review over a passive queue selection."""
+
+        if (
+            self.loaded_review_gloss
+            and self.recipe_path is not None
+            and self.landmark_path is not None
+        ):
+            return self.loaded_review_gloss, self.recipe_path, self.landmark_path
+        return self._selected_created_gloss(silent=True)
+
+    def _refresh_owner_approval_control(self, gloss: str | None = None) -> None:
+        """Reflect the explicit owner gate without changing it implicitly."""
+
+        if self.owner_approval_button is None:
+            return
+        target = self._owner_approval_target()
+        target_gloss = gloss or (target[0] if target is not None else None)
+        if target_gloss is None:
+            self.owner_approval_checked.set(False)
+            self.owner_approval_button.configure(state="disabled")
+            self.owner_approval_label.set(
+                "Carga o selecciona una seña para comenzar."
+            )
+            if self.publish_approved_button is not None:
+                self.publish_approved_button.configure(
+                    text="2. ENVIAR A FIREBASE · CARGA UNA SEÑA",
+                    state="disabled",
+                )
+            return
+        approved = owner_approval_status(find_entry(target_gloss)) == "approved"
+        self.owner_approval_checked.set(approved)
+        self.owner_approval_button.configure(state="normal")
+        self.owner_approval_label.set(
+            f"{target_gloss}: "
+            + (
+                "APROBADA EN ESTE EDITOR ✓ Falta pulsar el botón 2 para enviar los cambios."
+                if approved
+                else "PENDIENTE. Revisa la simulación y marca el paso 1."
+            )
+        )
+        if self.publish_approved_button is not None:
+            self.publish_approved_button.configure(
+                text=(
+                    f"2. ENVIAR {target_gloss} A FIREBASE"
+                    if approved
+                    else "2. ENVIAR A FIREBASE · PRIMERO APRUÉBALA"
+                ),
+                state="normal" if approved else "disabled",
+            )
+
+    def _toggle_owner_approval(self) -> None:
+        """Add or remove one sign from the owner-approved publication set."""
+
+        target = self._owner_approval_target()
+        if target is None:
+            self.owner_approval_checked.set(False)
+            messagebox.showinfo(
+                "Aprobación de la seña",
+                "Carga o selecciona una seña antes de cambiar su aprobación.",
+                parent=self.root,
+            )
+            return
+        gloss, recipe_path, landmark_path = target
+        approved = bool(self.owner_approval_checked.get())
+        if approved and not self._confirm_mobile_previews(
+            [gloss], request_confirmation=False
+        ):
+            self.owner_approval_checked.set(False)
+            self._refresh_owner_approval_control(gloss)
+            return
+        try:
+            if approved:
+                self._export_mobile_motion(gloss, recipe_path, landmark_path)
+                self._register_published_linguistic_entry(gloss, recipe_path)
+            set_owner_approval(gloss, approved)
+            reviewed_signature = self.mobile_preview_signatures.get(gloss)
+            if approved and reviewed_signature is not None:
+                self._persist_mobile_preview_review(gloss, reviewed_signature)
+            write_published_motion_manifest()
+        except (
+            OSError,
+            ValueError,
+            json.JSONDecodeError,
+            subprocess.CalledProcessError,
+        ) as error:
+            self.owner_approval_checked.set(not approved)
+            messagebox.showerror(
+                "No se pudo cambiar la aprobación", str(error), parent=self.root
+            )
+            return
+        self._refresh_created_signs()
+        self._refresh_owner_approval_control(gloss)
+        self.step_status.set(
+            f"{gloss} "
+            + (
+                "APROBADA: puede publicarse como una seña independiente."
+                if approved
+                else "RETIRADA DE PUBLICACIÓN: permanece guardada para revisión."
+            )
+        )
+        self.status.set(
+            f"{gloss} "
+            + (
+                "quedó aprobada por ti."
+                if approved
+                else "quedó marcada como pendiente de tu aprobación."
+            )
+        )
 
     def _toggle_library_filter(self) -> None:
         """Keep the publishing queue focused while retaining access to history."""
@@ -1623,6 +2469,19 @@ class SignAuthoringEditor:
             "all" if self.library_filter.get() == "pending" else "pending"
         )
         self._refresh_created_signs()
+
+    @staticmethod
+    def _choose_random_pending_gloss(
+        glosses: Iterable[str],
+        approved_glosses: set[str],
+        previous_gloss: str | None = None,
+    ) -> str | None:
+        """Choose an unapproved sign and avoid an immediate repeat when possible."""
+
+        candidates = sorted(set(glosses) - approved_glosses)
+        if previous_gloss in candidates and len(candidates) > 1:
+            candidates.remove(previous_gloss)
+        return random.choice(candidates) if candidates else None
 
     def _open_library_search(self) -> None:
         """Search the library without rendering an unbounded list in the editor."""
@@ -1653,8 +2512,8 @@ class SignAuthoringEditor:
         tk.Label(
             panel,
             text=(
-                "Escribe el nombre de una seña. La cola principal seguirá mostrando "
-                "solo las pendientes de publicación."
+                "Escribe el nombre de una seña. Usa ⌘ clic para seleccionar varias "
+                "y enviarlas juntas cuando estén aprobadas."
             ),
             fg="#9fb0c4",
             bg="#111e2e",
@@ -1663,15 +2522,28 @@ class SignAuthoringEditor:
             justify="left",
         ).pack(anchor="w", pady=(4, 12))
         query = tk.StringVar()
+        search_row = tk.Frame(panel, bg="#111e2e")
+        search_row.pack(fill="x")
         tk.Entry(
-            panel,
+            search_row,
             textvariable=query,
             bg="#172638",
             fg="#f5f8fc",
             insertbackground="#f5f8fc",
             relief="flat",
             font=("Arial", 12),
-        ).pack(fill="x", ipady=7)
+        ).pack(side="left", fill="x", expand=True, ipady=7)
+        tk.Button(
+            search_row,
+            text="SEÑA PENDIENTE ALEATORIA",
+            command=lambda: select_random_pending(),
+            bg="#20d6ce",
+            fg="#07111f",
+            activebackground="#58e8e1",
+            activeforeground="#07111f",
+            relief="flat",
+            font=("Arial", 9, "bold"),
+        ).pack(side="right", padx=(8, 0), ipadx=10, ipady=7)
         result_status = tk.StringVar(value="Escribe para buscar entre las señas disponibles.")
         tk.Label(
             panel,
@@ -1686,18 +2558,20 @@ class SignAuthoringEditor:
         list_frame.pack(side="left", fill="both", expand=True)
         results = ttk.Treeview(
             list_frame,
-            columns=("gloss", "category", "aliases", "state"),
+            columns=("gloss", "category", "aliases", "state", "firebase"),
             show="headings",
-            selectmode="browse",
+            selectmode="extended",
         )
         results.heading("gloss", text="SEÑA")
         results.heading("category", text="CATEGORÍA")
         results.heading("aliases", text="PALABRAS DE VOZ")
-        results.heading("state", text="ESTADO")
+        results.heading("state", text="APROBACIÓN")
+        results.heading("firebase", text="FIREBASE")
         results.column("gloss", width=120, anchor="w")
         results.column("category", width=145, anchor="w")
         results.column("aliases", width=250, anchor="w")
         results.column("state", width=90, anchor="center")
+        results.column("firebase", width=190, anchor="center")
         results.pack(side="left", fill="both", expand=True)
         scrollbar = tk.Scrollbar(list_frame, command=results.yview)
         scrollbar.pack(side="right", fill="y")
@@ -1849,9 +2723,22 @@ class SignAuthoringEditor:
         dialog.protocol("WM_DELETE_WINDOW", close_search)
         matched_glosses: list[str] = []
         aliases_by_gloss: dict[str, list[str]] = {}
+        firebase_statuses: dict[str, tuple[str, int | None]] = {}
+        firebase_status_loading = True
+        firebase_status_failed = False
         represented_forms = tk.StringVar(
             value="Selecciona una seña para ver todas las palabras de voz que representa."
         )
+
+        def firebase_label(gloss: str) -> str:
+            if firebase_status_loading:
+                return "CONSULTANDO…"
+            if firebase_status_failed:
+                return "NO SE PUDO CONSULTAR"
+            state, version = firebase_statuses.get(
+                gloss, ("not_published", None)
+            )
+            return self._firebase_status_label(state, version)
 
         def refresh_results(*_args: object) -> None:
             nonlocal aliases_by_gloss, matched_glosses
@@ -1873,12 +2760,21 @@ class SignAuthoringEditor:
                 or any(needle in alias.casefold() for alias in aliases_by_gloss[gloss])
             ][:50]
             for gloss in matched_glosses:
-                state = "PUBLICADA" if gloss in self._published_mobile_glosses() else "PENDIENTE"
+                state = (
+                    "APROBADA ✓"
+                    if gloss in self._published_mobile_glosses()
+                    else "POR REVISAR"
+                )
                 categories = editor_metadata(gloss)["categories"]
                 category = ", ".join(str(item).replace("_", " ") for item in categories)
                 aliases = aliases_by_gloss[gloss]
                 preview = ", ".join(aliases[:4]) + ("…" if len(aliases) > 4 else "")
-                results.insert("", tk.END, iid=gloss, values=(gloss, category, preview, state))
+                results.insert(
+                    "",
+                    tk.END,
+                    iid=gloss,
+                    values=(gloss, category, preview, state, firebase_label(gloss)),
+                )
             result_status.set(
                 f"{len(matched_glosses)} resultado(s). Refina la búsqueda si hay demasiados."
                 if matched_glosses else "No encontramos una seña con ese nombre."
@@ -1901,6 +2797,78 @@ class SignAuthoringEditor:
                 )
             )
             show_selected_recording()
+
+        def select_random_pending() -> None:
+            selected = results.selection()
+            previous = selected[0] if selected else None
+            gloss = self._choose_random_pending_gloss(
+                self.created_sign_paths,
+                self._published_mobile_glosses(),
+                previous,
+            )
+            if gloss is None:
+                result_status.set("No quedan señas pendientes de aprobación.")
+                messagebox.showinfo(
+                    "Biblioteca revisada",
+                    "Todas las señas guardadas ya están aprobadas.",
+                    parent=dialog,
+                )
+                return
+            query.set(gloss)
+            if not results.exists(gloss):
+                refresh_results()
+            results.selection_set(gloss)
+            results.focus(gloss)
+            results.see(gloss)
+            show_represented_forms()
+            result_status.set(
+                f"PENDIENTE ALEATORIA: {gloss}. Pulsa ABRIR SEÑA para revisarla."
+            )
+
+        def refresh_visible_firebase_states() -> None:
+            for gloss in matched_glosses:
+                if not results.exists(gloss):
+                    continue
+                values = list(results.item(gloss, "values"))
+                if len(values) < 5:
+                    continue
+                values[4] = firebase_label(gloss)
+                results.item(gloss, values=values)
+
+        def finish_firebase_status_lookup(
+            statuses: dict[str, tuple[str, int | None]] | None,
+        ) -> None:
+            nonlocal firebase_statuses, firebase_status_loading, firebase_status_failed
+            try:
+                if not dialog.winfo_exists():
+                    return
+            except tk.TclError:
+                return
+            firebase_status_loading = False
+            firebase_status_failed = statuses is None
+            firebase_statuses = statuses or {}
+            refresh_visible_firebase_states()
+            firebase_send_button.configure(
+                state="disabled" if firebase_status_failed else "normal"
+            )
+            if firebase_status_failed:
+                result_status.set(
+                    "No se pudo consultar Firebase. Revisa la conexión; la aprobación local sí se muestra."
+                )
+
+        def load_firebase_statuses() -> None:
+            try:
+                statuses = self._firebase_sign_statuses()
+            except (
+                OSError,
+                ValueError,
+                json.JSONDecodeError,
+                subprocess.SubprocessError,
+            ):
+                statuses = None
+            self.root.after(
+                0, lambda: finish_firebase_status_lookup(statuses)
+            )
 
         def select_in_main_queue(gloss: str) -> bool:
             """Select one searched sign through the established editor pathway."""
@@ -1929,6 +2897,69 @@ class SignAuthoringEditor:
                 self._load_created_sign()
             restore_compact_queue()
             close_search()
+
+        def send_selected_to_firebase() -> None:
+            selected = list(results.selection())
+            if not selected:
+                messagebox.showinfo(
+                    "Enviar señas a Firebase",
+                    "Selecciona una o varias señas de la tabla primero.",
+                    parent=dialog,
+                )
+                return
+            approved = self._published_mobile_glosses()
+            unapproved = [gloss for gloss in selected if gloss not in approved]
+            if unapproved:
+                messagebox.showwarning(
+                    "Hay señas sin aprobar",
+                    "Estas señas todavía no pueden enviarse:\n• "
+                    + "\n• ".join(unapproved)
+                    + "\n\nÁbrelas y completa primero el paso 1: YA REVISÉ ESTA SEÑA Y LA APRUEBO.",
+                    parent=dialog,
+                )
+                return
+            pending = [
+                gloss
+                for gloss in selected
+                if firebase_statuses.get(gloss, ("not_published", None))[0]
+                != "current"
+            ]
+            if not pending:
+                messagebox.showinfo(
+                    "Firebase ya está actualizado",
+                    "Todas las señas seleccionadas muestran ACTUALIZADA. No hay nada por enviar.",
+                    parent=dialog,
+                )
+                return
+            dialog.grab_release()
+            if not self._confirm_mobile_previews(
+                pending, request_confirmation=False
+            ):
+                if dialog.winfo_exists():
+                    dialog.grab_set()
+                return
+            try:
+                for gloss in pending:
+                    recipe_path, landmark_path = self.created_sign_paths[gloss]
+                    self._export_mobile_motion(gloss, recipe_path, landmark_path)
+                    self._register_published_linguistic_entry(gloss, recipe_path)
+                write_published_motion_manifest()
+            except (
+                OSError,
+                ValueError,
+                json.JSONDecodeError,
+                subprocess.CalledProcessError,
+            ) as error:
+                if dialog.winfo_exists():
+                    dialog.grab_set()
+                messagebox.showerror(
+                    "No se pudieron preparar las señas",
+                    str(error),
+                    parent=dialog,
+                )
+                return
+            close_search()
+            self._publish_approved_signs_to_firebase(pending)
 
         def delete_selected() -> None:
             selected = results.selection()
@@ -2002,7 +3033,7 @@ class SignAuthoringEditor:
             result_status.set(
                 "Palabras guardadas en VOZUAL. "
                 + (
-                    "La app móvil las usará en la próxima compilación."
+                    "La app móvil las usará después de publicar los cambios en Firebase."
                     if gloss in self._published_mobile_glosses()
                     else "Se aplicarán cuando publiques esta seña."
                 )
@@ -2068,6 +3099,7 @@ class SignAuthoringEditor:
         action_row.pack(fill="x", pady=(10, 0))
         action_row.grid_columnconfigure(0, weight=1)
         action_row.grid_columnconfigure(1, weight=1)
+        action_row.grid_columnconfigure(2, weight=1)
         tk.Button(
             action_row,
             text="ABRIR SEÑA",
@@ -2079,6 +3111,22 @@ class SignAuthoringEditor:
             relief="flat",
             font=("Arial", 10, "bold"),
         ).grid(row=0, column=0, sticky="ew", padx=(0, 4), ipady=5)
+        firebase_send_button = tk.Button(
+            action_row,
+            text="ENVIAR SELECCIONADAS A FIREBASE",
+            command=send_selected_to_firebase,
+            bg="#20d6ce",
+            fg="#07111f",
+            activebackground="#58e8e1",
+            activeforeground="#07111f",
+            disabledforeground="#62738a",
+            relief="flat",
+            font=("Arial", 9, "bold"),
+            state="disabled",
+        )
+        firebase_send_button.grid(
+            row=0, column=1, sticky="ew", padx=4, ipady=5
+        )
         tk.Button(
             action_row,
             text="ELIMINAR",
@@ -2089,7 +3137,8 @@ class SignAuthoringEditor:
             activeforeground="#172638",
             relief="flat",
             font=("Arial", 10, "bold"),
-        ).grid(row=0, column=1, sticky="ew", padx=(4, 0), ipady=5)
+        ).grid(row=0, column=2, sticky="ew", padx=(4, 0), ipady=5)
+        threading.Thread(target=load_firebase_statuses, daemon=True).start()
 
     def _open_vocabulary_planner(self) -> None:
         """List useful pending concepts and phrase-driven recording goals."""
@@ -2304,7 +3353,25 @@ class SignAuthoringEditor:
     def _refresh_sign_suggestions(self, exclude_gloss: str | None = None) -> None:
         """Show a random uncreated gloss, avoiding the one just prepared."""
 
-        existing = set(self.created_sign_paths) | self._published_mobile_glosses()
+        remote_glosses: set[str] | None = getattr(
+            self, "firebase_published_glosses", set()
+        )
+        if remote_glosses is None:
+            self.current_suggestion = None
+            if getattr(self, "firebase_suggestion_status_loading", False):
+                self.suggestion_label.set("VERIFICANDO FIREBASE…")
+            else:
+                self.suggestion_label.set(
+                    "NO SE PUDO VERIFICAR FIREBASE\n"
+                    "Revisa la conexión antes de grabar."
+                )
+            return
+
+        existing = (
+            set(self.created_sign_paths)
+            | self._published_mobile_glosses()
+            | remote_glosses
+        )
         suggestions = suggested_signs(existing, self.suggestion_category.get())
         alternatives = tuple(
             suggestion
@@ -2351,7 +3418,12 @@ class SignAuthoringEditor:
         selected = self.current_suggestion
         self.gloss.set(selected.gloss)
         self._set_default_speech_aliases(selected.gloss)
+        self.avatar_duration_mode.set(DURATION_MODE_MATCH_RECORDING)
+        self.recording_duration_seconds.set(
+            selected.recommended_duration_seconds
+        )
         self.duration_seconds.set(selected.recommended_duration_seconds)
+        self._update_duration_controls()
         self.video_path.set("")
         self._reset_workflow_after_video()
         self.step_status.set(
@@ -2368,12 +3440,106 @@ class SignAuthoringEditor:
     def _mobile_library_summary(
         published_glosses: set[str], created_glosses: set[str]
     ) -> str:
-        """Summarize publication state without filling the UI with gloss names."""
+        """Summarize the explicit owner-approval publication gate."""
         pending_count = len(created_glosses - published_glosses)
         return (
-            f"APP MÓVIL: {len(published_glosses)} PUBLICADAS · "
-            f"{pending_count} PENDIENTES"
+            f"EN ESTE EDITOR: {len(published_glosses)} APROBADAS · "
+            f"{pending_count} POR REVISAR"
         )
+
+    @staticmethod
+    def _firebase_status_label(state: str, version: int | None) -> str:
+        """Translate a verified remote comparison into a concise UI label."""
+
+        if state == "current":
+            return f"ACTUALIZADA ✓ v{version}" if version is not None else "ACTUALIZADA ✓"
+        if state == "changes_pending":
+            return f"CAMBIOS SIN ENVIAR · v{version}" if version is not None else "CAMBIOS SIN ENVIAR"
+        if state == "published_not_approved":
+            return f"PUBLICADA · APROBACIÓN RETIRADA · v{version}" if version is not None else "PUBLICADA · APROBACIÓN RETIRADA"
+        return "NO PUBLICADA"
+
+    def _firebase_sign_statuses(self) -> dict[str, tuple[str, int | None]]:
+        """Read current public metadata and compare it with local release hashes."""
+
+        mobile_directory = REPO_ROOT / "mobile"
+        result = subprocess.run(
+            [
+                str(self._node_executable()),
+                str(mobile_directory / "tools/firebase-sign-status.js"),
+            ],
+            cwd=mobile_directory,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=45,
+        )
+        payload = json.loads(result.stdout)
+        statuses = payload.get("statuses")
+        if not isinstance(statuses, list):
+            raise ValueError("Firebase returned an invalid sign status list.")
+        parsed: dict[str, tuple[str, int | None]] = {}
+        for item in statuses:
+            if not isinstance(item, dict):
+                continue
+            gloss = str(item.get("gloss", "")).strip().upper()
+            state = str(item.get("state", "")).strip()
+            raw_version = item.get("version")
+            version = int(raw_version) if isinstance(raw_version, (int, float)) else None
+            if gloss and state:
+                parsed[gloss] = (state, version)
+        return parsed
+
+    @staticmethod
+    def _firebase_uploaded_glosses(
+        statuses: dict[str, tuple[str, int | None]],
+    ) -> set[str]:
+        """Return signs whose document already exists in public Firebase."""
+        return {
+            gloss
+            for gloss, (state, _version) in statuses.items()
+            if state != "not_published"
+        }
+
+    def _refresh_firebase_suggestion_statuses(self) -> None:
+        """Refresh suggestion exclusions from the current public Firebase state."""
+
+        if getattr(self, "firebase_suggestion_status_loading", False):
+            return
+        self.firebase_suggestion_status_loading = True
+        self.firebase_published_glosses = None
+        self.current_suggestion = None
+        self.suggestion_label.set("VERIFICANDO FIREBASE…")
+
+        def worker() -> None:
+            try:
+                statuses = self._firebase_sign_statuses()
+            except (OSError, ValueError, subprocess.SubprocessError):
+                statuses = None
+            self.root.after(
+                0,
+                lambda: self._finish_firebase_suggestion_statuses(statuses),
+            )
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_firebase_suggestion_statuses(
+        self,
+        statuses: dict[str, tuple[str, int | None]] | None,
+    ) -> None:
+        """Update suggestions only after Firebase could be verified."""
+
+        self.firebase_suggestion_status_loading = False
+        if statuses is None:
+            self.firebase_published_glosses = None
+            self.current_suggestion = None
+            self.suggestion_label.set(
+                "NO SE PUDO VERIFICAR FIREBASE\n"
+                "Revisa la conexión antes de grabar."
+            )
+            return
+        self.firebase_published_glosses = self._firebase_uploaded_glosses(statuses)
+        self._refresh_sign_suggestions()
 
     @staticmethod
     def _aliases_for_gloss(
@@ -2466,7 +3632,7 @@ class SignAuthoringEditor:
         gloss = self.gloss.get().strip().upper()
         if gloss == "YO":
             self.linguistic_summary.set(
-                "Para YO no necesitas configurar nada: es un pronombre de primera persona."
+                "YO es un pronombre de primera persona. Si la toma lo requiere, añade boca redonda (O), apertura leve, ojos y cejas en el editor por cuadro."
             )
             return
         category = self.linguistic_categories.get().replace("_", " ")
@@ -2600,13 +3766,14 @@ class SignAuthoringEditor:
             return
         gloss, _recipe_path, _landmark_path = selected
         state = (
-            "ya está publicada: el celular la incluirá en la próxima instalación."
+            "está aprobada por ti y puede publicarse como descarga independiente."
             if gloss in self._published_mobile_glosses()
-            else "solo existe en VOZUAL: ya puedes publicarla en la app móvil."
+            else "está por revisar y no puede publicarse."
         )
         self.library_selection_status.set(
             f"Seleccionada: {gloss}. CARGAR Y EDITAR abre sus vistas y parámetros; {state}"
         )
+        self._refresh_owner_approval_control()
 
     @staticmethod
     def _export_mobile_motion(
@@ -2653,6 +3820,7 @@ class SignAuthoringEditor:
         recipe_path: Path,
         landmark_path: Path,
         extra_inputs: tuple[Path, ...] | None = None,
+        actor_video_path: Path | None = None,
     ) -> tuple[tuple[str, int, int], ...]:
         """Identify the exact capture and mobile runtime reviewed by the author."""
 
@@ -2667,14 +3835,16 @@ class SignAuthoringEditor:
                     mobile_root / "tools/export_skeleton_motion.py",
                     mobile_root / "assets/models/vozual_woman_avatar_hands_v4.glb",
                     mobile_root / "assets/motions/avatar_profile_overrides.json",
-                    mobile_root / "assets/motions/published_signs.json",
                     mobile_root / "package-lock.json",
-                    *sorted((mobile_root / "assets/motions").glob("*.motion.json")),
                     *sorted((mobile_root / "src/services").glob("*.ts")),
                 ]
             )
         else:
             inputs.extend(extra_inputs)
+        # The original recording, publication manifest, and exported motion files
+        # are comparison or delivery artifacts. Approving a reviewed sign updates
+        # those files, but it does not change the recipe, capture, or avatar runtime
+        # the owner just reviewed.
         signature: list[tuple[str, int, int]] = []
         for path in inputs:
             try:
@@ -2683,6 +3853,48 @@ class SignAuthoringEditor:
             except OSError:
                 signature.append((str(path.resolve()), -1, -1))
         return tuple(signature)
+
+    @staticmethod
+    def _mobile_preview_fingerprint(
+        signature: tuple[tuple[str, int, int], ...],
+    ) -> str:
+        """Create a durable content fingerprint for one reviewed mobile preview."""
+
+        digest = hashlib.sha256()
+        for path_value, _modified_at, _size in signature:
+            path = Path(path_value)
+            try:
+                label = str(path.resolve().relative_to(REPO_ROOT))
+            except ValueError:
+                label = str(path.resolve())
+            digest.update(label.encode("utf-8"))
+            digest.update(b"\0")
+            try:
+                with path.open("rb") as source:
+                    while chunk := source.read(1024 * 1024):
+                        digest.update(chunk)
+            except OSError:
+                digest.update(b"<missing>")
+            digest.update(b"\0")
+        return digest.hexdigest()
+
+    def _persist_mobile_preview_review(
+        self,
+        gloss: str,
+        signature: tuple[tuple[str, int, int], ...],
+    ) -> bool:
+        """Remember an approved review so reopening VOZUAL does not repeat it."""
+
+        try:
+            entry = find_entry(gloss)
+            if owner_approval_status(entry) != "approved":
+                return False
+            fingerprint = self._mobile_preview_fingerprint(signature)
+            if owner_review_fingerprint(entry) != fingerprint:
+                set_owner_review_fingerprint(gloss, fingerprint)
+        except (OSError, ValueError, json.JSONDecodeError):
+            return False
+        return True
 
     @staticmethod
     def _node_executable() -> Path:
@@ -2712,14 +3924,38 @@ class SignAuthoringEditor:
     def _mobile_preview_glosses(
         candidate_gloss: str,
         manifest_path: Path | None = None,
+        catalog_path: Path | None = None,
     ) -> list[str]:
-        """Include the mobile library plus the candidate under active review."""
+        """Include every reviewable sign plus the candidate under active review.
+
+        The production manifest intentionally contains only owner-approved signs.
+        Using it as the preview browser would hide the signs that still need that
+        approval, so the editor preview reads the linguistic catalog instead.
+        """
 
         manifest = manifest_path or (
             REPO_ROOT / "mobile/assets/motions/published_signs.json"
         )
-        data = json.loads(manifest.read_text(encoding="utf-8"))
-        published = data.get("publishedGlosses", [])
+        catalog = catalog_path or (
+            REPO_ROOT / "mobile/assets/data/lsc_linguistic_catalog.json"
+        )
+        published: list[object]
+        if catalog.is_file():
+            entries = load_catalog(catalog).get("entries", [])
+            published = sorted(
+                str(
+                    entry.get("motion", {}).get("clip")
+                    or entry.get("gloss", "")
+                ).strip().upper()
+                for entry in entries
+                if isinstance(entry, dict)
+                and entry.get("motion", {}).get("published")
+                and entry.get("review", {}).get("status")
+                in {"approved", "legacy_approved"}
+            )
+        else:
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            published = data.get("publishedGlosses", [])
         glosses: list[str] = []
         for value in published:
             normalized = str(value).strip().upper()
@@ -2731,10 +3967,63 @@ class SignAuthoringEditor:
         return glosses
 
     @staticmethod
+    def _mobile_motion_asset_path(gloss: str, motion_library: Path) -> Path | None:
+        """Resolve legacy motion filenames without losing catalog accents."""
+
+        expected = motion_library / f"{gloss.strip().lower()}.motion.json"
+        if expected.is_file():
+            return expected
+
+        def folded(value: str) -> str:
+            return "".join(
+                character
+                for character in unicodedata.normalize("NFD", value.casefold())
+                if unicodedata.category(character) != "Mn"
+            )
+
+        target = folded(gloss.strip())
+        return next(
+            (
+                path
+                for path in motion_library.glob("*.motion.json")
+                if folded(path.name.removesuffix(".motion.json")) == target
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _available_mobile_preview_glosses(
+        candidate_gloss: str,
+        requested_glosses: Iterable[str],
+        motion_library: Path,
+    ) -> list[str]:
+        """Keep the candidate while omitting library rows with missing motion files."""
+
+        candidate = candidate_gloss.strip().upper()
+        available: list[str] = []
+        for value in requested_glosses:
+            gloss = str(value).strip().upper()
+            if not gloss or gloss in available:
+                continue
+            if (
+                gloss == candidate
+                or SignAuthoringEditor._mobile_motion_asset_path(
+                    gloss, motion_library
+                )
+                is not None
+            ):
+                available.append(gloss)
+        if candidate and candidate not in available:
+            available.append(candidate)
+        return available
+
+    @staticmethod
     def _build_mobile_runtime_preview(
         gloss: str,
         recipe_path: Path,
         landmark_path: Path,
+        actor_video_path: Path | None = None,
+        reviewed_change_callback: Callable[[str], None] | None = None,
     ) -> tuple[ThreadingHTTPServer, str, Path]:
         """Build and serve one candidate through the production mobile runtime."""
 
@@ -2748,15 +4037,69 @@ class SignAuthoringEditor:
         (runtime_dir / "motions").mkdir(parents=True)
 
         motion_library = mobile_root / "assets/motions"
-        preview_glosses = SignAuthoringEditor._mobile_preview_glosses(gloss)
+        preview_glosses = SignAuthoringEditor._mobile_preview_glosses(
+            gloss,
+            catalog_path=mobile_root / "assets/data/lsc_linguistic_catalog.json",
+        )
+        preview_glosses = SignAuthoringEditor._available_mobile_preview_glosses(
+            gloss,
+            preview_glosses,
+            motion_library,
+        )
+        preferred_recordings: dict[str, Path] | None = None
+        recording_start_offsets_ms: dict[str, int] | None = None
+        recording_durations_ms: dict[str, int] | None = None
+        if actor_video_path is not None and actor_video_path.is_file():
+            normalized_gloss = gloss.strip().upper()
+            preferred_recordings = {normalized_gloss: actor_video_path}
+            recipe_data = json.loads(recipe_path.read_text(encoding="utf-8"))
+            output_fps = max(1, int(recipe_data.get("output_fps", 30)))
+            source_start_frame = max(
+                0,
+                int(recipe_data.get("source_start_frame", 0)),
+            )
+            if source_start_frame:
+                recording_start_offsets_ms = {
+                    normalized_gloss: round(source_start_frame * 1000 / output_fps)
+                }
+            source_end_frame = recipe_data.get("source_end_frame")
+            if source_end_frame is not None:
+                recording_duration_ms = round(
+                    (max(source_start_frame, int(source_end_frame)) - source_start_frame + 1)
+                    * 1000
+                    / output_fps
+                )
+            else:
+                reference_data = json.loads(landmark_path.read_text(encoding="utf-8"))
+                capture = reference_data.get("capture", {})
+                source_duration_ms = (
+                    float(capture.get("sourceDurationMs", 0.0))
+                    if isinstance(capture, dict)
+                    else 0.0
+                )
+                start_offset_ms = round(source_start_frame * 1000 / output_fps)
+                recording_duration_ms = round(source_duration_ms) - start_offset_ms
+            if recording_duration_ms > 0:
+                recording_durations_ms = {
+                    normalized_gloss: recording_duration_ms
+                }
         SignAuthoringEditor._stage_mobile_preview_recordings(
             preview_glosses,
             runtime_dir,
+            preferred_recordings=preferred_recordings,
+            recording_start_offsets_ms=recording_start_offsets_ms,
+            recording_durations_ms=recording_durations_ms,
         )
         for published_gloss in preview_glosses:
-            published_motion = motion_library / f"{published_gloss.lower()}.motion.json"
-            if published_motion.is_file():
-                shutil.copy2(published_motion, source_motion_dir / published_motion.name)
+            published_motion = SignAuthoringEditor._mobile_motion_asset_path(
+                published_gloss,
+                motion_library,
+            )
+            if published_motion is not None:
+                shutil.copy2(
+                    published_motion,
+                    source_motion_dir / f"{published_gloss.lower()}.motion.json",
+                )
         SignAuthoringEditor._export_mobile_motion_file(
             gloss,
             recipe_path,
@@ -2821,6 +4164,14 @@ class SignAuthoringEditor:
         handler = partial(
             _MobilePreviewRequestHandler,
             directory=str(runtime_dir),
+            profile_path=profile_overrides,
+            runtime_profile_path=runtime_dir / "motions/avatar_profiles.json",
+            catalog_path=REPO_ROOT / "mobile/assets/data/lsc_linguistic_catalog.json",
+            manifest_path=REPO_ROOT / "mobile/assets/motions/published_signs.json",
+            candidate_gloss=gloss,
+            candidate_motion_path=source_motion_dir / f"{gloss.lower()}.motion.json",
+            published_motion_path=motion_library / f"{gloss.lower()}.motion.json",
+            reviewed_change_callback=reviewed_change_callback,
         )
         server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         server.daemon_threads = True
@@ -2837,17 +4188,28 @@ class SignAuthoringEditor:
         glosses: list[str],
         runtime_dir: Path,
         recording_root: Path | None = None,
-    ) -> dict[str, str]:
+        preferred_recordings: dict[str, Path] | None = None,
+        recording_start_offsets_ms: dict[str, int] | None = None,
+        recording_durations_ms: dict[str, int] | None = None,
+    ) -> dict[str, object]:
         """Expose the newest original take for each gloss in a local preview."""
 
         recordings_dir = runtime_dir / "recordings"
         recordings_dir.mkdir(parents=True, exist_ok=True)
-        manifest: dict[str, str] = {}
+        manifest: dict[str, object] = {}
         for index, gloss in enumerate(glosses):
-            recording = SignAuthoringEditor._recording_for_gloss(
-                gloss,
-                recording_root,
+            normalized_gloss = gloss.strip().upper()
+            preferred = (preferred_recordings or {}).get(normalized_gloss)
+            recording = (
+                preferred
+                if preferred is not None and preferred.is_file()
+                else None
             )
+            if recording is None:
+                recording = SignAuthoringEditor._recording_for_gloss(
+                    gloss,
+                    recording_root,
+                )
             if recording is None:
                 continue
             destination = recordings_dir / f"source-{index:03d}{recording.suffix.lower()}"
@@ -2855,7 +4217,24 @@ class SignAuthoringEditor:
                 os.link(recording, destination)
             except OSError:
                 shutil.copy2(recording, destination)
-            manifest[gloss.strip().upper()] = f"./recordings/{destination.name}"
+            relative_url = f"./recordings/{destination.name}"
+            start_ms = max(
+                0,
+                int((recording_start_offsets_ms or {}).get(normalized_gloss, 0)),
+            )
+            duration_ms = max(
+                0,
+                int((recording_durations_ms or {}).get(normalized_gloss, 0)),
+            )
+            if start_ms or duration_ms:
+                recording_metadata: dict[str, object] = {"url": relative_url}
+                if start_ms:
+                    recording_metadata["startMs"] = start_ms
+                if duration_ms:
+                    recording_metadata["durationMs"] = duration_ms
+                manifest[normalized_gloss] = recording_metadata
+            else:
+                manifest[normalized_gloss] = relative_url
 
         (runtime_dir / "recordings.json").write_text(
             json.dumps(manifest, ensure_ascii=False),
@@ -2886,6 +4265,62 @@ class SignAuthoringEditor:
             self.tracking_capture = None
         self.root.destroy()
 
+    def _show_embedded_mobile_preview(self, url: str, gloss: str) -> bool:
+        """Ask the native VOZUAL shell to display the local preview internally."""
+
+        request_value = os.environ.get("VOZUAL_EMBEDDED_PREVIEW_REQUEST", "")
+        response_value = os.environ.get("VOZUAL_EMBEDDED_PREVIEW_RESPONSE", "")
+        if not request_value or not response_value:
+            messagebox.showerror(
+                "Abre VOZUAL Editor de Señas",
+                "La simulación integrada solo está disponible al abrir la aplicación VOZUAL.",
+                parent=self.root,
+            )
+            return False
+        request_path = Path(request_value)
+        response_path = Path(response_value)
+        nonce = str(time.time_ns())
+        try:
+            request_path.parent.mkdir(parents=True, exist_ok=True)
+            response_path.unlink(missing_ok=True)
+            _MobilePreviewRequestHandler._write_json(
+                request_path,
+                {"nonce": nonce, "url": url, "title": gloss},
+            )
+        except OSError as error:
+            messagebox.showerror(
+                "No se pudo abrir la simulación integrada",
+                str(error),
+                parent=self.root,
+            )
+            return False
+        self.embedded_preview_nonce = nonce
+        self.root.withdraw()
+        self.root.after(250, self._poll_embedded_preview_closed)
+        return True
+
+    def _poll_embedded_preview_closed(self) -> None:
+        """Restore the desktop workspace when the embedded preview is closed."""
+
+        nonce = self.embedded_preview_nonce
+        if nonce is None:
+            return
+        response_value = os.environ.get("VOZUAL_EMBEDDED_PREVIEW_RESPONSE", "")
+        response_path = Path(response_value) if response_value else None
+        if response_path is not None:
+            try:
+                payload = json.loads(response_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                payload = {}
+            if payload.get("nonce") == nonce and payload.get("closed") is True:
+                self.embedded_preview_nonce = None
+                response_path.unlink(missing_ok=True)
+                self.root.deiconify()
+                self.root.lift()
+                self.root.focus_force()
+                return
+        self.root.after(250, self._poll_embedded_preview_closed)
+
     def _preview_in_mobile_runtime(self) -> None:
         """Open a faithful pre-publication simulation of the loaded sign."""
 
@@ -2897,13 +4332,23 @@ class SignAuthoringEditor:
             )
             return
         gloss = self.gloss.get().strip().upper()
+        selected_video = Path(self.video_path.get()).expanduser()
+        actor_video_path = (
+            selected_video.resolve() if selected_video.is_file() else None
+        )
         try:
             self._save_recipe(notify=False)
+            # A newly authored motion can be previewed before it has a catalog
+            # row. Register its saved linguistic metadata now so the embedded
+            # approval control can review it without pretending the motion is
+            # already owner-approved or published to Firebase.
+            self._register_published_linguistic_entry(gloss, self.recipe_path)
             signature = self._mobile_preview_signature(
                 self.recipe_path,
                 self.landmark_path,
+                actor_video_path=actor_video_path,
             )
-        except (OSError, ValueError, json.JSONDecodeError) as error:
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
             messagebox.showerror(
                 "No se pudo preparar la seña",
                 str(error),
@@ -2917,7 +4362,7 @@ class SignAuthoringEditor:
             and self.mobile_preview_gloss == gloss
             and self.mobile_preview_signatures.get(gloss) == signature
         ):
-            subprocess.Popen(["open", self.mobile_preview_url])
+            self._show_embedded_mobile_preview(self.mobile_preview_url, gloss)
             return
 
         self._stop_mobile_preview_server()
@@ -2933,7 +4378,13 @@ class SignAuthoringEditor:
         )
         threading.Thread(
             target=self._build_mobile_preview_in_background,
-            args=(gloss, self.recipe_path, self.landmark_path, signature),
+            args=(
+                gloss,
+                self.recipe_path,
+                self.landmark_path,
+                signature,
+                actor_video_path,
+            ),
             daemon=True,
         ).start()
 
@@ -2943,14 +4394,34 @@ class SignAuthoringEditor:
         recipe_path: Path,
         landmark_path: Path,
         signature: tuple[tuple[str, int, int], ...],
+        actor_video_path: Path | None,
     ) -> None:
+        def mark_saved_simulation_as_reviewed(changed_gloss: str) -> None:
+            self.root.after(
+                0,
+                lambda: self._accept_saved_mobile_preview_change(
+                    changed_gloss,
+                    recipe_path,
+                    landmark_path,
+                    actor_video_path,
+                ),
+            )
+
         try:
             server, url, preview_root = self._build_mobile_runtime_preview(
                 gloss,
                 recipe_path,
                 landmark_path,
+                actor_video_path,
+                mark_saved_simulation_as_reviewed,
             )
-        except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as error:
+        except (
+            OSError,
+            TypeError,
+            ValueError,
+            json.JSONDecodeError,
+            subprocess.CalledProcessError,
+        ) as error:
             details = self._mobile_install_failure_details(error)
             self.root.after(
                 0,
@@ -2968,6 +4439,52 @@ class SignAuthoringEditor:
             ),
         )
 
+    def _accept_saved_mobile_preview_change(
+        self,
+        gloss: str,
+        recipe_path: Path,
+        landmark_path: Path,
+        actor_video_path: Path | None,
+    ) -> None:
+        """Keep a saved change valid when it was reviewed in the open simulation."""
+
+        if self.mobile_preview_gloss != gloss:
+            return
+        signature = self._mobile_preview_signature(
+            recipe_path,
+            landmark_path,
+            actor_video_path=actor_video_path,
+        )
+        self.mobile_preview_signatures[gloss] = signature
+        self._persist_mobile_preview_review(gloss, signature)
+        if self.mobile_preview_button is not None:
+            self.mobile_preview_button.configure(
+                state="normal", text="ÚLTIMOS CAMBIOS REVISADOS ✓"
+            )
+        self._refresh_owner_approval_control(gloss)
+        approved = owner_approval_status(find_entry(gloss)) == "approved"
+        published_glosses = self._published_mobile_glosses()
+        self.mobile_library_status.set(
+            self._mobile_library_summary(
+                published_glosses, set(self.created_sign_paths)
+            )
+        )
+        self.step_status.set(
+            (
+                f"PASO 1 COMPLETO ✓ {gloss} ESTÁ APROBADA."
+                if approved
+                else f"REVISIÓN TERMINADA ✓ FALTA APROBAR {gloss}."
+            )
+        )
+        self.status.set(
+            (
+                f"{gloss} quedó guardada y revisada. Ahora pulsa 2. ENVIAR "
+                f"{gloss} A FIREBASE."
+                if approved
+                else f"{gloss} quedó guardada y revisada. Marca el paso 1 para aprobarla."
+            )
+        )
+
     def _finish_mobile_runtime_preview(
         self,
         gloss: str,
@@ -2983,6 +4500,7 @@ class SignAuthoringEditor:
         self.mobile_preview_gloss = gloss
         self.mobile_preview_root = preview_root
         self.mobile_preview_signatures[gloss] = signature
+        self._persist_mobile_preview_review(gloss, signature)
         if self.mobile_preview_button is not None:
             self.mobile_preview_button.configure(
                 state="normal", text="VOLVER A VER SIMULACIÓN MÓVIL ✓"
@@ -2993,15 +4511,8 @@ class SignAuthoringEditor:
         self.status.set(
             "No publiques si PUNTOS o PERSONAJE no representan claramente la seña."
         )
-        try:
-            subprocess.Popen(["open", url])
-        except OSError as error:
+        if not self._show_embedded_mobile_preview(url, gloss):
             self._stop_mobile_preview_server()
-            messagebox.showerror(
-                "No se pudo abrir la simulación",
-                str(error),
-                parent=self.root,
-            )
 
     def _fail_mobile_runtime_preview(self, details: str) -> None:
         self.analysis_progress.stop()
@@ -3021,8 +4532,10 @@ class SignAuthoringEditor:
     def _confirm_mobile_previews(
         self,
         glosses: list[str],
+        *,
+        request_confirmation: bool = True,
     ) -> bool:
-        """Fail closed when any sign has not been reviewed in the current runtime."""
+        """Fail closed when any sign changed after its latest approved review."""
 
         missing: list[str] = []
         for gloss in glosses:
@@ -3031,18 +4544,55 @@ class SignAuthoringEditor:
                 missing.append(gloss)
                 continue
             signature = self._mobile_preview_signature(paths[0], paths[1])
-            if self.mobile_preview_signatures.get(gloss) != signature:
-                missing.append(gloss)
+            if self.mobile_preview_signatures.get(gloss) == signature:
+                continue
+            entry = find_entry(gloss)
+            persisted_fingerprint = owner_review_fingerprint(entry)
+            current_fingerprint = self._mobile_preview_fingerprint(signature)
+            if owner_approval_status(entry) == "approved" and (
+                persisted_fingerprint is None
+                or persisted_fingerprint == current_fingerprint
+            ):
+                # Existing approvals predate durable fingerprints. Trust that
+                # explicit review once, migrate it, and validate all future
+                # changes against the exact reviewed content.
+                self.mobile_preview_signatures[gloss] = signature
+                self._persist_mobile_preview_review(gloss, signature)
+                continue
+            missing.append(gloss)
         if missing:
             first = missing[0]
+            mobile_preview_button = getattr(self, "mobile_preview_button", None)
+            if mobile_preview_button is not None:
+                mobile_preview_button.configure(
+                    state="normal",
+                    text="SIMULAR ESTA SEÑA EN LA APP MÓVIL",
+                )
+            if hasattr(self, "step_status"):
+                self.step_status.set(
+                    f"CAMBIOS GUARDADOS, PERO FALTA REVISAR {first}."
+                )
+            if hasattr(self, "status"):
+                self.status.set(
+                    "Todavía no se enviaron a Firebase. Abre la simulación y, al "
+                    "regresar, pulsa el botón 2."
+                )
             messagebox.showwarning(
-                "Falta revisar la simulación móvil",
-                f"Antes de publicar, carga {first} y pulsa SIMULAR APP MÓVIL.\n\n"
-                "Debes comprobar PUNTOS y PERSONAJE. Si modificas la captura, la "
-                "receta o el motor del avatar, VOZUAL pedirá revisarla de nuevo.",
+                "Los cambios están guardados, pero aún no enviados",
+                f"{first} está GUARDADA en este Mac, pero todavía NO está enviada a Firebase.\n\n"
+                f"Haz esto:\n"
+                f"1. Cierra este aviso.\n"
+                "2. Baja hasta REVISAR LA SEÑA CARGADA.\n"
+                "3. Pulsa SIMULAR ESTA SEÑA EN LA APP MÓVIL.\n"
+                "4. Comprueba PUNTOS y PERSONAJE.\n"
+                "5. Regresa, marca el paso 1 y pulsa "
+                f"2. ENVIAR {first} A FIREBASE.\n\n"
+                "Guardar no publica ni actualiza el celular.",
                 parent=self.root,
             )
             return False
+        if not request_confirmation:
+            return True
         label = glosses[0] if len(glosses) == 1 else f"{len(glosses)} señas"
         return messagebox.askyesno(
             "Confirmar revisión móvil",
@@ -3141,14 +4691,14 @@ class SignAuthoringEditor:
         )
 
     def _publish_all_signs(self) -> None:
-        """Publish every locally reviewed sign that is not yet in the mobile catalog."""
+        """Prepare pending signs while leaving owner approval explicit."""
         self._refresh_created_signs()
         published = self._published_mobile_glosses()
         pending = sorted(set(self.created_sign_paths) - published)
         if not pending:
             messagebox.showinfo(
                 "Biblioteca sincronizada",
-                "Todas las señas de VOZUAL ya están publicadas para la app móvil.",
+                "Todas las señas guardadas ya están aprobadas para publicación.",
                 parent=self.root,
             )
             return
@@ -3180,8 +4730,8 @@ class SignAuthoringEditor:
                 f"• {gloss}: {error}" for gloss, error in failures
             )
             messagebox.showerror(
-                "Algunas señas no se publicaron",
-                f"Se publicaron {len(exported)} señas y fallaron {len(failures)}: "
+                "Algunas señas no se prepararon",
+                f"Se prepararon {len(exported)} señas y fallaron {len(failures)}: "
                 f"\n\n{failure_details}",
                 parent=self.root,
             )
@@ -3190,59 +4740,44 @@ class SignAuthoringEditor:
 
         publication_label = "1 seña" if len(exported) == 1 else f"{len(exported)} señas"
         self.step_status.set(
-            f"PUBLICACIÓN TERMINADA: {publication_label.upper()}. "
-            "Decide si quieres actualizar Android ahora."
+            f"PREPARACIÓN TERMINADA: {publication_label.upper()}. "
+            "Revísalas y marca APROBADA POR MÍ una por una."
         )
         self.status.set(
-            f"Se publicaron {publication_label} en el catálogo móvil."
+            f"Se prepararon {publication_label}; ninguna aprobación personal cambió."
         )
-        compile_now = messagebox.askyesno(
-            "Señas publicadas",
-            f"Se publicaron {publication_label} para la app móvil.\n\n"
-            "¿Quieres compilar e instalar ahora la app Android?\n\n"
-            "Si confirmas, VOZUAL sincronizará toda la biblioteca, construirá el APK "
-            "e intentará instalarlo en el teléfono o emulador conectado.",
+        messagebox.showinfo(
+            "Señas preparadas",
+            f"Se prepararon {publication_label}.\n\n"
+            "Ahora revisa cada simulación y marca APROBADA POR MÍ. Solo esas señas "
+            "se publicarán cuando pulses PUBLICAR CAMBIOS EN FIREBASE.",
             parent=self.root,
         )
-        if compile_now:
-            self._compile_and_install_mobile_app(publication_label)
-        else:
-            self.status.set(
-                f"Se publicaron {publication_label}. Puedes compilar Android más adelante."
-            )
 
     def _publish_selected_sign(self) -> None:
-        """Publish one selected sign; retained for internal compatibility."""
+        """Prepare one selected sign without granting owner approval."""
         selected = self._selected_created_gloss()
         if selected is None:
             return
         gloss, recipe_path, landmark_path = selected
-        if not self._confirm_mobile_previews([gloss]):
+        if not self._confirm_mobile_previews(
+            [gloss], request_confirmation=False
+        ):
             return
         try:
             self._export_mobile_motion(gloss, recipe_path, landmark_path)
             self._register_published_linguistic_entry(gloss, recipe_path)
             write_published_motion_manifest()
         except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as error:
-            messagebox.showerror("No se pudo publicar", str(error), parent=self.root)
+            messagebox.showerror("No se pudo preparar", str(error), parent=self.root)
             return
         self._refresh_created_signs()
-        self.step_status.set(f"SEÑA PUBLICADA: {gloss}. Decide si quieres actualizar Android ahora.")
-        self.status.set(f"{gloss} exportada a mobile/assets/motions y añadida al catálogo móvil.")
-        compile_now = messagebox.askyesno(
-            "Seña publicada",
-            f"{gloss} quedó marcada como EN APP.\n\n"
-            "¿Quieres compilar e instalar ahora la app Android?\n\n"
-            "Si confirmas, VOZUAL sincronizará la seña, construirá el APK e intentará "
-            "instalarlo en el teléfono o emulador conectado.",
-            parent=self.root,
+        self.step_status.set(
+            f"SEÑA PREPARADA: {gloss}. Marca APROBADA POR MÍ después de revisarla."
         )
-        if compile_now:
-            self._compile_and_install_mobile_app(gloss)
-        else:
-            self.status.set(
-                f"{gloss} está publicada. Cuando quieras, puedes compilar Android desde VOZUAL."
-            )
+        self.status.set(
+            f"{gloss} está preparada, pero no podrá publicarse sin tu aprobación."
+        )
 
     def _update_loaded_sign_voice_forms(self) -> None:
         """Persist edited spoken forms and offer an immediate Android update.
@@ -3280,23 +4815,181 @@ class SignAuthoringEditor:
 
         forms_label = ", ".join(forms) if forms else f"{gloss.lower()} (nombre automático)"
         self.step_status.set(
-            f"PALABRAS ACTUALIZADAS: {gloss}. Decide si quieres actualizar Android ahora."
+            f"PALABRAS ACTUALIZADAS: {gloss}."
         )
         self.status.set(f"{gloss} reconocerá: {forms_label}.")
-        compile_now = messagebox.askyesno(
+        if gloss not in self._published_mobile_glosses():
+            messagebox.showinfo(
+                "Palabras guardadas",
+                f"{gloss} ahora reconocerá:\n{forms_label}\n\n"
+                "La seña sigue POR REVISAR. Cuando la apruebes, estas palabras "
+                "se incluirán en los metadatos de su descarga independiente.",
+                parent=self.root,
+            )
+            return
+        publish_now = messagebox.askyesno(
             "Palabras actualizadas",
             f"{gloss} ahora reconocerá:\n{forms_label}\n\n"
-            "¿Quieres compilar e instalar ahora la app Android?\n\n"
-            "La seña no se vuelve a grabar ni se regenera: solo se actualizan las palabras "
-            "que la activan en el celular.",
+            "¿Quieres publicar este cambio en Firebase ahora?\n\n"
+            "Se actualizará únicamente esta seña independiente; la aplicación móvil no se "
+            "reconstruirá.",
             parent=self.root,
         )
-        if compile_now:
-            self._compile_and_install_mobile_app(gloss)
+        if publish_now:
+            self._publish_approved_signs_to_firebase(gloss)
         else:
             self.status.set(
-                f"Palabras de {gloss} guardadas para la app móvil. Compila Android cuando quieras."
+                f"Palabras de {gloss} guardadas. Publícalas en Firebase cuando quieras."
             )
+
+    def _publish_current_sign_to_firebase(self) -> None:
+        """Export and publish only the sign currently being reviewed."""
+
+        target = self._owner_approval_target()
+        if target is None:
+            messagebox.showinfo(
+                "Carga una seña primero",
+                "Carga la seña que deseas publicar antes de continuar.",
+                parent=self.root,
+            )
+            return
+        gloss, recipe_path, landmark_path = target
+        if gloss not in self._published_mobile_glosses():
+            messagebox.showwarning(
+                "Falta tu aprobación",
+                f"Marca {gloss} como APROBADA POR MÍ antes de publicarla.",
+                parent=self.root,
+            )
+            return
+        if not self._confirm_mobile_previews(
+            [gloss], request_confirmation=False
+        ):
+            return
+        try:
+            self._export_mobile_motion(gloss, recipe_path, landmark_path)
+            self._register_published_linguistic_entry(gloss, recipe_path)
+            write_published_motion_manifest()
+        except (
+            OSError,
+            ValueError,
+            json.JSONDecodeError,
+            subprocess.CalledProcessError,
+        ) as error:
+            messagebox.showerror(
+                "No se pudo preparar la publicación",
+                str(error),
+                parent=self.root,
+            )
+            return
+        self._publish_approved_signs_to_firebase(gloss)
+
+    def _publish_approved_signs_to_firebase(
+        self, gloss: str | list[str]
+    ) -> None:
+        """Publish selected new or changed owner-approved signs to Firebase."""
+
+        glosses = [gloss] if isinstance(gloss, str) else list(dict.fromkeys(gloss))
+        label = ", ".join(glosses)
+        self._start_progress("PUBLICANDO EN FIREBASE… verificando cambios aprobados.")
+        self.status.set(
+            f"Enviando {label} a Firebase. No cierres VOZUAL Editor."
+        )
+        threading.Thread(
+            target=self._publish_approved_signs_in_background,
+            args=(glosses,),
+            daemon=True,
+        ).start()
+
+    def _publish_approved_signs_in_background(self, gloss: str | list[str]) -> None:
+        mobile_directory = REPO_ROOT / "mobile"
+        publish_script = mobile_directory / "tools/publish-approved-signs.js"
+        glosses = [gloss] if isinstance(gloss, str) else list(dict.fromkeys(gloss))
+        label = ", ".join(glosses)
+        arguments = [str(self._node_executable()), str(publish_script)]
+        for selected_gloss in glosses:
+            arguments.extend(["--gloss", selected_gloss])
+        try:
+            result = subprocess.run(
+                arguments,
+                cwd=mobile_directory,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as error:
+            details = self._mobile_install_failure_details(error)
+            self.root.after(
+                0,
+                lambda: self._finish_firebase_publication_failure(label, details),
+            )
+            return
+        self.root.after(
+            0,
+            lambda: self._finish_firebase_publication(label, result.stdout),
+        )
+
+    def _finish_firebase_publication(self, label: str, output: str) -> None:
+        self.analysis_progress.stop()
+        self.analysis_progress.pack_forget()
+        try:
+            details = json.loads(output)
+            project = str(details.get("project", "Firebase"))
+            published = details.get("published", [])
+            unchanged = details.get("unchanged", [])
+            retired = details.get("retired", [])
+            if not isinstance(published, list) or not isinstance(unchanged, list):
+                raise ValueError("Invalid publication result")
+        except (json.JSONDecodeError, TypeError, ValueError):
+            self._finish_firebase_publication_failure(
+                label,
+                "Firebase terminó sin devolver un resultado verificable.",
+            )
+            return
+        self._refresh_created_signs()
+        self._refresh_firebase_suggestion_statuses()
+        if published:
+            published_labels = [
+                f"{item.get('gloss', 'SEÑA')} v{item.get('version', '?')}"
+                for item in published
+                if isinstance(item, dict)
+            ]
+            summary = ", ".join(published_labels)
+            self.step_status.set(
+                f"ENVIADA A FIREBASE ✓  {summary}."
+            )
+            self.status.set(
+                "Terminaste. Vozual móvil detectará esta actualización y permitirá descargarla."
+            )
+            messagebox.showinfo(
+                "Seña enviada correctamente",
+                f"Firebase: {project}\n\n"
+                f"Enviada y verificada:\n• " + "\n• ".join(published_labels)
+                + "\n\nYa terminaste: no necesitas pulsar ningún otro botón."
+                + (f"\nRetiradas: {len(retired)}" if retired else "")
+                + "\n\nLa app móvil avisará que hay una actualización y solo la descargará si el usuario acepta.",
+                parent=self.root,
+            )
+            return
+        self.step_status.set(f"{label.upper()} YA ESTÁ EN FIREBASE ✓")
+        self.status.set(
+            "No había cambios nuevos por enviar. Ya terminaste."
+        )
+        messagebox.showinfo(
+            "La seña ya estaba actualizada",
+            f"{label} ya tiene su última versión en {project}. No necesitas hacer nada más.",
+            parent=self.root,
+        )
+
+    def _finish_firebase_publication_failure(self, label: str, details: str) -> None:
+        self.analysis_progress.stop()
+        self.analysis_progress.pack_forget()
+        self.step_status.set(f"NO SE PUDIERON PUBLICAR {label.upper()}.")
+        self.status.set("Firebase no recibió el cambio. La copia guardada en este Mac no se perdió.")
+        self._show_detailed_error(
+            title="No se pudieron publicar las señas",
+            summary="La publicación y verificación en Firebase no terminó.",
+            details=details,
+        )
 
     def _compile_and_install_mobile_app(self, gloss: str) -> None:
         """Build and install the standalone Android app after a sign is published."""
@@ -3346,7 +5039,7 @@ class SignAuthoringEditor:
                 env=environment,
             )
             subprocess.run(
-                [str(adb), "shell", "am", "force-stop", "com.manospeak"],
+                [str(adb), "shell", "am", "force-stop", "com.androsja.vozual"],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -3359,7 +5052,7 @@ class SignAuthoringEditor:
                     "am",
                     "start",
                     "-n",
-                    "com.manospeak/.MainActivity",
+                    "com.androsja.vozual/.MainActivity",
                 ],
                 check=True,
                 capture_output=True,
@@ -3621,7 +5314,7 @@ class SignAuthoringEditor:
         gloss, recipe_path, _landmark_path = selected
         published = gloss in self._published_mobile_glosses()
         scope = (
-            "También se retirará de la app móvil en la próxima compilación."
+            "También se retirará de Firebase cuando pulses PUBLICAR CAMBIOS EN FIREBASE."
             if published
             else "Solo se eliminará de la biblioteca local de VOZUAL."
         )
@@ -3773,6 +5466,13 @@ class SignAuthoringEditor:
         reference = json.loads(landmark_path.read_text(encoding="utf-8"))
         self.reference_frames = reference.get("rawFrames", [])
         self.reference_fps = int(data.get("output_fps", reference.get("fps", 30)) or 30)
+        final_duration_seconds = float(self.duration_seconds.get())
+        if self.reference_frames:
+            final_duration_seconds = (
+                self._recipe_output_frame_count(data, len(self.reference_frames))
+                / max(1, self.reference_fps)
+            )
+        self._load_duration_settings(reference, final_duration_seconds)
         self.reference_active_hand = str(data.get("active_hand", "right"))
         self._set_tracking_preview(landmark_path)
         self.anchor.set(str(data.get("contact_anchor", "chin")))
@@ -3780,6 +5480,7 @@ class SignAuthoringEditor:
         self.release_palm.set(str(data.get("palm_at_release", "up")))
         self.forward.set(float(data.get("forward_distance", 0.45)))
         self.return_to_rest.set(bool(data.get("return_to_rest", True)))
+        self._load_avatar_finger_states(gloss)
         self._load_motion_adjustments(data)
         recording = self._latest_recording(self._recording_directory())
         self.video_path.set(str(recording) if recording else "")
@@ -3803,13 +5504,14 @@ class SignAuthoringEditor:
                 "para aplicarlas en la app móvil."
             )
         self.library_selection_status.set(
-            f"✓ {gloss} está cargada. Usa las vistas de revisión debajo o EDITAR PARÁMETROS POR SEGUNDO."
+            f"✓ {gloss} está cargada. Revísala con SIMULAR APP MÓVIL."
         )
+        self._refresh_owner_approval_control(gloss)
         self._set_stage(3)
         messagebox.showinfo(
             "Seña cargada",
             f"{gloss} quedó cargada para editar.\n\n"
-            "Ahora puedes abrir Puntos, Esqueleto, Animación o Parámetros por segundo en la sección Revisar.",
+            "Ahora puedes abrir Puntos, Esqueleto o SIMULAR APP MÓVIL en la sección Revisar.",
             parent=self.root,
         )
 
@@ -3911,7 +5613,7 @@ class SignAuthoringEditor:
         )
         self.apply_adjustments_button.configure(state="disabled")
         self.preview_button.configure(
-            state="normal", text="VISTA 3D CON BLENDER (OPCIONAL)  ·  GENERA O CARGA UNA SEÑA"
+            state="normal", text="VISTA 3D INTERNA"
         )
         if self.mobile_preview_button is not None:
             self.mobile_preview_button.configure(
@@ -4175,6 +5877,11 @@ class SignAuthoringEditor:
         if selection is None:
             return
         video, gloss = selection
+        try:
+            _recording_duration, avatar_duration = self._duration_values()
+        except ValueError as error:
+            messagebox.showerror("Duración inválida", str(error), parent=self.root)
+            return
         output = REPO_ROOT / "tmp/creator_references/video_imports" / gloss.lower()
         self.automatic_button.configure(
             state="disabled", text="CREANDO SEÑA… ESPERA"
@@ -4188,7 +5895,7 @@ class SignAuthoringEditor:
         self._start_progress("MODO AUTOMÁTICO: analizando y creando la seña…")
         threading.Thread(
             target=self._automatic_in_background,
-            args=(video, gloss, output, float(self.duration_seconds.get())),
+            args=(video, gloss, output, avatar_duration),
             daemon=True,
         ).start()
 
@@ -4231,6 +5938,7 @@ class SignAuthoringEditor:
         self.release_palm.set(str(data["palm_at_release"]))
         self.forward.set(float(data["forward_distance"]))
         self.return_to_rest.set(bool(data["return_to_rest"]))
+        self._load_avatar_finger_states(self.loaded_review_gloss)
         self._load_motion_adjustments(data)
         self.analysis_progress.stop()
         self.analysis_progress.pack_forget()
@@ -4242,7 +5950,7 @@ class SignAuthoringEditor:
             state="normal", text="GUARDAR SIN GENERAR (OPCIONAL)"
         )
         self.preview_button.configure(
-            state="normal", text="GENERAR VISTA 3D CON BLENDER (OPCIONAL)"
+            state="normal", text="GENERAR VISTA 3D INTERNA"
         )
         if self.mobile_preview_button is not None:
             self.mobile_preview_button.configure(
@@ -4266,11 +5974,10 @@ class SignAuthoringEditor:
         self.root.bell()
         messagebox.showinfo(
             "Seña automática terminada",
-            f"VOZUAL extrajo los landmarks sin usar Blender.\n\n"
+            f"VOZUAL extrajo los landmarks correctamente.\n\n"
             f"Mano detectada: {active_hand}.\n"
             f"Contacto detectado: {contact}.\n\n"
-            "La seña está lista para publicar. Usa los controles avanzados solo "
-            "si necesitas un ajuste fino. La vista 3D con Blender es opcional."
+            "La seña está lista para revisar en SIMULAR APP MÓVIL."
             f"{tracking_review}",
             parent=self.root,
         )
@@ -4368,9 +6075,9 @@ class SignAuthoringEditor:
     def _record_video(self) -> None:
         gloss = self.gloss.get().strip()
         try:
-            duration = float(self.duration_seconds.get())
-        except (tk.TclError, ValueError):
-            messagebox.showerror("Duración inválida", "Escribe una duración válida en segundos.")
+            recording_duration, avatar_duration = self._duration_values()
+        except ValueError as error:
+            messagebox.showerror("Duración inválida", str(error), parent=self.root)
             return
         if not gloss:
             messagebox.showerror("Falta el nombre", "Escribe primero el nombre de la seña.")
@@ -4382,13 +6089,14 @@ class SignAuthoringEditor:
         output = REPO_ROOT / "tmp/creator_references/recorded_videos" / gloss.lower()
         try:
             while True:
-                video = record_video(0, gloss, duration, output)
+                video = record_video(0, gloss, recording_duration, output)
                 self.video_path.set(str(video))
                 self._reset_workflow_after_video()
                 decision = self._review_recording(video)
                 if decision == "use":
                     self.status.set(
-                        f"Grabación elegida: {video.name} ({duration:.1f} s). "
+                        f"Grabación elegida: {video.name} ({recording_duration:.1f} s). "
+                        f"El avatar durará {avatar_duration:.1f} s. "
                         "Ahora pulsa CREAR ANIMACIÓN."
                     )
                     break
@@ -4417,6 +6125,11 @@ class SignAuthoringEditor:
             return
         if not self._can_create_new_gloss(gloss):
             return
+        try:
+            _recording_duration, avatar_duration = self._duration_values()
+        except ValueError as error:
+            messagebox.showerror("Duración inválida", str(error), parent=self.root)
+            return
         self.status.set("Analizando cuerpo, rostro y manos. Espera a que aparezca el aviso…")
         self.step_status.set("ANALIZANDO VIDEO… No cierres la aplicación.")
         self.analyze_button.configure(state="disabled", text="ANALIZANDO… ESPERA")
@@ -4430,7 +6143,7 @@ class SignAuthoringEditor:
 
         threading.Thread(
             target=self._analyze_in_background,
-            args=(video, self.gloss.get(), output, float(self.duration_seconds.get())),
+            args=(video, self.gloss.get(), output, avatar_duration),
             daemon=True,
         ).start()
 
@@ -4491,6 +6204,7 @@ class SignAuthoringEditor:
         self.release_palm.set(str(data["palm_at_release"]))
         self.forward.set(float(data["forward_distance"]))
         self.return_to_rest.set(bool(data["return_to_rest"]))
+        self._load_avatar_finger_states(self.loaded_review_gloss)
         self._load_motion_adjustments(data)
         tracking_review = self._hand_tracking_review_message(landmark_path)
         self._stop_analysis_progress()
@@ -4517,18 +6231,165 @@ class SignAuthoringEditor:
             "Análisis terminado",
             "El video terminó de analizarse correctamente.\n\n"
             "Puedes abrir VER LOS 21 PUNTOS para comprobar la captura.\n\n"
-            "Siguiente paso: revisa los controles y pulsa\n"
-            f"GUARDAR CORRECCIONES.{tracking_review}",
+            "Siguiente paso: pulsa SIMULAR APP MÓVIL para revisarla en la web."
+            f"{tracking_review}",
             parent=self.root,
         )
-        self.save_button.focus_set()
-        self._open_advanced_dialog()
+        if self.mobile_preview_button is not None:
+            self.mobile_preview_button.focus_set()
 
     def _fail_analysis(self, error: str) -> None:
         self._stop_analysis_progress()
         self.step_status.set("EL ANÁLISIS FALLÓ. Corrige el problema e inténtalo nuevamente.")
         messagebox.showerror("No se pudo analizar", error, parent=self.root)
         self.status.set("El análisis no se completó.")
+
+    @staticmethod
+    def _default_finger_state_snapshot() -> dict[str, dict[str, str]]:
+        return {
+            side: {finger: "captured" for finger in FINGER_NAMES}
+            for side in ("left", "right")
+        }
+
+    def _finger_state_snapshot(self) -> dict[str, dict[str, str]]:
+        return {
+            "left": {
+                finger: FINGER_STATE_TO_PROFILE[self.left_finger_states[finger].get()]
+                for finger in FINGER_NAMES
+            },
+            "right": {
+                finger: FINGER_STATE_TO_PROFILE[self.right_finger_states[finger].get()]
+                for finger in FINGER_NAMES
+            },
+        }
+
+    @staticmethod
+    def _finger_states_from_profile(
+        profile: dict[str, object],
+    ) -> dict[str, dict[str, str]]:
+        snapshot = SignAuthoringEditor._default_finger_state_snapshot()
+        for side, key in (
+            ("left", "rigLeftFingerStates"),
+            ("right", "rigRightFingerStates"),
+        ):
+            stored = profile.get(key, {})
+            if not isinstance(stored, dict):
+                continue
+            for finger in FINGER_NAMES:
+                state = stored.get(finger)
+                if state in PROFILE_TO_FINGER_STATE:
+                    snapshot[side][finger] = str(state)
+        return snapshot
+
+    def _load_avatar_finger_states(self, gloss: str) -> None:
+        try:
+            profiles = json.loads(
+                AVATAR_PROFILE_OVERRIDES_PATH.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            profiles = {}
+        profile = profiles.get(gloss, {}) if isinstance(profiles, dict) else {}
+        if isinstance(profile, dict):
+            self.left_index_middle_spread.set(float(profile.get("rigLeftIndexMiddleSpread", 0.025)))
+            self.loaded_index_middle_spread = self.left_index_middle_spread.get()
+        snapshot = self._finger_states_from_profile(
+            profile if isinstance(profile, dict) else {}
+        )
+        for side, variables in (
+            ("left", self.left_finger_states),
+            ("right", self.right_finger_states),
+        ):
+            for finger in FINGER_NAMES:
+                variables[finger].set(
+                    PROFILE_TO_FINGER_STATE[snapshot[side][finger]]
+                )
+        self.loaded_finger_states = snapshot
+
+    @staticmethod
+    def _merge_finger_states_into_profiles(
+        profiles: dict[str, object],
+        gloss: str,
+        current: dict[str, dict[str, str]],
+        previous: dict[str, dict[str, str]],
+    ) -> tuple[dict[str, object], bool]:
+        updated = dict(profiles)
+        stored_profile = updated.get(gloss, {})
+        profile = dict(stored_profile) if isinstance(stored_profile, dict) else {}
+        changed = False
+        for side, states_key, shape_key in (
+            ("left", "rigLeftFingerStates", "rigLeftHandShape"),
+            ("right", "rigRightFingerStates", "rigRightHandShape"),
+        ):
+            if current[side] == previous[side]:
+                continue
+            changed = True
+            # Once an editor explicitly configures the fingers, that choice
+            # replaces any older whole-hand preset for this side.
+            profile.pop(shape_key, None)
+            authored = {
+                finger: state
+                for finger, state in current[side].items()
+                if state != "captured"
+            }
+            if authored:
+                profile[states_key] = authored
+            else:
+                profile.pop(states_key, None)
+        if changed:
+            if profile:
+                updated[gloss] = profile
+            else:
+                updated.pop(gloss, None)
+        return updated, changed
+
+    def _save_avatar_finger_states(self, gloss: str) -> bool:
+        try:
+            profiles = json.loads(
+                AVATAR_PROFILE_OVERRIDES_PATH.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            profiles = {}
+        if not isinstance(profiles, dict):
+            profiles = {}
+        current = self._finger_state_snapshot()
+        updated, changed = self._merge_finger_states_into_profiles(
+            profiles,
+            gloss,
+            current,
+            self.loaded_finger_states,
+        )
+        spread = round(float(self.left_index_middle_spread.get()), 3)
+        if abs(spread - self.loaded_index_middle_spread) > 0.0001:
+            profile = dict(updated.get(gloss, {})) if isinstance(updated.get(gloss, {}), dict) else {}
+            profile["rigLeftIndexMiddleSpread"] = spread
+            updated[gloss] = profile
+            changed = True
+        if changed:
+            AVATAR_PROFILE_OVERRIDES_PATH.write_text(
+                json.dumps(updated, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            self.loaded_finger_states = current
+            self.loaded_index_middle_spread = spread
+        return changed
+
+    @staticmethod
+    def _recipe_output_frame_count(
+        data: dict[str, object],
+        raw_frame_count: int,
+    ) -> int:
+        """Return the exported frame count after applying a recipe source trim."""
+
+        if raw_frame_count <= 0:
+            return 0
+        source_start = int(data.get("source_start_frame", 0))
+        raw_source_end = data.get("source_end_frame")
+        source_end = (
+            raw_frame_count - 1
+            if raw_source_end is None
+            else int(raw_source_end)
+        )
+        return max(0, source_end - source_start + 1)
 
     def _load_motion_adjustments(self, data: dict[str, object]) -> None:
         for key, variable in (
@@ -4540,80 +6401,169 @@ class SignAuthoringEditor:
             ("exit_depth_cm", self.exit_depth_cm),
         ):
             variable.set(float(data.get(key, 0.0)))
+        captured_duration = (
+            self._recipe_output_frame_count(data, len(self.reference_frames))
+            / max(1, self.reference_fps)
+            if self.reference_frames
+            else float(self.duration_seconds.get())
+        )
+        duration = max(0.05, captured_duration)
         stored = data.get("motion_keyframes", [])
         if isinstance(stored, list) and stored:
-            self.motion_keyframes = [dict(point) for point in stored]
+            self.motion_keyframes = self._fit_motion_keyframes_to_duration(
+                stored,
+                duration,
+            )
         else:
-            duration = max(0.05, float(self.duration_seconds.get()))
-            self.motion_keyframes = [
-                {
-                    "kind": "entry",
-                    "time_seconds": 0.0,
-                    "height_cm": float(data.get("entry_height_cm", 0.0)),
-                    "lateral_cm": float(data.get("entry_lateral_cm", 0.0)),
-                    "depth_cm": float(data.get("entry_depth_cm", 0.0)),
-                },
-                {
-                    "kind": "exit",
-                    "time_seconds": duration,
-                    "height_cm": float(data.get("exit_height_cm", 0.0)),
-                    "lateral_cm": float(data.get("exit_lateral_cm", 0.0)),
-                    "depth_cm": float(data.get("exit_depth_cm", 0.0)),
-                },
-            ]
+            self.motion_keyframes = self._default_motion_keyframes(data, duration)
         self._refresh_motion_tree()
+
+    @staticmethod
+    def _default_motion_keyframes(
+        data: dict[str, object],
+        duration: float,
+    ) -> list[dict[str, object]]:
+        """Build neutral timeline endpoints from the captured duration."""
+
+        return [
+            {
+                "kind": "entry",
+                "time_seconds": 0.0,
+                "height_cm": float(data.get("entry_height_cm", 0.0)),
+                "lateral_cm": float(data.get("entry_lateral_cm", 0.0)),
+                "depth_cm": float(data.get("entry_depth_cm", 0.0)),
+            },
+            {
+                "kind": "exit",
+                "time_seconds": duration,
+                "height_cm": float(data.get("exit_height_cm", 0.0)),
+                "lateral_cm": float(data.get("exit_lateral_cm", 0.0)),
+                "depth_cm": float(data.get("exit_depth_cm", 0.0)),
+            },
+        ]
+
+    @staticmethod
+    def _fit_motion_keyframes_to_duration(
+        stored: list[object],
+        duration: float,
+    ) -> list[dict[str, object]]:
+        """Scale legacy timeline points into the actual captured sequence."""
+
+        points = [dict(point) for point in stored if isinstance(point, dict)]
+        times = [float(point.get("time_seconds", 0.0)) for point in points]
+        latest_time = max(times, default=0.0)
+        scale = duration / latest_time if latest_time > duration else 1.0
+        for point, time_seconds in zip(points, times):
+            point["time_seconds"] = max(
+                0.0,
+                min(duration, time_seconds * scale),
+            )
+        return points
 
     def _save_recipe(self, notify: bool = True) -> None:
         if self.recipe_path is None:
             messagebox.showerror("Falta análisis", "Primero analiza un video.")
             return
         data = json.loads(self.recipe_path.read_text(encoding="utf-8"))
-        recipe = SignRecipe(
-            **{
-                **data,
-                "contact_anchor": self.anchor.get(),
-                "palm_at_contact": self.contact_palm.get(),
-                "palm_at_release": self.release_palm.get(),
-                "forward_distance": self.forward.get(),
-                "return_to_rest": self.return_to_rest.get(),
-                "entry_height_cm": self.entry_height_cm.get(),
-                "entry_lateral_cm": self.entry_lateral_cm.get(),
-                "entry_depth_cm": self.entry_depth_cm.get(),
-                "exit_height_cm": self.exit_height_cm.get(),
-                "exit_lateral_cm": self.exit_lateral_cm.get(),
-                "exit_depth_cm": self.exit_depth_cm.get(),
-                "motion_keyframes": self.motion_keyframes,
-                "speech_aliases": self._current_speech_aliases(),
-                "speech_aliases_overridden": self.speech_aliases_overridden,
-                "linguistic_categories": self._current_linguistic_categories(),
-                "lexical_class": self.lexical_class.get(),
-                "lsc_verb_type": self.lsc_verb_type.get(),
-                "linguistic_review_status": self.linguistic_review_status.get(),
-            }
+        landmark_data = (
+            json.loads(self.landmark_path.read_text(encoding="utf-8"))
+            if self.landmark_path
+            else {}
         )
-        landmark_data = json.loads(self.landmark_path.read_text(encoding="utf-8")) if self.landmark_path else {}
         frame_count = len(landmark_data.get("rawFrames", []))
+        output_fps = max(1, int(data.get("output_fps", 30)))
+        captured_duration = (
+            self._recipe_output_frame_count(data, frame_count) / output_fps
+        )
+        updated_data = {
+            **data,
+            "contact_anchor": self.anchor.get(),
+            "palm_at_contact": self.contact_palm.get(),
+            "palm_at_release": self.release_palm.get(),
+            "forward_distance": self.forward.get(),
+            "return_to_rest": self.return_to_rest.get(),
+            "entry_height_cm": self.entry_height_cm.get(),
+            "entry_lateral_cm": self.entry_lateral_cm.get(),
+            "entry_depth_cm": self.entry_depth_cm.get(),
+            "exit_height_cm": self.exit_height_cm.get(),
+            "exit_lateral_cm": self.exit_lateral_cm.get(),
+            "exit_depth_cm": self.exit_depth_cm.get(),
+            "motion_keyframes": self.motion_keyframes,
+            "speech_aliases": self._current_speech_aliases(),
+            "speech_aliases_overridden": self.speech_aliases_overridden,
+            "linguistic_categories": self._current_linguistic_categories(),
+            "lexical_class": self.lexical_class.get(),
+            "lsc_verb_type": self.lsc_verb_type.get(),
+            "linguistic_review_status": self.linguistic_review_status.get(),
+        }
+        scalar_motion_fields = (
+            "contact_anchor",
+            "palm_at_contact",
+            "palm_at_release",
+            "forward_distance",
+            "return_to_rest",
+            "entry_height_cm",
+            "entry_lateral_cm",
+            "entry_depth_cm",
+            "exit_height_cm",
+            "exit_lateral_cm",
+            "exit_depth_cm",
+        )
+        stored_keyframes = data.get("motion_keyframes", [])
+        original_keyframes = (
+            [dict(point) for point in stored_keyframes if isinstance(point, dict)]
+            if isinstance(stored_keyframes, list) and stored_keyframes
+            else self._default_motion_keyframes(data, captured_duration)
+        )
+        motion_changed = (
+            any(
+                data.get(field) != updated_data.get(field)
+                for field in scalar_motion_fields
+            )
+            or original_keyframes != self.motion_keyframes
+        )
+        approval_invalidated = False
+        recipe = SignRecipe(**updated_data)
         recipe.validate(frame_count)
         recipe.save(self.recipe_path)
+        gloss = self.gloss.get().strip().upper()
+        finger_states_changed = self._save_avatar_finger_states(gloss)
+        motion_changed = motion_changed or finger_states_changed
+        if (
+            motion_changed
+            and owner_approval_status(find_entry(gloss)) == "approved"
+        ):
+            set_owner_approval(gloss, False)
+            write_published_motion_manifest()
+            self.mobile_preview_signatures.pop(gloss, None)
+            self._refresh_created_signs()
+            self._refresh_owner_approval_control(gloss)
+            approval_invalidated = True
         self.avatar_preview_path = None
         self.preview_button.configure(
-            state="normal", text="GENERAR VISTA 3D CON BLENDER (OPCIONAL)"
+            state="normal", text="GENERAR VISTA 3D INTERNA"
         )
         if self.mobile_preview_button is not None:
             self.mobile_preview_button.configure(
                 state="normal", text="SIMULAR ESTA SEÑA EN LA APP MÓVIL"
             )
         self.step_status.set(
-            "AJUSTES GUARDADOS ✓  Ahora revisa la simulación móvil antes de publicar."
+            "AJUSTES GUARDADOS ✓  Ahora revisa la simulación móvil antes de aprobar."
         )
         self._set_stage(3)
-        self.status.set(f"Receta guardada: {self.recipe_path}")
+        self.status.set(
+            f"Receta guardada: {self.recipe_path}. "
+            + (
+                "La aprobación anterior se retiró porque cambió el movimiento."
+                if approval_invalidated
+                else ""
+            )
+        )
         if notify:
             messagebox.showinfo(
                 "Correcciones guardadas",
                 "Los ajustes quedaron guardados.\n\n"
-                "Pulsa SIMULAR APP MÓVIL para revisar el resultado real. La vista "
-                "de Blender es opcional y no sirve para aprobar la publicación.",
+                "Pulsa SIMULAR APP MÓVIL para revisar el resultado real.",
                 parent=self.root,
             )
 
@@ -4677,7 +6627,7 @@ class SignAuthoringEditor:
     def _fail_preview_generation(self, error: str) -> None:
         self.analysis_progress.stop()
         self.analysis_progress.pack_forget()
-        self.preview_button.configure(state="normal", text="GENERAR VISTA 3D CON BLENDER (OPCIONAL)")
+        self.preview_button.configure(state="normal", text="GENERAR VISTA 3D INTERNA")
         self.apply_adjustments_button.configure(state="normal", text="GUARDAR Y REGENERAR AHORA")
         self.status.set("No se pudo generar la animación.")
         self.step_status.set("LA GENERACIÓN FALLÓ. Revisa el aviso e inténtalo nuevamente.")

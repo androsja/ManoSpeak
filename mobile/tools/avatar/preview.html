@@ -378,8 +378,10 @@
           positivo lo cierra; así puedes abrir un dedo incluso sobre un puño. Agrega otro punto neutral
           cuando quieras regresar a la captura. GIRO DESDE EL CODO rota juntos el antebrazo y la mano.
           POSICIÓN HORIZONTAL y ALTURA permiten alinear las manos sin separar la muñeca del brazo.
-          PROFUNDIDAD mueve la mano hacia adelante o hacia atrás. SONRISA agrega una expresión leve;
-          prueba entre 15% y 25% para que se vea natural.
+          PROFUNDIDAD mueve la mano hacia adelante o hacia atrás. Los controles de ROSTRO se guardan
+          en el mismo cuadro: BOCA EN O contrae, junta y proyecta los labios. Usa APERTURA solo si la seña
+          necesita separar los labios. Puedes añadir ojos un poco más abiertos y cejas arriba.
+          Para una sonrisa natural prueba entre 15% y 25%.
         </p>
         <div class="rig-app-state" aria-live="polite">
           <span class="rig-app-state-marker" aria-hidden="true"></span>
@@ -403,13 +405,18 @@
           </label>
         </div>
         <div class="rig-edit-grid">
-          <div class="rig-edit-row"><label for="rig-elbow-rotation">GIRO DESDE EL CODO</label><input id="rig-elbow-rotation" type="range" min="-90" max="90" step="1" value="0" /><output id="rig-elbow-rotation-value">0°</output></div>
+          <div class="rig-edit-row"><label for="rig-elbow-rotation">GIRO AXIAL DESDE EL CODO (180°)</label><input id="rig-elbow-rotation" type="range" min="-180" max="180" step="1" value="0" /><output id="rig-elbow-rotation-value">0°</output></div>
+          <div class="rig-edit-row"><label for="rig-forearm-roll">GIRO DEL ANTEBRAZO SOBRE SU EJE</label><input id="rig-forearm-roll" type="range" min="-180" max="180" step="1" value="0" /><output id="rig-forearm-roll-value">0°</output></div>
           <div class="rig-edit-row"><label for="rig-wrist-pitch">MUÑECA X</label><input id="rig-wrist-pitch" type="range" min="-90" max="90" step="1" value="0" /><output id="rig-wrist-pitch-value">0°</output></div>
           <div class="rig-edit-row"><label for="rig-wrist-yaw">MUÑECA Y</label><input id="rig-wrist-yaw" type="range" min="-90" max="90" step="1" value="0" /><output id="rig-wrist-yaw-value">0°</output></div>
           <div class="rig-edit-row"><label for="rig-wrist-roll">MUÑECA Z</label><input id="rig-wrist-roll" type="range" min="-90" max="90" step="1" value="0" /><output id="rig-wrist-roll-value">0°</output></div>
           <div class="rig-edit-row"><label for="rig-horizontal-offset">POSICIÓN HORIZONTAL</label><input id="rig-horizontal-offset" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-horizontal-offset-value">CENTRO</output></div>
           <div class="rig-edit-row"><label for="rig-vertical-offset">ALTURA</label><input id="rig-vertical-offset" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-vertical-offset-value">CENTRO</output></div>
           <div class="rig-edit-row"><label for="rig-depth-offset">PROFUNDIDAD</label><input id="rig-depth-offset" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-depth-offset-value">CENTRO</output></div>
+          <div class="rig-edit-row"><label for="rig-mouth-round">BOCA EN O (LABIOS)</label><input id="rig-mouth-round" type="range" min="0" max="100" step="1" value="0" /><output id="rig-mouth-round-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-mouth-opening">APERTURA DE BOCA</label><input id="rig-mouth-opening" type="range" min="0" max="100" step="1" value="0" /><output id="rig-mouth-opening-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-eye-widening">OJOS ABIERTOS</label><input id="rig-eye-widening" type="range" min="0" max="100" step="1" value="0" /><output id="rig-eye-widening-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-brow-raise">CEJAS ARRIBA</label><input id="rig-brow-raise" type="range" min="0" max="100" step="1" value="0" /><output id="rig-brow-raise-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-smile">SONRISA</label><input id="rig-smile" type="range" min="0" max="100" step="1" value="0" /><output id="rig-smile-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-fist">PUÑO</label><input id="rig-fist" type="range" min="0" max="100" step="1" value="0" /><output id="rig-fist-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-thumb">PULGAR</label><input id="rig-thumb" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-thumb-value">0%</output></div>
@@ -417,6 +424,7 @@
           <div class="rig-edit-row"><label for="rig-middle">MEDIO</label><input id="rig-middle" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-middle-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-ring">ANULAR</label><input id="rig-ring" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-ring-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-pinky">MEÑIQUE</label><input id="rig-pinky" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-pinky-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-finger-spread">SEPARACIÓN ENTRE DEDOS (ABANICO)</label><input id="rig-finger-spread" type="range" min="0" max="80" step="1" value="25" /><output id="rig-finger-spread-value">25%</output></div>
         </div>
         <div class="rig-editor-toolbar">
           <label>DEDO DE PRECISIÓN
@@ -486,7 +494,13 @@
       const rigEditorFrame = document.getElementById('rig-editor-frame');
       const rigEditorHand = document.getElementById('rig-editor-hand');
       const rigPrecisionFinger = document.getElementById('rig-precision-finger');
-      const rigSmile = document.getElementById('rig-smile');
+      const rigFacialFields = [
+        {id: 'rig-mouth-round', key: 'mouthPucker'},
+        {id: 'rig-mouth-opening', key: 'mouthOpening'},
+        {id: 'rig-eye-widening', key: 'eyeWidening'},
+        {id: 'rig-brow-raise', key: 'browRaise'},
+        {id: 'rig-smile', key: 'smile'},
+      ];
       const rigTransitionFrames = document.getElementById('rig-transition-frames');
       const rigKeyframeList = document.getElementById('rig-keyframe-list');
       const rigSaveStatus = document.getElementById('rig-save-status');
@@ -520,7 +534,7 @@
       let rigEditorKeyframes = [];
       let rigSavedKeyframesSignature = '[]';
       let rigEditorPose = emptyRigEditorHands();
-      let rigEditorSmile = 0;
+      let rigEditorFace = emptyRigEditorFace();
       let rigPreviewDirty = false;
       let approvalSnapshot;
 
@@ -538,6 +552,7 @@
         {id: 'rig-middle', finger: 'middle', suffix: '%', scale: 100},
         {id: 'rig-ring', finger: 'ring', suffix: '%', scale: 100},
         {id: 'rig-pinky', finger: 'pinky', suffix: '%', scale: 100},
+        {id: 'rig-finger-spread', key: 'indexMiddleSpread', suffix: '%', scale: 100},
         {id: 'rig-joint-base', joint: 0, suffix: '%', scale: 100},
         {id: 'rig-joint-middle', joint: 1, suffix: '%', scale: 100},
         {id: 'rig-joint-tip', joint: 2, suffix: '%', scale: 100},
@@ -558,11 +573,30 @@
             thumb: [0, 0, 0], index: [0, 0, 0], middle: [0, 0, 0],
             ring: [0, 0, 0], pinky: [0, 0, 0],
           },
+          indexMiddleSpread: 0.025,
         };
       }
 
       function emptyRigEditorHands() {
         return {left: emptyRigEditorHand(), right: emptyRigEditorHand()};
+      }
+
+      function emptyRigEditorFace() {
+        return {
+          smile: 0,
+          mouthPucker: 0,
+          mouthOpening: 0,
+          eyeWidening: 0,
+          browRaise: 0,
+        };
+      }
+
+      function normalizedRigEditorFace(value, legacySmile = 0) {
+        const face = value || {};
+        return Object.fromEntries(rigFacialFields.map(field => [
+          field.key,
+          Math.min(1, Math.max(0, Number(face[field.key] ?? (field.key === 'smile' ? legacySmile : 0)) || 0)),
+        ]));
       }
 
       function copyRigEditorPose(value) {
@@ -579,8 +613,11 @@
           input.value = String(Math.round(Number(value || 0) * field.scale));
           document.getElementById(`${field.id}-value`).value = rigEditorFieldLabel(field, input.value);
         });
-        rigSmile.value = String(Math.round(Number(rigEditorSmile || 0) * 100));
-        document.getElementById('rig-smile-value').value = `${rigSmile.value}%`;
+        rigFacialFields.forEach(field => {
+          const input = document.getElementById(field.id);
+          input.value = String(Math.round(Number(rigEditorFace[field.key] || 0) * 100));
+          document.getElementById(`${field.id}-value`).value = `${input.value}%`;
+        });
       }
 
       function rigEditorFieldLabel(field, rawValue) {
@@ -616,8 +653,11 @@
           else hand[field.key] = value;
         });
         rigEditorPose[side] = hand;
-        rigEditorSmile = Math.min(1, Math.max(0, Number(rigSmile.value) / 100));
-        document.getElementById('rig-smile-value').value = `${rigSmile.value}%`;
+        rigFacialFields.forEach(field => {
+          const input = document.getElementById(field.id);
+          rigEditorFace[field.key] = Math.min(1, Math.max(0, Number(input.value) / 100));
+          document.getElementById(`${field.id}-value`).value = `${input.value}%`;
+        });
       }
 
       function sortedRigEditorKeyframes(keyframes) {
@@ -658,7 +698,7 @@
         const keyframe = {
           frame,
           transitionFrames: Math.min(120, Math.max(1, Math.round(Number(rigTransitionFrames.value) || 6))),
-          smile: rigEditorSmile,
+          ...rigEditorFace,
           left: copyRigEditorPose(rigEditorPose).left,
           right: copyRigEditorPose(rigEditorPose).right,
         };
@@ -674,7 +714,11 @@
           const option = document.createElement('option');
           option.value = String(keyframe.frame);
           const smile = Math.round(Number(keyframe.smile || 0) * 100);
-          option.textContent = `CUADRO ${keyframe.frame} · transición ${keyframe.transitionFrames || 6} · sonrisa ${smile}%`;
+          const mouthRound = Math.round(Number(keyframe.mouthPucker || 0) * 100);
+          const mouthOpening = Math.round(Number(keyframe.mouthOpening || 0) * 100);
+          const eyes = Math.round(Number(keyframe.eyeWidening || 0) * 100);
+          const brows = Math.round(Number(keyframe.browRaise || 0) * 100);
+          option.textContent = `CUADRO ${keyframe.frame} · transición ${keyframe.transitionFrames || 6} · O ${mouthRound}% · boca ${mouthOpening}% · ojos ${eyes}% · cejas ${brows}% · sonrisa ${smile}%`;
           return option;
         }));
         if ([...rigKeyframeList.options].some(option => option.value === selectedFrame)) {
@@ -702,7 +746,9 @@
         rigEditorFrame.max = String(rigEditorFrameCount - 1);
         rigEditorFrame.value = String(Math.max(0, Number(state.currentFrame) || 0));
         rigEditorPose = copyRigEditorPose(state.pose);
-        rigEditorSmile = Math.min(1, Math.max(0, Number(state.smile) || 0));
+        document.getElementById('rig-finger-spread').value = String(Math.round(Number(state.indexMiddleSpread || 0) * 1000));
+        document.getElementById('rig-forearm-roll').value = String(Math.round(Number(state.forearmAxialRollDegrees || 0)));
+        rigEditorFace = normalizedRigEditorFace(state.face, state.smile);
         renderRigEditorControls();
         setRigSaveStatus(rigEditorKeyframes.length
           ? `${rigEditorKeyframes.length} corrección(es) manual(es) cargada(s) para ${gloss}.`
@@ -718,12 +764,20 @@
         if (!state) return;
         rigEditorFrame.value = String(Math.max(0, Math.round(Number(frame) || 0)));
         rigEditorPose = copyRigEditorPose(state.pose);
-        rigEditorSmile = Math.min(1, Math.max(0, Number(state.smile) || 0));
+        document.getElementById('rig-finger-spread').value = String(Math.round(Number(state.indexMiddleSpread || 0) * 1000));
+        document.getElementById('rig-forearm-roll').value = String(Math.round(Number(state.forearmAxialRollDegrees || 0)));
+        rigEditorFace = normalizedRigEditorFace(state.face, state.smile);
         renderRigEditorControls();
       }
 
       function previewRigEditorControls() {
         readRigEditorControls();
+        const spreadInput = document.getElementById('rig-finger-spread');
+        const rollInput = document.getElementById('rig-forearm-roll');
+        window.setVozualRigFingerSpread?.(gloss, Number(spreadInput.value) / 1000);
+        window.setVozualForearmAxialRoll?.(gloss, Number(rollInput.value));
+        document.getElementById('rig-finger-spread-value').value = `${spreadInput.value}%`;
+        document.getElementById('rig-forearm-roll-value').value = `${rollInput.value}°`;
         rigPreviewDirty = true;
         paused = window.setVozualPlaybackPaused?.(true) ?? paused;
         pause.textContent = 'CONTINUAR';
@@ -757,7 +811,7 @@
           const response = await fetch('./api/rig-hand-keyframes', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({gloss, keyframes: rigEditorKeyframes}),
+          body: JSON.stringify({gloss, keyframes: rigEditorKeyframes, indexMiddleSpread: Number(document.getElementById('rig-finger-spread').value) / 1000, forearmAxialRollDegrees: Number(document.getElementById('rig-forearm-roll').value)}),
           });
           const result = await response.json().catch(() => ({}));
           if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
@@ -1380,7 +1434,11 @@
       rigEditorFields.forEach(field => {
         document.getElementById(field.id).addEventListener('input', previewRigEditorControls);
       });
-      rigSmile.addEventListener('input', previewRigEditorControls);
+      document.getElementById('rig-finger-spread').addEventListener('input', previewRigEditorControls);
+      document.getElementById('rig-forearm-roll').addEventListener('input', previewRigEditorControls);
+      rigFacialFields.forEach(field => {
+        document.getElementById(field.id).addEventListener('input', previewRigEditorControls);
+      });
       document.getElementById('rig-keyframe-upsert').addEventListener('click', () => {
         rigEditorKeyframes = upsertRigEditorKeyframe(rigEditorKeyframes);
         rigPreviewDirty = false;
@@ -1415,7 +1473,7 @@
       document.getElementById('rig-clear-keyframes').addEventListener('click', () => {
         rigEditorKeyframes = [];
         rigEditorPose = emptyRigEditorHands();
-        rigEditorSmile = 0;
+        rigEditorFace = emptyRigEditorFace();
         rigPreviewDirty = false;
         applyRigEditorKeyframes([]);
         renderRigKeyframeList();
