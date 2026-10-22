@@ -14,7 +14,7 @@ import {
   observeActivationAccount,
   type ActivationAccount,
 } from './src/services/ActivationService';
-import {ensureAccountProfile} from './src/services/AccountProfileService';
+import {ensureAccountProfile, updateSelectedSignLanguage} from './src/services/AccountProfileService';
 import {loadPlusEntitlement} from './src/services/AccountAccessService';
 import {SignLanguageLibraryScreen} from './src/components/SignLanguageLibraryScreen';
 import {
@@ -24,6 +24,7 @@ import {
   installedPhrasesForSelectedLanguage,
   installedSignsForSelectedLanguage,
   listSignLanguages,
+  selectedSignLanguageId,
   type InstalledPhrase,
   type InstalledSign,
   unpromptedSignChangeCount,
@@ -114,7 +115,9 @@ function AppContent() {
     if (!account) return;
     // Profile synchronization is best-effort until the Firestore database and
     // rules are deployed. It never blocks translation or account activation.
-    ensureAccountProfile(account).catch(() => undefined);
+    selectedSignLanguageId()
+      .then(languageId => ensureAccountProfile(account, languageId))
+      .catch(() => undefined);
   }, [account]);
 
   useEffect(() => {
@@ -150,6 +153,9 @@ function AppContent() {
         <StatusBar barStyle="light-content" />
         <SignLanguageLibraryScreen
           initialSetup={initialLibrarySetup}
+          onSelectedLanguageChange={account
+            ? languageId => updateSelectedSignLanguage(account.uid, languageId)
+            : undefined}
           onContinue={statuses => {
             void (async () => {
               try {

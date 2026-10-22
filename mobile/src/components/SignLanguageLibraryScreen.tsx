@@ -26,6 +26,7 @@ import {useI18n} from '../i18n/I18n';
 type Props = {
   initialSetup: boolean;
   onContinue: (statuses: readonly SignLanguageStatus[]) => void;
+  onSelectedLanguageChange?: (languageId: string) => Promise<void>;
 };
 
 const CATALOG_PAGE_SIZE = 100;
@@ -73,7 +74,7 @@ function megabytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 }
 
-export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
+export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedLanguageChange}: Props) {
   const {t} = useI18n();
   const [languages, setLanguages] = useState<SignLanguageStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,6 +159,11 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
     setProgress(0);
     try {
       const changed = await installSignLanguageChanges(language, setProgress);
+      try {
+        await onSelectedLanguageChange?.(language.id);
+      } catch {
+        // The local selection remains usable while the account profile syncs later.
+      }
       await load();
       Alert.alert(
         t('library.updated.title'),
@@ -174,6 +180,11 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
   const select = async (language: SignLanguageStatus) => {
     try {
       await selectSignLanguage(language.id);
+      try {
+        await onSelectedLanguageChange?.(language.id);
+      } catch {
+        // The local selection remains usable while the account profile syncs later.
+      }
       await load();
     } catch {
       Alert.alert(t('library.selectError.title'), t('library.selectError.detail'));

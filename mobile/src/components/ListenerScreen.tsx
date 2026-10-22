@@ -258,6 +258,42 @@ export function ListenerScreen({
     usagePeriod,
     hasPlusEntitlement || (billingSandboxEnabled && billingSandboxEntitlement.active),
   );
+  const availableListeningModes = useMemo(
+    () => LISTENING_MODES.filter(mode => (
+      mode === 'continuous'
+        ? accessPolicy.canUseContinuousMode
+        : accessPolicy.canUsePhraseMode
+    )),
+    [accessPolicy.canUseContinuousMode, accessPolicy.canUsePhraseMode],
+  );
+  const accountEmail = account?.email?.trim() ?? '';
+  const accountDisplayName = account?.displayName?.trim();
+  const visibleAccountName = accountDisplayName && accountDisplayName.toLowerCase() !== accountEmail.toLowerCase()
+    ? accountDisplayName
+    : account?.providerIds.includes('apple.com')
+      ? t('settings.appleAccount')
+      : account?.providerIds.includes('google.com')
+        ? t('settings.googleAccount')
+        : t('settings.noAccount');
+  const visibleAccountDetail = account?.providerIds.includes('apple.com')
+    ? t('settings.privateAppleEmail')
+    : accountEmail || t('settings.protectedAccount');
+  const launchAccessCopy = accessPolicy.canUseContinuousMode
+    ? t('settings.launchAccessAllModes')
+    : t('settings.launchAccessPhrase');
+  const hasActivePlus = hasPlusEntitlement || (billingSandboxEnabled && billingSandboxEntitlement.active);
+  const accessTitle = hasActivePlus
+    ? t('settings.plusAccess')
+    : effectiveAccessConfig.monetizationEnabled
+      ? t('settings.freePlan')
+      : t('settings.freeLaunchAccess');
+
+  useEffect(() => {
+    if (availableListeningModes.includes(listeningMode)) return;
+    const fallbackMode = availableListeningModes[0] ?? 'phrase';
+    setListeningMode(fallbackMode);
+    listeningModeRef.current = fallbackMode;
+  }, [availableListeningModes, listeningMode]);
 
   const showNextPhraseSuggestion = useCallback(() => {
     setPhraseSuggestionIndex(current => nextPhraseSuggestionIndex(
@@ -1538,7 +1574,9 @@ export function ListenerScreen({
       </View>
 
       {!compactMode && <View style={styles.panel}>
-        <Text style={styles.modeHeading}>{t('listener.translationMode')}</Text>
+        {availableListeningModes.length > 1 && (
+          <Text style={styles.modeHeading}>{t('listener.translationMode')}</Text>
+        )}
         {availableSignChangeCount > 0 && <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('listener.newSignsLabel', {count: availableSignChangeCount})}
@@ -1553,12 +1591,8 @@ export function ListenerScreen({
           </View>
           <Text style={styles.signUpdateAction}>{t('listener.download')}</Text>
         </Pressable>}
-        <View style={styles.listeningModeControl}>
-          {LISTENING_MODES.filter(mode => (
-            mode === 'continuous'
-              ? accessPolicy.canUseContinuousMode
-              : accessPolicy.canUsePhraseMode
-          )).map(mode => {
+        {availableListeningModes.length > 1 && <View style={styles.listeningModeControl}>
+          {availableListeningModes.map(mode => {
             const selected = listeningMode === mode;
             const disabled = listening || playingSign || phraseFinalizing;
             const label = t(`listener.mode.${mode}.label`);
@@ -1586,7 +1620,7 @@ export function ListenerScreen({
               </Pressable>
             );
           })}
-        </View>
+        </View>}
         {tutorialVisible && (
           <View style={styles.tutorialCard} accessibilityLabel={t('listener.tutorial.label')}>
             <View style={styles.tutorialHeader}>
@@ -1876,9 +1910,11 @@ export function ListenerScreen({
             <View style={styles.settingsDivider} />
             <Text style={styles.settingsLabel}>{t('settings.access')}</Text>
             <View style={styles.settingsAccessCard}>
-              <Text style={styles.settingsAccessTitle}>{accessPolicy.accessLabel}</Text>
+              <Text style={styles.settingsAccessTitle}>{accessTitle}</Text>
               <Text style={styles.settingsAccessDetail}>
-                {t('settings.consumedMinutes', {count: accessPolicy.consumedMinutes})}
+                {accessPolicy.consumedMinutes === 0
+                  ? t('settings.noConsumedMinutes')
+                  : t('settings.consumedMinutes', {count: accessPolicy.consumedMinutes})}
               </Text>
               <Text style={styles.settingsAccessExplanation}>
                 {t('settings.minuteExplanation')}
@@ -1886,7 +1922,7 @@ export function ListenerScreen({
               <Text style={styles.settingsAccessStatus}>
                 {effectiveAccessConfig.monetizationEnabled
                   ? t('settings.remainingMinutes', {count: accessPolicy.remainingMinutes})
-                  : t('settings.launchAccess')}
+                  : launchAccessCopy}
               </Text>
               {billingSandboxEnabled && (
                 <>
@@ -1910,11 +1946,11 @@ export function ListenerScreen({
             <View style={styles.settingsAccountRow}>
               <View style={styles.settingsAccountCopy}>
                 <Text style={styles.settingsAccountTitle} numberOfLines={1}>
-                  {account?.displayName || account?.email || t('settings.noAccount')}
+                  {visibleAccountName}
                 </Text>
                 <Text style={styles.settingsAccountDetail} numberOfLines={1}>
                   {account
-                    ? account.email || t('settings.protectedAccount')
+                    ? visibleAccountDetail
                     : t('settings.accountPrompt')}
                 </Text>
               </View>

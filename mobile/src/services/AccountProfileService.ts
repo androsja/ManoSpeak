@@ -16,7 +16,10 @@ import type {ActivationAccount} from './ActivationService';
  * usage are intentionally excluded because only trusted server code may own
  * them.
  */
-export async function ensureAccountProfile(account: ActivationAccount): Promise<void> {
+export async function ensureAccountProfile(
+  account: ActivationAccount,
+  selectedLanguageId = 'lsc-co',
+): Promise<void> {
   const reference = doc(getFirestore(), 'users', account.uid);
   const snapshot = await getDoc(reference);
   const profile = {
@@ -24,7 +27,7 @@ export async function ensureAccountProfile(account: ActivationAccount): Promise<
     displayName: account.displayName,
     providers: account.providerIds,
     country: 'CO',
-    selectedSignLanguage: 'lsc-co',
+    selectedSignLanguage: selectedLanguageId,
     lastSeenAt: serverTimestamp(),
   };
 
@@ -37,6 +40,16 @@ export async function ensureAccountProfile(account: ActivationAccount): Promise<
     ...profile,
     createdAt: serverTimestamp(),
   });
+}
+
+export async function updateSelectedSignLanguage(uid: string, languageId: string): Promise<void> {
+  const accountId = uid.trim();
+  const selectedLanguage = languageId.trim();
+  if (!accountId || !selectedLanguage) throw new Error('A valid account and sign language are required.');
+  await setDoc(doc(getFirestore(), 'users', accountId), {
+    selectedSignLanguage: selectedLanguage,
+    lastSeenAt: serverTimestamp(),
+  }, {merge: true});
 }
 
 /**

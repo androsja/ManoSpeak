@@ -537,6 +537,12 @@ export async function installedSignsForSelectedLanguage(): Promise<InstalledSign
     .sort((left, right) => left.gloss.localeCompare(right.gloss));
 }
 
+export async function selectedSignLanguageId(): Promise<string | undefined> {
+  const state = await readLibraryState();
+  return state.selectedLanguageId
+    ?? Object.values(state.installedSigns)[0]?.languageId;
+}
+
 export async function installedSignGlosses(): Promise<string[]> {
   return (await installedSignsForSelectedLanguage()).map(sign => sign.gloss);
 }
