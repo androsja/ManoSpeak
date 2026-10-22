@@ -3,7 +3,7 @@ import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
-from model import PhonSSM
+from model import PhonSSM  # noqa: E402
 
 model = PhonSSM()
 model.load_state_dict(torch.load("checkpoints/best_model.pt", map_location='cpu'))

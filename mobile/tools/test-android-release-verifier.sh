@@ -42,7 +42,7 @@ expect_failure() {
 
 run_verifier >/dev/null
 export MOCK_TARGET_SDK=35
-expect_failure 'wrong target SDK' 'release target SDK is not 37' run_verifier
+expect_failure 'wrong target SDK' 'release target SDK is not 36' run_verifier
 unset MOCK_TARGET_SDK
 export MOCK_CERT_CN='Android Debug'
 expect_failure 'debug signing' 'Android debug certificate' run_verifier

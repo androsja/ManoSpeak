@@ -1,4 +1,4 @@
-"""Import a local sign video into the ManoSpeak avatar-authoring format."""
+"""Import a local sign video into the Vozual avatar-authoring format."""
 
 from __future__ import annotations
 
@@ -46,6 +46,10 @@ FACE_UPPER_LIP = FACE_START + 13
 FACE_FOREHEAD = FACE_START + 10
 FINGERTIP_INDICES = (8, 12, 16, 20)
 DEFAULT_OUTPUT_FPS = 30
+# MediaPipe packages the full pose model with the editor. Complexity 2 selects
+# the heavy model and downloads it on first use, which makes local authoring
+# depend on network access and the host Python certificate store.
+LOCAL_HOLISTIC_MODEL_COMPLEXITY = 1
 POSE_ARM_INDICES = {
     "left": (11, 13, 15),
     "right": (12, 14, 16),
@@ -722,7 +726,7 @@ def import_video(
     frame_index = 0
     with mp.solutions.holistic.Holistic(
         static_image_mode=False,
-        model_complexity=2,
+        model_complexity=LOCAL_HOLISTIC_MODEL_COMPLEXITY,
         smooth_landmarks=True,
         refine_face_landmarks=True,
         min_detection_confidence=0.55,

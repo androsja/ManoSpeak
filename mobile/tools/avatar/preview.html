@@ -183,9 +183,56 @@
       .zoom-step { min-height: 38px; padding: 4px; font-size: 24px; line-height: 1; }
       .zoom-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
       .zoom-actions button { min-height: 38px; }
-      .timeline { margin: 0 0 18px; padding: 14px; border-radius: 12px; background: #111e2e; }
-      .timeline-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #c9d5e3; font-size: 13px; font-weight: 900; }
-      #seek { width: 100%; accent-color: #20d6ce; cursor: pointer; }
+      .timeline {
+        position: sticky;
+        top: 12px;
+        z-index: 30;
+        margin: 0 0 18px;
+        padding: 16px 18px 18px;
+        border: 1px solid #2f6680;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #142d40f5, #0b1828f5 72%);
+        box-shadow: 0 12px 34px #000b, 0 0 0 3px rgb(32 214 206 / 10%);
+        backdrop-filter: blur(14px);
+      }
+      .timeline-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 13px;
+        color: #f5f8fc;
+        font-size: 15px;
+        font-weight: 900;
+        letter-spacing: .03em;
+      }
+      #time-label { color: #20d6ce; font-size: 17px; text-shadow: 0 0 12px rgb(32 214 206 / 35%); }
+      #seek {
+        width: 100%;
+        height: 12px;
+        accent-color: #20d6ce;
+        cursor: pointer;
+        filter: drop-shadow(0 0 5px rgb(32 214 206 / 35%));
+      }
+      #seek::-webkit-slider-runnable-track { height: 8px; border-radius: 999px; background: #06101d; }
+      #seek::-webkit-slider-thumb {
+        width: 24px;
+        height: 24px;
+        margin-top: -8px;
+        border: 3px solid #d8fffc;
+        border-radius: 50%;
+        background: #20d6ce;
+        box-shadow: 0 0 0 5px rgb(32 214 206 / 18%), 0 2px 8px #000b;
+        appearance: none;
+      }
+      #seek::-moz-range-track { height: 8px; border-radius: 999px; background: #06101d; }
+      #seek::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border: 3px solid #d8fffc;
+        border-radius: 50%;
+        background: #20d6ce;
+        box-shadow: 0 0 0 5px rgb(32 214 206 / 18%), 0 2px 8px #000b;
+      }
       .seek-row { display: grid; grid-template-columns: minmax(0, 1fr) 1.3fr; gap: 8px; margin-top: 10px; }
       .seek-row input {
         min-width: 0;
@@ -258,6 +305,9 @@
       }
       @media (max-width: 800px) {
         body { grid-template-columns: minmax(300px, 430px); padding: 12px; }
+        .timeline { top: 8px; padding: 13px 14px 15px; }
+        .timeline-heading { font-size: 13px; }
+        #time-label { font-size: 15px; }
         .visual-comparison.has-source-video { grid-template-columns: minmax(300px, 430px); }
         .phone { height: 68vh; min-height: 500px; }
         .rig-editor-toolbar, .rig-edit-grid { grid-template-columns: 1fr; }
@@ -375,7 +425,9 @@
         <p class="rig-editor-help">
           Pausa en un cuadro, ajusta una mano y agrega el punto. La transición comienza automáticamente
           antes del cuadro elegido para evitar saltos. En cada dedo, un valor negativo lo extiende y uno
-          positivo lo cierra; así puedes abrir un dedo incluso sobre un puño. Agrega otro punto neutral
+          positivo lo cierra; así puedes abrir un dedo incluso sobre una empuñadura. El control PUÑO NATURAL
+          cierra índice, medio, anular y meñique con una curvatura progresiva; no mueve el pulgar, para que
+          puedas orientarlo hacia abajo en señas como MAL. Agrega otro punto neutral
           cuando quieras regresar a la captura. GIRO DESDE EL CODO rota juntos el antebrazo y la mano.
           POSICIÓN HORIZONTAL y ALTURA permiten alinear las manos sin separar la muñeca del brazo.
           PROFUNDIDAD mueve la mano hacia adelante o hacia atrás. Los controles de ROSTRO se guardan
@@ -418,13 +470,27 @@
           <div class="rig-edit-row"><label for="rig-eye-widening">OJOS ABIERTOS</label><input id="rig-eye-widening" type="range" min="0" max="100" step="1" value="0" /><output id="rig-eye-widening-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-brow-raise">CEJAS ARRIBA</label><input id="rig-brow-raise" type="range" min="0" max="100" step="1" value="0" /><output id="rig-brow-raise-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-smile">SONRISA</label><input id="rig-smile" type="range" min="0" max="100" step="1" value="0" /><output id="rig-smile-value">0%</output></div>
-          <div class="rig-edit-row"><label for="rig-fist">PUÑO</label><input id="rig-fist" type="range" min="0" max="100" step="1" value="0" /><output id="rig-fist-value">0%</output></div>
+          <div class="rig-edit-row"><label for="rig-fist">PUÑO NATURAL</label><input id="rig-fist" type="range" min="0" max="100" step="1" value="0" /><output id="rig-fist-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-thumb">PULGAR</label><input id="rig-thumb" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-thumb-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-index">ÍNDICE</label><input id="rig-index" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-index-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-middle">MEDIO</label><input id="rig-middle" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-middle-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-ring">ANULAR</label><input id="rig-ring" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-ring-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-pinky">MEÑIQUE</label><input id="rig-pinky" type="range" min="-100" max="100" step="1" value="0" /><output id="rig-pinky-value">0%</output></div>
           <div class="rig-edit-row"><label for="rig-finger-spread">SEPARACIÓN ENTRE DEDOS (ABANICO)</label><input id="rig-finger-spread" type="range" min="0" max="80" step="1" value="25" /><output id="rig-finger-spread-value">25%</output></div>
+        </div>
+        <div class="rig-editor-actions">
+          <button id="rig-natural-fist" type="button">APLICAR PUÑO NATURAL</button>
+        </div>
+        <div class="rig-editor-toolbar">
+          <label>DEDOS DENTRO DEL PUÑO
+            <select id="rig-contact-finger-count">
+              <option value="1">1 DEDO</option>
+              <option value="2" selected>2 DEDOS</option>
+              <option value="3">3 DEDOS</option>
+              <option value="4">4 DEDOS</option>
+            </select>
+          </label>
+          <button id="rig-finger-contact" type="button">APLICAR CONTACTO ENTRE MANOS</button>
         </div>
         <div class="rig-editor-toolbar">
           <label>DEDO DE PRECISIÓN
@@ -658,6 +724,53 @@
           rigEditorFace[field.key] = Math.min(1, Math.max(0, Number(input.value) / 100));
           document.getElementById(`${field.id}-value`).value = `${input.value}%`;
         });
+      }
+
+      function applyNaturalFistPreset() {
+        const side = rigEditorHand.value;
+        const hand = rigEditorPose[side] || emptyRigEditorHand();
+        hand.fist = 1;
+        ['index', 'middle', 'ring', 'pinky'].forEach(finger => {
+          hand.fingers[finger] = 0;
+          hand.fingerJoints[finger] = [0, 0, 0];
+        });
+        hand.indexMiddleSpread = 0;
+        rigEditorPose[side] = hand;
+        renderRigEditorControls();
+        previewRigEditorControls();
+      }
+
+      function resetRigHandShape(hand) {
+        hand.fist = 0;
+        hand.fingers = {thumb: 0, index: 0, middle: 0, ring: 0, pinky: 0};
+        hand.fingerJoints = {
+          thumb: [0, 0, 0], index: [0, 0, 0], middle: [0, 0, 0],
+          ring: [0, 0, 0], pinky: [0, 0, 0],
+        };
+        hand.indexMiddleSpread = 0;
+      }
+
+      function applyFingerContactPreset() {
+        const receivingSide = rigEditorHand.value;
+        const insertedSide = receivingSide === 'left' ? 'right' : 'left';
+        const receivingHand = rigEditorPose[receivingSide] || emptyRigEditorHand();
+        const insertedHand = rigEditorPose[insertedSide] || emptyRigEditorHand();
+        const fingerCount = Math.min(
+          4,
+          Math.max(1, Number(document.getElementById('rig-contact-finger-count').value) || 2),
+        );
+        const longFingers = ['index', 'middle', 'ring', 'pinky'];
+
+        resetRigHandShape(receivingHand);
+        receivingHand.fist = 1;
+        resetRigHandShape(insertedHand);
+        longFingers.forEach((finger, index) => {
+          insertedHand.fingers[finger] = index < fingerCount ? -1 : 1;
+        });
+        rigEditorPose[receivingSide] = receivingHand;
+        rigEditorPose[insertedSide] = insertedHand;
+        renderRigEditorControls();
+        previewRigEditorControls();
       }
 
       function sortedRigEditorKeyframes(keyframes) {
@@ -1431,6 +1544,8 @@
       });
       rigEditorHand.addEventListener('change', renderRigEditorControls);
       rigPrecisionFinger.addEventListener('change', renderRigEditorControls);
+      document.getElementById('rig-natural-fist').addEventListener('click', applyNaturalFistPreset);
+      document.getElementById('rig-finger-contact').addEventListener('click', applyFingerContactPreset);
       rigEditorFields.forEach(field => {
         document.getElementById(field.id).addEventListener('input', previewRigEditorControls);
       });

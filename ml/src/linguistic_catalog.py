@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ VERB_TYPES = {
     "spatial_review_required",
 }
 REVIEW_STATUSES = {"draft", "reviewed", "approved", "legacy_approved", "blocked"}
+OWNER_APPROVAL_STATUSES = {"pending", "approved"}
 
 
 def load_catalog(path: Path = CATALOG_PATH) -> dict[str, Any]:
@@ -46,7 +48,43 @@ def load_catalog(path: Path = CATALOG_PATH) -> dict[str, Any]:
         review = entry.get("review", {})
         if review.get("status") not in REVIEW_STATUSES:
             raise ValueError(f"{gloss} has an unsupported review status.")
+        owner_approval = review.get("ownerApproval")
+        if owner_approval is not None:
+            if not isinstance(owner_approval, dict):
+                raise TypeError(f"{gloss} has an invalid owner approval record.")
+            if owner_approval.get("status") not in OWNER_APPROVAL_STATUSES:
+                raise ValueError(f"{gloss} has an unsupported owner approval status.")
     return data
+
+
+def owner_approval_status(entry: dict[str, Any] | None) -> str:
+    """Return the explicit visual approval state; legacy rows stay pending."""
+
+    if entry is None:
+        return "pending"
+    approval = entry.get("review", {}).get("ownerApproval", {})
+    return "approved" if approval.get("status") == "approved" else "pending"
+
+
+def owner_review_fingerprint(entry: dict[str, Any] | None) -> str | None:
+    """Return the exact reviewed motion/runtime fingerprint when available."""
+
+    if entry is None:
+        return None
+    value = entry.get("review", {}).get("ownerApproval", {}).get(
+        "reviewFingerprint"
+    )
+    return value if isinstance(value, str) and value else None
+
+
+def is_mobile_compilation_eligible(entry: dict[str, Any]) -> bool:
+    """Require publication, linguistic review, and explicit owner approval."""
+
+    return bool(
+        entry.get("motion", {}).get("published")
+        and entry.get("review", {}).get("status") in {"approved", "legacy_approved"}
+        and owner_approval_status(entry) == "approved"
+    )
 
 
 def find_entry(gloss: str, path: Path = CATALOG_PATH) -> dict[str, Any] | None:
@@ -135,7 +173,10 @@ def recommended_entries(
     ]
 
 
-def preview_renderable_plan(text: str) -> tuple[list[str], list[str]]:
+def preview_renderable_plan(
+    text: str,
+    path: Path = CATALOG_PATH,
+) -> tuple[list[str], list[str]]:
     """Preview the approved avatar sequence and explicitly list missing markers."""
 
     def normalize(value: str) -> str:
@@ -147,7 +188,7 @@ def preview_renderable_plan(text: str) -> tuple[list[str], list[str]]:
             ).replace("¿", " ").replace("?", " ").replace("!", " ").split()
         )
 
-    catalog = load_catalog()
+    catalog = load_catalog(path)
     grammar = dict(catalog.get("grammar", {}))
     verb_forms = dict(grammar.get("spanishVerbForms", {}))
     markers = dict(grammar.get("subjectMarkers", {}))
@@ -155,8 +196,7 @@ def preview_renderable_plan(text: str) -> tuple[list[str], list[str]]:
     published = {
         str(entry["motion"]["clip"])
         for entry in catalog["entries"]
-        if entry.get("motion", {}).get("published")
-        and entry.get("review", {}).get("status") in {"approved", "legacy_approved"}
+        if is_mobile_compilation_eligible(entry)
     }
     published_entries: dict[str, dict[str, Any]] = {}
     for entry in catalog["entries"]:
@@ -376,19 +416,87 @@ def write_published_motion_manifest(
     path: Path = CATALOG_PATH,
     manifest_path: Path | None = None,
 ) -> None:
-    """Derive the legacy avatar manifest from approved linguistic entries."""
+    """Derive the avatar manifest from explicitly owner-approved entries."""
 
     manifest = manifest_path or REPO_ROOT / "mobile/assets/motions/published_signs.json"
     catalog = load_catalog(path)
     clips = sorted({
         str(entry["motion"]["clip"])
         for entry in catalog["entries"]
-        if entry.get("motion", {}).get("published")
-        and entry.get("review", {}).get("status") in {"approved", "legacy_approved"}
+        if is_mobile_compilation_eligible(entry)
     })
     manifest.write_text(
         json.dumps({"version": 2, "publishedGlosses": clips}, ensure_ascii=False, indent=2)
         + "\n",
+        encoding="utf-8",
+    )
+
+
+def set_owner_approval(
+    gloss: str,
+    approved: bool,
+    path: Path = CATALOG_PATH,
+) -> None:
+    """Persist the project owner's explicit visual approval for one sign."""
+
+    data = load_catalog(path)
+    normalized_gloss = gloss.strip().upper()
+    entry = next(
+        (
+            item
+            for item in data["entries"]
+            if str(item["gloss"]).strip().upper() == normalized_gloss
+        ),
+        None,
+    )
+    if entry is None:
+        raise ValueError(f"{normalized_gloss} is not registered in the catalog.")
+    review = entry.setdefault("review", {})
+    review["ownerApproval"] = {
+        "status": "approved" if approved else "pending",
+        "approvedBy": "project_owner",
+        "approvedAt": (
+            datetime.now(timezone.utc).isoformat(timespec="seconds")
+            if approved
+            else None
+        ),
+    }
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def set_owner_review_fingerprint(
+    gloss: str,
+    fingerprint: str,
+    path: Path = CATALOG_PATH,
+) -> None:
+    """Persist which exact approved sign/runtime combination was reviewed."""
+
+    if not fingerprint:
+        raise ValueError("The mobile review fingerprint cannot be empty.")
+    data = load_catalog(path)
+    normalized_gloss = gloss.strip().upper()
+    entry = next(
+        (
+            item
+            for item in data["entries"]
+            if str(item["gloss"]).strip().upper() == normalized_gloss
+        ),
+        None,
+    )
+    if entry is None:
+        raise ValueError(f"{normalized_gloss} is not registered in the catalog.")
+    approval = entry.setdefault("review", {}).get("ownerApproval")
+    if not isinstance(approval, dict) or approval.get("status") != "approved":
+        raise ValueError(
+            f"{normalized_gloss} must be owner-approved before saving its review."
+        )
+    approval["reviewFingerprint"] = fingerprint
+    approval["reviewedAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -401,5 +509,10 @@ def unpublish_entry(gloss: str, path: Path = CATALOG_PATH) -> None:
     for entry in data["entries"]:
         if str(entry["gloss"]).upper() == normalized_gloss:
             entry.setdefault("motion", {})["published"] = False
+            entry.setdefault("review", {})["ownerApproval"] = {
+                "status": "pending",
+                "approvedBy": "project_owner",
+                "approvedAt": None,
+            }
             break
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

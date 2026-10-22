@@ -3,23 +3,96 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Privacidad y control de cuenta de VOZUAL.">
-  <title>VOZUAL — Privacidad y cuenta</title>
-  <link rel="stylesheet" href="/styles.css">
+  <meta name="description" content="VOZUAL convierte tu voz en Lengua de Señas Colombiana mediante un avatar 3D, con privacidad y recursos disponibles sin conexión.">
+  <meta name="theme-color" content="#07111f">
+  <title>VOZUAL — Tu voz, en señas</title>
+  <link rel="icon" href="/assets/vozual-icon.png">
+  <link rel="stylesheet" href="/styles.css?v=20260910-2">
 </head>
-<body>
-  <main>
-    <div class="brand">VOZUAL</div>
-    <h1>Privacidad y control de tu cuenta</h1>
-    <p>VOZUAL traduce habla a Lengua de Señas Colombiana con el procesamiento principal en tu dispositivo.</p>
-    <div class="card">
-      <h2>Recursos</h2>
-      <nav aria-label="Recursos de privacidad">
-        <a href="/privacidad">Política de privacidad</a>
-        <a href="/eliminar-cuenta">Eliminar cuenta y datos</a>
-        <a href="mailto:androsjapps@gmail.com">Contactar soporte</a>
-      </nav>
-    </div>
+<body class="home-page">
+  <header class="site-header">
+    <a class="logo" href="/" aria-label="VOZUAL, inicio">
+      <img src="/assets/vozual-icon.png" alt="" width="46" height="46">
+      <span>VOZUAL</span>
+    </a>
+    <nav class="site-nav" aria-label="Navegación principal">
+      <a href="#funciones">Funciones</a>
+      <a href="/privacidad">Privacidad</a>
+      <a class="nav-action" href="mailto:androsjapps@gmail.com">Soporte</a>
+    </nav>
+  </header>
+
+  <main class="home">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div class="eyebrow"><span></span> Traducción accesible</div>
+        <h1 id="hero-title">Tu voz,<br><em>en señas.</em></h1>
+        <p class="hero-lead">VOZUAL convierte el habla en Lengua de Señas Colombiana mediante un avatar 3D, para ayudar a que cada conversación sea más clara y accesible.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#funciones">Conocer VOZUAL</a>
+          <a class="button button-secondary" href="/privacidad">Ver privacidad</a>
+        </div>
+        <div class="trust-row" aria-label="Características principales">
+          <span>Procesamiento local</span>
+          <span>Uso sin cuenta</span>
+          <span>Señas descargables</span>
+        </div>
+      </div>
+
+      <div class="product-visual" aria-label="Vista de VOZUAL traduciendo una frase">
+        <div class="visual-glow"></div>
+        <div class="phone">
+          <div class="phone-speaker"></div>
+          <img src="/assets/vozual-app.png" alt="Pantalla de VOZUAL con el avatar realizando una seña" width="1284" height="2778">
+        </div>
+        <div class="visual-note">
+          <span class="status-dot"></span>
+          <div><strong>Traducción en vivo</strong><small>Voz a Lengua de Señas Colombiana</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="feature-section" id="funciones" aria-labelledby="features-title">
+      <div class="section-heading">
+        <span class="section-kicker">Diseñada para conversar</span>
+        <h2 id="features-title">Una experiencia simple, incluso sin conexión.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-number">01</span>
+          <h3>Habla con naturalidad</h3>
+          <p>Activa el micrófono y traduce en vivo o espera la frase completa antes de mostrarla.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">02</span>
+          <h3>Visualiza las señas</h3>
+          <p>Un avatar 3D reproduce palabras y frases aprobadas con velocidad ajustable.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">03</span>
+          <h3>Lleva tu catálogo</h3>
+          <p>Descarga las señas disponibles para utilizarlas cuando no tengas conexión a internet.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="privacy-panel" aria-labelledby="privacy-title">
+      <div>
+        <span class="section-kicker">Privacidad desde el diseño</span>
+        <h2 id="privacy-title">Tu conversación se queda contigo.</h2>
+        <p>El audio y las frases se procesan principalmente en tu dispositivo. Puedes usar VOZUAL sin crear una cuenta.</p>
+      </div>
+      <div class="resource-links">
+        <a href="/privacidad"><span>Política de privacidad</span><b aria-hidden="true">→</b></a>
+        <a href="/eliminar-cuenta"><span>Eliminar cuenta y datos</span><b aria-hidden="true">→</b></a>
+        <a href="mailto:androsjapps@gmail.com"><span>Contactar soporte</span><b aria-hidden="true">→</b></a>
+      </div>
+    </section>
   </main>
+
+  <footer class="site-footer">
+    <div><strong>VOZUAL</strong><span>La tecnología puede acercarnos.</span></div>
+    <p>© 2026 Androsjapps</p>
+  </footer>
 </body>
 </html>

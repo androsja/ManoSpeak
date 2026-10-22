@@ -41,14 +41,29 @@
       "description": "Keeps the entire installed LSC vocabulary available to free accounts.",
       "valueType": "BOOLEAN"
     },
+    "continuous_mode_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Makes continuous live translation available on Android and iOS.",
+      "valueType": "BOOLEAN"
+    },
+    "continuous_mode_requires_plus": {
+      "defaultValue": { "value": "true" },
+      "description": "Requires a verified Plus entitlement for continuous live translation.",
+      "valueType": "BOOLEAN"
+    },
+    "picture_in_picture_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Makes Picture-in-Picture available on Android and iOS.",
+      "valueType": "BOOLEAN"
+    },
     "pip_requires_plus": {
       "defaultValue": { "value": "true" },
-      "description": "Makes Picture-in-Picture a Plus feature once monetization is enabled.",
+      "description": "Requires a verified Plus entitlement for Picture-in-Picture.",
       "valueType": "BOOLEAN"
     },
     "phrase_mode_requires_plus": {
-      "defaultValue": { "value": "true" },
-      "description": "Makes phrase translation a Plus feature once monetization is enabled.",
+      "defaultValue": { "value": "false" },
+      "description": "Keeps phrase translation free during the launch period.",
       "valueType": "BOOLEAN"
     },
     "free_usage_measurement": {
@@ -73,6 +88,6 @@
     }
   },
   "version": {
-    "description": "Initial VOZUAL activation and access configuration."
+    "description": "Share premium En vivo and Picture-in-Picture gates across Android and iOS."
   }
 }

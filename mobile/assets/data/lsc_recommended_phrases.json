@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "language": "lsc-CO",
+  "entries": [
+    {
+      "id": "hola-como-estas",
+      "spanish": "Hola, ¿cómo estás?",
+      "glossSequence": [
+        "HOLA",
+        "¿CÓMO ESTÁS?"
+      ]
+    },
+    {
+      "id": "yo-quiero-comer-carne",
+      "spanish": "Yo quiero comer carne.",
+      "glossSequence": [
+        "YO",
+        "QUERER",
+        "COMER",
+        "CARNE"
+      ]
+    },
+    {
+      "id": "yo-quiero-comer",
+      "spanish": "Yo quiero comer.",
+      "glossSequence": [
+        "YO",
+        "QUERER",
+        "COMER"
+      ]
+    },
+    {
+      "id": "yo-quiero-carne",
+      "spanish": "Yo quiero carne.",
+      "glossSequence": [
+        "YO",
+        "QUERER",
+        "CARNE"
+      ]
+    },
+    {
+      "id": "yo-quiero-agua",
+      "spanish": "Yo quiero agua.",
+      "glossSequence": [
+        "YO",
+        "QUERER",
+        "AGUA"
+      ]
+    },
+    {
+      "id": "ayer-comi-carne",
+      "spanish": "Ayer comí carne.",
+      "glossSequence": [
+        "AYER",
+        "COMER",
+        "CARNE"
+      ]
+    },
+    {
+      "id": "gracias-amigo",
+      "spanish": "Gracias, amigo.",
+      "glossSequence": [
+        "GRACIAS",
+        "AMIGO"
+      ]
+    },
+    {
+      "id": "yo-no-entiendo",
+      "spanish": "Yo no entiendo.",
+      "glossSequence": [
+        "YO",
+        "NO ENTIENDO"
+      ]
+    },
+    {
+      "id": "yo-quiero-dinero",
+      "spanish": "Yo quiero dinero.",
+      "glossSequence": [
+        "YO",
+        "QUERER",
+        "DINERO"
+      ]
+    },
+    {
+      "id": "buenas-tardes-amigo",
+      "spanish": "Buenas tardes, amigo.",
+      "glossSequence": [
+        "BUENAS TARDES",
+        "AMIGO"
+      ]
+    },
+    {
+      "id": "buenos-dias-amigo",
+      "spanish": "Buenos días, amigo.",
+      "glossSequence": [
+        "BUENOS DÍAS",
+        "AMIGO"
+      ]
+    },
+    {
+      "id": "buenas-noches-amigo",
+      "spanish": "Buenas noches, amigo.",
+      "glossSequence": [
+        "BUENAS NOCHES",
+        "AMIGO"
+      ]
+    },
+    {
+      "id": "adios-amigo",
+      "spanish": "Adiós, amigo.",
+      "glossSequence": [
+        "ADIÓS",
+        "AMIGO"
+      ]
+    },
+    {
+      "id": "caballo-blanco",
+      "spanish": "Caballo blanco.",
+      "glossSequence": [
+        "CABALLO",
+        "BLANCO"
+      ]
+    },
+    {
+      "id": "auto-mal-quiero",
+      "spanish": "Quiero mal.",
+      "glossSequence": [
+        "YO",
+        "QUERER",
+        "MAL"
+      ],
+      "sourceGloss": "MAL",
+      "template": "quiero",
+      "editorGenerated": true
+    },
+    {
+      "id": "auto-mal-necesito",
+      "spanish": "Necesito mal.",
+      "glossSequence": [
+        "NECESITAR",
+        "MAL"
+      ],
+      "sourceGloss": "MAL",
+      "template": "necesito",
+      "editorGenerated": true
+    },
+    {
+      "id": "auto-mal-donde",
+      "spanish": "¿Dónde está mal?",
+      "glossSequence": [
+        "DÓNDE",
+        "MAL"
+      ],
+      "sourceGloss": "MAL",
+      "template": "donde",
+      "editorGenerated": true
+    }
+  ]
+}

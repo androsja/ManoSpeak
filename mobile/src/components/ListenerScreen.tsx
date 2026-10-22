@@ -23,15 +23,17 @@ import {
   selectKnownSpeechAlternative,
   shouldDeferSpeechMatch,
 } from '../services/VoiceCommandService';
-import type {InstalledSign} from '../services/SignLanguageService';
+import type {InstalledPhrase, InstalledSign} from '../services/SignLanguageService';
 import {
-  playableLscPhraseSuggestions,
   playableLscPhraseVocabulary,
 } from '../services/LscPhraseAssetCatalogService';
 import {resolveRuntimeLscPlayback} from '../services/LscRuntimePlaybackService';
 import {speechVocabularyForInstalledSigns} from '../services/LinguisticCatalogService';
 import {PHRASE_CONTINUATION_GRACE_MS} from '../services/SignPhraseContinuity';
-import {nextPhraseSuggestionIndex} from '../services/PhraseSuggestionService';
+import {
+  nextPhraseSuggestionIndex,
+  phraseSuggestionsForInstalledLibrary,
+} from '../services/PhraseSuggestionService';
 import { AvatarClip, AvatarRenderMode, SkeletalAvatar } from './SkeletalAvatar';
 import {PipSkeletalAvatar} from './PipSkeletalAvatar';
 import type {ActivationAccount} from '../services/ActivationService';
@@ -57,24 +59,20 @@ import {
   type BillingPlan,
   type BillingSandboxEntitlement,
 } from '../services/BillingSandboxService';
+import {SUPPORTED_APP_LOCALES, useI18n} from '../i18n/I18n';
 // The shared linguistic catalog controls what speech can activate a published
 // avatar clip. A clip may stay in VOZUAL without entering this vocabulary.
 const PLAYBACK_SPEEDS = [1, 2, 3, 4] as const;
 const PLAYBACK_SPEED_PREFERENCE_PATH = `${RNFS.DocumentDirectoryPath}/vozual-playback-speed.json`;
+const LISTENER_TUTORIAL_PATH = `${RNFS.DocumentDirectoryPath}/vozual-listener-tutorial-v1.json`;
 const AVATAR_ZOOM_MIN = 0.85;
 const AVATAR_ZOOM_MAX = 1.3;
 const AVATAR_ZOOM_STEP = 0.05;
 const DEFAULT_AVATAR_ZOOM = 1;
 const CONTINUOUS_PREFIX_WAIT_MS = 1200;
 type ListeningMode = 'continuous' | 'phrase';
-const LISTENING_MODES: Array<{value: ListeningMode; label: string; detail: string}> = [
-  {value: 'phrase', label: 'POR FRASE', detail: 'Escucha primero y reproduce después'},
-  {value: 'continuous', label: 'EN VIVO', detail: 'Escucha continuamente y traduce al instante'},
-];
-const AVATAR_RENDER_MODES: Array<{value: AvatarRenderMode; label: string}> = [
-  {value: 'points', label: 'PUNTOS'},
-  {value: 'rigged', label: 'PERSONAJE'},
-];
+const LISTENING_MODES: readonly ListeningMode[] = ['phrase', 'continuous'];
+const AVATAR_RENDER_MODES: readonly AvatarRenderMode[] = ['points', 'rigged'];
 type KnownWord = string;
 type SpeechEvent = {
   value?: string[];
@@ -148,7 +146,10 @@ const pictureInPicture = NativeModules.VozualPictureInPicture as {
 type ListenerScreenProps = {
   account?: ActivationAccount | null;
   accessConfig: AppAccessConfig;
+  hasPlusEntitlement?: boolean;
   installedSigns?: readonly InstalledSign[];
+  installedPhrases?: readonly InstalledPhrase[];
+  availableSignChangeCount?: number;
   onManageAccount?: () => void;
   onManageSignLanguages?: () => void;
   onSignOut?: () => Promise<void>;
@@ -158,12 +159,16 @@ type ListenerScreenProps = {
 export function ListenerScreen({
   account,
   accessConfig,
+  hasPlusEntitlement = false,
   installedSigns = [],
+  installedPhrases = [],
+  availableSignChangeCount = 0,
   onManageAccount,
   onManageSignLanguages,
   onSignOut,
   onDeleteAccount,
 }: ListenerScreenProps) {
+  const {locale, setLocale, t} = useI18n();
   const phraseContinuationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const phraseFinalizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const deferredSpeechTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -211,6 +216,7 @@ export function ListenerScreen({
   const [accountActionPending, setAccountActionPending] = useState(false);
   const [accountActionError, setAccountActionError] = useState('');
   const [phraseSuggestionIndex, setPhraseSuggestionIndex] = useState(0);
+  const [tutorialVisible, setTutorialVisible] = useState(false);
   const [pictureInPictureMode, setPictureInPictureMode] = useState(false);
   const [avatarReady, setAvatarReady] = useState(false);
   // Remount the full WebView after leaving PiP. Android can keep the compact
@@ -225,12 +231,12 @@ export function ListenerScreen({
   const compactMode = pictureInPictureMode;
   const microphonePreparing = listening && !recognitionReady;
   const phraseSuggestions = useMemo(
-    () => playableLscPhraseSuggestions(installedSigns),
-    [installedSigns],
+    () => phraseSuggestionsForInstalledLibrary(installedPhrases, installedSigns),
+    [installedPhrases, installedSigns],
   );
   const phraseSuggestion = phraseSuggestions.length > 0
     ? phraseSuggestions[phraseSuggestionIndex % phraseSuggestions.length]
-    : 'Di una frase para comenzar';
+    : '';
   const knownWords = useMemo(() => {
     const reviewed = playableLscPhraseVocabulary(installedSigns);
     return [...reviewed, ...speechVocabularyForInstalledSigns(installedSigns)];
@@ -250,7 +256,7 @@ export function ListenerScreen({
   const accessPolicy = resolveAccessPolicy(
     effectiveAccessConfig,
     usagePeriod,
-    billingSandboxEntitlement.active,
+    hasPlusEntitlement || (billingSandboxEnabled && billingSandboxEntitlement.active),
   );
 
   const showNextPhraseSuggestion = useCallback(() => {
@@ -265,6 +271,18 @@ export function ListenerScreen({
     const timer = setInterval(showNextPhraseSuggestion, 60_000);
     return () => clearInterval(timer);
   }, [showNextPhraseSuggestion]);
+
+  useEffect(() => {
+    let active = true;
+    RNFS.exists(LISTENER_TUTORIAL_PATH)
+      .then(completed => {
+        if (active && !completed) setTutorialVisible(true);
+      })
+      .catch(() => {
+        if (active) setTutorialVisible(true);
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -400,16 +418,33 @@ export function ListenerScreen({
         if (active && Number.isFinite(storedZoom) && storedZoom >= AVATAR_ZOOM_MIN && storedZoom <= AVATAR_ZOOM_MAX) {
           setAvatarZoom(storedZoom);
         }
-        // The current test build exposes only the free phrase mode.
-        if (active) {
-          listeningModeRef.current = 'phrase';
-          setListeningMode('phrase');
+        const storedMode = preferences.listeningMode;
+        if (active && (storedMode === 'phrase' || storedMode === 'continuous')) {
+          const permittedMode = storedMode === 'continuous' && !accessPolicy.canUseContinuousMode
+            ? 'phrase'
+            : storedMode;
+          listeningModeRef.current = permittedMode;
+          setListeningMode(permittedMode);
         }
       })
       // A first launch has no preference file. Playback remains at 1×.
       .catch(() => undefined);
     return () => { active = false; };
-  }, []);
+  }, [accessPolicy.canUseContinuousMode]);
+
+  useEffect(() => {
+    if (accessPolicy.canUseContinuousMode || listeningModeRef.current !== 'continuous') return;
+    listeningModeRef.current = 'phrase';
+    phrasePartialTextRef.current = '';
+    setListeningMode('phrase');
+    setTranscript('');
+    setPlannedLsc('');
+    RNFS.writeFile(
+      PLAYBACK_SPEED_PREFERENCE_PATH,
+      JSON.stringify({speed: playbackSpeed, zoom: avatarZoom, listeningMode: 'phrase'}),
+      'utf8',
+    ).catch(() => undefined);
+  }, [accessPolicy.canUseContinuousMode, avatarZoom, playbackSpeed]);
 
   const choosePlaybackSpeed = useCallback((speed: (typeof PLAYBACK_SPEEDS)[number]) => {
     setPlaybackSpeed(speed);
@@ -547,6 +582,18 @@ export function ListenerScreen({
       }
     }
   }, [installedSigns, playNextSign]);
+
+  const playSuggestedPhrase = useCallback(() => {
+    if (!phraseSuggestion || listening || playingSign) return;
+    recognizedWords.current = [];
+    handleText(phraseSuggestion, true);
+  }, [handleText, listening, phraseSuggestion, playingSign]);
+
+  const dismissTutorial = useCallback(() => {
+    setTutorialVisible(false);
+    RNFS.writeFile(LISTENER_TUTORIAL_PATH, JSON.stringify({completedAt: new Date().toISOString()}), 'utf8')
+      .catch(() => undefined);
+  }, []);
 
   const clearDeferredSpeech = useCallback(() => {
     if (deferredSpeechTimer.current) clearTimeout(deferredSpeechTimer.current);
@@ -1418,13 +1465,13 @@ export function ListenerScreen({
         <View style={styles.headerRow}>
           <Text style={styles.logo}>VOZUAL</Text>
           <View style={styles.headerSpeedControl}>
-            <Text style={styles.speedLabel}>VELOCIDAD</Text>
+            <Text style={styles.speedLabel}>{t('listener.speed')}</Text>
             <View style={styles.speedOptions}>
               {PLAYBACK_SPEEDS.map((speed) => (
                 <Pressable
                   key={speed}
                   accessibilityRole="button"
-                  accessibilityLabel={`Velocidad ${speed}x`}
+                  accessibilityLabel={t('listener.speedLabel', {speed})}
                   onPress={() => choosePlaybackSpeed(speed)}
                   style={[styles.speedOption, playbackSpeed === speed && styles.speedOptionActive]}
                 >
@@ -1434,13 +1481,13 @@ export function ListenerScreen({
             </View>
           </View>
         </View>
-        <Text style={styles.subtitle}>TRADUCTOR DE HABLA A LSC</Text>
+        <Text style={styles.subtitle}>{t('listener.subtitle')}</Text>
       </View>}
 
       <View style={[styles.avatarCard, compactMode && styles.avatarCardCompact]}>
         {!compactMode && <Pressable
           accessibilityRole="button"
-          accessibilityLabel={account ? 'Abrir ajustes y cuenta' : 'Activar cuenta gratis'}
+          accessibilityLabel={account ? t('listener.openSettings') : t('listener.activateFree')}
           onPress={() => {
             if (account) {
               setSettingsVisible(true);
@@ -1454,12 +1501,12 @@ export function ListenerScreen({
             {account ? '⚙' : '●'}
           </Text>
           <Text style={[styles.avatarSettingsText, !account && styles.avatarAccountButtonText]}>
-            {account ? 'AJUSTES' : 'ACTIVAR GRATIS'}
+            {account ? t('listener.settings') : t('listener.activateFree')}
           </Text>
         </Pressable>}
         {Platform.OS === 'android' && <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${installedSignCount} señas descargadas. Abrir lenguas de señas`}
+          accessibilityLabel={t('listener.downloadedSigns', {count: installedSignCount})}
           onPress={onManageSignLanguages}
           style={styles.avatarSignCountBadge}
         >
@@ -1491,6 +1538,74 @@ export function ListenerScreen({
       </View>
 
       {!compactMode && <View style={styles.panel}>
+        <Text style={styles.modeHeading}>{t('listener.translationMode')}</Text>
+        {availableSignChangeCount > 0 && <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('listener.newSignsLabel', {count: availableSignChangeCount})}
+          onPress={onManageSignLanguages}
+          style={styles.signUpdateCard}
+        >
+          <View style={styles.signUpdateCopy}>
+            <Text style={styles.signUpdateTitle}>
+              {t('listener.newSignsTitle', {count: availableSignChangeCount})}
+            </Text>
+            <Text style={styles.signUpdateDetail}>{t('listener.newSignsDetail')}</Text>
+          </View>
+          <Text style={styles.signUpdateAction}>{t('listener.download')}</Text>
+        </Pressable>}
+        <View style={styles.listeningModeControl}>
+          {LISTENING_MODES.filter(mode => (
+            mode === 'continuous'
+              ? accessPolicy.canUseContinuousMode
+              : accessPolicy.canUsePhraseMode
+          )).map(mode => {
+            const selected = listeningMode === mode;
+            const disabled = listening || playingSign || phraseFinalizing;
+            const label = t(`listener.mode.${mode}.label`);
+            const detail = t(`listener.mode.${mode}.detail`);
+            return (
+              <Pressable
+                key={mode}
+                accessibilityRole="button"
+                accessibilityState={{selected, disabled}}
+                accessibilityLabel={`${label}. ${detail}`}
+                disabled={disabled}
+                onPress={() => chooseListeningMode(mode)}
+                style={[
+                  styles.listeningModeOption,
+                  selected && styles.listeningModeOptionActive,
+                  disabled && styles.listeningModeOptionDisabled,
+                ]}
+              >
+                <Text style={[styles.listeningModeLabel, selected && styles.listeningModeLabelActive]}>
+                  {label}
+                </Text>
+                <Text style={[styles.listeningModeDetail, selected && styles.listeningModeDetailActive]}>
+                  {detail}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {tutorialVisible && (
+          <View style={styles.tutorialCard} accessibilityLabel={t('listener.tutorial.label')}>
+            <View style={styles.tutorialHeader}>
+              <Text style={styles.tutorialTitle}>{t('listener.tutorial.title')}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('listener.tutorial.close')}
+                onPress={dismissTutorial}
+                style={styles.tutorialDismissButton}
+              >
+                <Text style={styles.tutorialDismissText}>×</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.tutorialText}>
+              {t('listener.tutorial.instructions')}
+            </Text>
+            <Text style={styles.tutorialPointer}>{t('listener.tutorial.pointer')}</Text>
+          </View>
+        )}
         <Pressable
           accessibilityRole="button"
           style={[styles.button, listening && styles.buttonActive, (phraseFinalizing || (!listening && playingSign)) && styles.buttonDisabled]}
@@ -1503,25 +1618,42 @@ export function ListenerScreen({
             ? <ActivityIndicator color="#07111F" />
             : <Text style={styles.buttonText}>
               {listeningMode === 'phrase'
-                ? (playingSign ? 'REPRODUCIENDO SEÑAS…' : listening ? 'TERMINAR FRASE' : 'HABLAR')
-                : listening ? 'DETENER ESCUCHA' : 'ACTIVAR MICRÓFONO'}
+                ? (playingSign ? t('listener.replaying') : listening ? t('listener.finishPhrase') : t('listener.speak'))
+                : listening ? t('listener.stopListening') : t('listener.activateMicrophone')}
             </Text>}
         </Pressable>
+        {accessPolicy.canUsePictureInPicture && <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('listener.openFloating')}
+          disabled={!avatarReady || starting || phraseFinalizing}
+          onPress={() => { enterFloatingMode().catch(() => undefined); }}
+          style={[
+            styles.floatingButton,
+            (!avatarReady || starting || phraseFinalizing) && styles.floatingButtonDisabled,
+          ]}
+        >
+          <Text style={[
+            styles.floatingButtonText,
+            (!avatarReady || starting || phraseFinalizing) && styles.floatingButtonTextDisabled,
+          ]}>
+            {t('listener.openFloatingAction')}
+          </Text>
+        </Pressable>}
         {phraseFinalizing ? (
-          <View style={styles.microphoneProgress} accessibilityLabel="Preparando traducción">
+          <View style={styles.microphoneProgress} accessibilityLabel={t('listener.preparingTranslation')}>
             <ActivityIndicator size="small" color="#16D9D1" />
-            <Text style={styles.microphoneProgressText}>PREPARANDO LA SEÑA…</Text>
+            <Text style={styles.microphoneProgressText}>{t('listener.preparingSign')}</Text>
           </View>
         ) : microphonePreparing ? (
-          <View style={styles.microphoneProgress} accessibilityLabel="Preparando micrófono">
+          <View style={styles.microphoneProgress} accessibilityLabel={t('listener.preparingMicrophone')}>
             <ActivityIndicator size="small" color="#16D9D1" />
-            <Text style={styles.microphoneProgressText}>PREPARANDO MICRÓFONO… CASI LISTO</Text>
+            <Text style={styles.microphoneProgressText}>{t('listener.preparingMicrophoneDetail')}</Text>
           </View>
         ) : (
           (listening || playingSign) && <Text style={styles.status}>
             {listeningMode === 'phrase'
-              ? listening ? 'ESCUCHANDO · TOCA TERMINAR CUANDO ACABES' : 'REPRODUCIENDO FRASE'
-              : 'ESCUCHA CONTINUA ACTIVA'}
+              ? listening ? t('listener.listeningFinish') : t('listener.replayingPhrase')
+              : t('listener.continuousActive')}
           </Text>
         )}
         {!!errorMessage && (
@@ -1569,32 +1701,66 @@ export function ListenerScreen({
             </Pressable>
           </View>
         )}
-        <Pressable
-          accessibilityRole={transcript ? undefined : 'button'}
-          accessibilityLabel={transcript ? undefined : `Frase sugerida: ${phraseSuggestion}. Toca para ver otra.`}
-          disabled={Boolean(transcript)}
-          onPress={showNextPhraseSuggestion}
-          style={styles.recognizedCard}
-        >
-          {transcript ? <>
+        {transcript ? (
+          <View style={styles.recognizedCard}>
             <Text style={styles.transcript} numberOfLines={1} ellipsizeMode="tail">
               {transcript}
             </Text>
             <Text style={styles.lscPlan} numberOfLines={1} ellipsizeMode="tail">
-              {plannedLsc ? `LSC: ${plannedLsc}` : 'LSC: —'}
+              {plannedLsc ? `LSC: ${plannedLsc}` : t('listener.lscEmpty')}
             </Text>
-          </> : <>
+          </View>
+        ) : null}
+        <View style={styles.suggestionCard}>
+          {phraseSuggestions.length > 0 ? (
+            <>
             <View style={styles.suggestionHeader}>
-              <Text style={styles.suggestionLabel}>PRUEBA DICIENDO</Text>
-              <View style={styles.suggestionAction}>
-                <Text style={styles.suggestionActionText}>OTRA FRASE ↻</Text>
-              </View>
+              <Text style={styles.suggestionLabel}>{t('listener.recommendedPhrase')}</Text>
+              <Text style={styles.suggestionCount}>{t('listener.possibleCount', {count: phraseSuggestions.length})}</Text>
             </View>
-            <Text style={styles.suggestionText} numberOfLines={1} ellipsizeMode="tail">
+            <Text style={styles.suggestionText} numberOfLines={2} ellipsizeMode="tail">
               “{phraseSuggestion}”
             </Text>
-          </>}
-        </Pressable>
+            <Text style={styles.suggestionHint}>
+              {t('listener.suggestionHint')}
+            </Text>
+            <View style={styles.suggestionButtons}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('listener.nextSuggestionLabel')}
+                onPress={showNextPhraseSuggestion}
+                style={styles.suggestionButtonSecondary}
+              >
+                <Text style={styles.suggestionButtonSecondaryText}>{t('listener.nextSuggestion')}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('listener.viewSuggestionLabel', {phrase: phraseSuggestion})}
+                disabled={listening || playingSign}
+                onPress={playSuggestedPhrase}
+                style={[styles.suggestionButtonPrimary, (listening || playingSign) && styles.suggestionButtonDisabled]}
+              >
+                <Text style={styles.suggestionButtonPrimaryText}>{t('listener.viewInLsc')}</Text>
+              </Pressable>
+            </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.suggestionLabel}>{t('listener.recommendedPhrases')}</Text>
+              <Text style={styles.suggestionEmptyText}>
+                {t('listener.noSuggestions')}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('listener.openLibraryLabel')}
+                onPress={onManageSignLanguages}
+                style={styles.suggestionButtonSecondary}
+              >
+                <Text style={styles.suggestionButtonSecondaryText}>{t('listener.openLibrary')}</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
       </View>}
 
       {!compactMode && <Modal
@@ -1606,19 +1772,19 @@ export function ListenerScreen({
         <View style={styles.settingsOverlay}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Cerrar ajustes"
+            accessibilityLabel={t('settings.close')}
             onPress={() => setSettingsVisible(false)}
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.settingsSheet}>
             <View style={styles.settingsHeader}>
               <View>
-                <Text style={styles.settingsTitle}>AJUSTES</Text>
-                <Text style={styles.settingsSubtitle}>Personaje, cuenta y acceso</Text>
+                <Text style={styles.settingsTitle}>{t('settings.title')}</Text>
+                <Text style={styles.settingsSubtitle}>{t('settings.subtitle')}</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Cerrar ajustes"
+                accessibilityLabel={t('settings.close')}
                 onPress={() => setSettingsVisible(false)}
                 style={styles.settingsCloseButton}
               >
@@ -1626,26 +1792,46 @@ export function ListenerScreen({
               </Pressable>
             </View>
 
-            <Text style={styles.settingsLabel}>REPRESENTACIÓN</Text>
+            <Text style={styles.settingsLabel}>{t('settings.interfaceLanguage')}</Text>
+            <View style={styles.settingsRenderModes}>
+              {SUPPORTED_APP_LOCALES.map(candidate => (
+                <Pressable
+                  key={candidate}
+                  accessibilityRole="button"
+                  accessibilityState={{selected: locale === candidate}}
+                  onPress={() => { setLocale(candidate).catch(() => undefined); }}
+                  style={[styles.settingsRenderMode, locale === candidate && styles.settingsRenderModeActive]}
+                >
+                  <Text style={[styles.settingsRenderModeText, locale === candidate && styles.settingsRenderModeTextActive]}>
+                    {t(`language.name.${candidate}`)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.settingsLanguageDetail}>{t('language.interface.detail')}</Text>
+
+            <Text style={styles.settingsLabel}>{t('settings.representation')}</Text>
             <View style={styles.settingsRenderModes}>
               {AVATAR_RENDER_MODES.map(mode => (
                 <Pressable
-                  key={mode.value}
+                  key={mode}
                   accessibilityRole="button"
-                  accessibilityState={{selected: avatarRenderMode === mode.value}}
-                  onPress={() => setAvatarRenderMode(mode.value)}
-                  style={[styles.settingsRenderMode, avatarRenderMode === mode.value && styles.settingsRenderModeActive]}
+                  accessibilityState={{selected: avatarRenderMode === mode}}
+                  onPress={() => setAvatarRenderMode(mode)}
+                  style={[styles.settingsRenderMode, avatarRenderMode === mode && styles.settingsRenderModeActive]}
                 >
-                  <Text style={[styles.settingsRenderModeText, avatarRenderMode === mode.value && styles.settingsRenderModeTextActive]}>{mode.label}</Text>
+                  <Text style={[styles.settingsRenderModeText, avatarRenderMode === mode && styles.settingsRenderModeTextActive]}>
+                    {t(mode === 'points' ? 'settings.avatar.points' : 'settings.avatar.character')}
+                  </Text>
                 </Pressable>
               ))}
             </View>
 
-            <Text style={styles.settingsLabel}>TAMAÑO DEL PERSONAJE</Text>
+            <Text style={styles.settingsLabel}>{t('settings.avatarSize')}</Text>
             <View style={styles.settingsZoomControl}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Alejar personaje"
+                accessibilityLabel={t('settings.zoomOut')}
                 onPress={() => chooseAvatarZoom(-1)}
                 disabled={avatarZoom <= AVATAR_ZOOM_MIN}
                 style={[styles.settingsZoomButton, avatarZoom <= AVATAR_ZOOM_MIN && styles.avatarZoomButtonDisabled]}
@@ -1655,7 +1841,7 @@ export function ListenerScreen({
               <Text style={styles.settingsZoomValue}>{Math.round(avatarZoom * 100)}%</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Acercar personaje"
+                accessibilityLabel={t('settings.zoomIn')}
                 onPress={() => chooseAvatarZoom(1)}
                 disabled={avatarZoom >= AVATAR_ZOOM_MAX}
                 style={[styles.settingsZoomButton, avatarZoom >= AVATAR_ZOOM_MAX && styles.avatarZoomButtonDisabled]}
@@ -1665,43 +1851,54 @@ export function ListenerScreen({
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Abrir lenguas de señas"
+              accessibilityLabel={t('settings.signLanguagesLabel')}
               onPress={() => {
                 setSettingsVisible(false);
                 onManageSignLanguages?.();
               }}
             >
               <Text style={styles.settingsLibraryCount}>
-                {installedSignCount} señas descargadas · ADMINISTRAR LENGUAS
+                {t('settings.signLanguages', {count: installedSignCount})}
               </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.userGuideLabel')}
+              onPress={() => {
+                setSettingsVisible(false);
+                setTutorialVisible(true);
+              }}
+              style={styles.settingsTutorialButton}
+            >
+              <Text style={styles.settingsTutorialButtonText}>{t('settings.userGuide')}</Text>
             </Pressable>
 
             <View style={styles.settingsDivider} />
-            <Text style={styles.settingsLabel}>ACCESO</Text>
+            <Text style={styles.settingsLabel}>{t('settings.access')}</Text>
             <View style={styles.settingsAccessCard}>
               <Text style={styles.settingsAccessTitle}>{accessPolicy.accessLabel}</Text>
               <Text style={styles.settingsAccessDetail}>
-                {accessPolicy.consumedMinutes} min de señas reproducidas este mes
+                {t('settings.consumedMinutes', {count: accessPolicy.consumedMinutes})}
               </Text>
               <Text style={styles.settingsAccessExplanation}>
-                Solo cuenta mientras el personaje hace una seña. Escuchar y esperar no consume minutos.
+                {t('settings.minuteExplanation')}
               </Text>
               <Text style={styles.settingsAccessStatus}>
                 {effectiveAccessConfig.monetizationEnabled
-                  ? `${accessPolicy.remainingMinutes} min incluidos disponibles`
-                  : 'Todos los modos están disponibles sin costo por ahora'}
+                  ? t('settings.remainingMinutes', {count: accessPolicy.remainingMinutes})
+                  : t('settings.launchAccess')}
               </Text>
               {billingSandboxEnabled && (
                 <>
-                  <Text style={styles.settingsSandboxLabel}>MODO DE PRUEBA · SIN COBROS</Text>
+                  <Text style={styles.settingsSandboxLabel}>{t('settings.sandbox')}</Text>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Abrir simulador de VOZUAL Plus"
+                    accessibilityLabel={t('settings.sandboxOpen')}
                     onPress={() => openBillingSandbox()}
                     style={styles.settingsPlusButton}
                   >
                     <Text style={styles.settingsPlusButtonText}>
-                      {billingSandboxEntitlement.active ? 'ADMINISTRAR PLUS DE PRUEBA' : 'PROBAR VOZUAL PLUS'}
+                      {billingSandboxEntitlement.active ? t('settings.sandboxManage') : t('settings.sandboxTry')}
                     </Text>
                   </Pressable>
                 </>
@@ -1709,21 +1906,21 @@ export function ListenerScreen({
             </View>
 
             <View style={styles.settingsDivider} />
-            <Text style={styles.settingsLabel}>CUENTA</Text>
+            <Text style={styles.settingsLabel}>{t('settings.account')}</Text>
             <View style={styles.settingsAccountRow}>
               <View style={styles.settingsAccountCopy}>
                 <Text style={styles.settingsAccountTitle} numberOfLines={1}>
-                  {account?.displayName || account?.email || 'Sin cuenta activada'}
+                  {account?.displayName || account?.email || t('settings.noAccount')}
                 </Text>
                 <Text style={styles.settingsAccountDetail} numberOfLines={1}>
                   {account
-                    ? account.email || 'Cuenta protegida con inicio de sesión'
-                    : 'Actívala para conservar tu prueba y futuro acceso Plus'}
+                    ? account.email || t('settings.protectedAccount')
+                    : t('settings.accountPrompt')}
                 </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={account ? 'Cerrar sesión' : 'Activar cuenta'}
+                accessibilityLabel={account ? t('settings.signOut') : t('settings.activateAccount')}
                 disabled={accountActionPending}
                 onPress={() => {
                   if (account) {
@@ -1736,21 +1933,21 @@ export function ListenerScreen({
                 style={styles.settingsAccountButton}
               >
                 <Text style={styles.settingsAccountButtonText}>
-                  {account ? 'SALIR' : 'ACTIVAR'}
+                  {account ? t('settings.signOutAction') : t('settings.activateAction')}
                 </Text>
               </Pressable>
             </View>
             {account && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Eliminar cuenta y datos"
+                accessibilityLabel={t('settings.deleteAccount')}
                 disabled={accountActionPending}
                 onPress={confirmAccountDeletion}
                 style={styles.settingsDeleteAccountButton}
               >
                 {accountActionPending
                   ? <ActivityIndicator color="#F06275" />
-                  : <Text style={styles.settingsDeleteAccountText}>ELIMINAR CUENTA Y DATOS</Text>}
+                  : <Text style={styles.settingsDeleteAccountText}>{t('settings.deleteAccountAction')}</Text>}
               </Pressable>
             )}
             {!!accountActionError && (
@@ -1759,26 +1956,26 @@ export function ListenerScreen({
             {!!accountActionError && account && (
               <Pressable
                 accessibilityRole="link"
-                accessibilityLabel="Abrir solicitud web de eliminación"
+                accessibilityLabel={t('settings.webDeletion')}
                 onPress={() => openAccountResource(VOZUAL_ACCOUNT_DELETION_URL)}
               >
-                <Text style={styles.settingsAccountLink}>SOLICITAR ELIMINACIÓN POR WEB</Text>
+                <Text style={styles.settingsAccountLink}>{t('settings.webDeletionAction')}</Text>
               </Pressable>
             )}
             <View style={styles.settingsPolicyLinks}>
               <Pressable
                 accessibilityRole="link"
-                accessibilityLabel="Abrir política de privacidad"
+                accessibilityLabel={t('activation.openPrivacyLabel')}
                 onPress={() => openAccountResource(VOZUAL_PRIVACY_POLICY_URL)}
               >
-                <Text style={styles.settingsPolicyLink}>PRIVACIDAD</Text>
+                <Text style={styles.settingsPolicyLink}>{t('settings.privacy')}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="link"
-                accessibilityLabel="Abrir solicitud de eliminación de cuenta"
+                accessibilityLabel={t('settings.webDeletion')}
                 onPress={() => openAccountResource(VOZUAL_ACCOUNT_DELETION_URL)}
               >
-                <Text style={styles.settingsPolicyLink}>ELIMINAR DATOS</Text>
+                <Text style={styles.settingsPolicyLink}>{t('settings.deleteData')}</Text>
               </Pressable>
             </View>
           </View>
@@ -1823,6 +2020,8 @@ const styles = StyleSheet.create({
   listeningModeOptionDisabled: { opacity: 0.62 },
   listeningModeLabel: { color: '#A9B8C9', fontSize: 11, fontWeight: '900', letterSpacing: 0.3 },
   listeningModeLabelActive: { color: '#69DDD9' },
+  listeningModeDetail: { color: '#7F91A6', fontSize: 8, fontWeight: '700', marginTop: 3, textAlign: 'center' },
+  listeningModeDetailActive: { color: '#D8E1EC' },
   headerSpeedControl: { alignItems: 'flex-end', marginLeft: 16 },
   speedLabel: { color: '#A9B8C9', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   speedOptions: { flexDirection: 'row', gap: 5 },
@@ -1834,6 +2033,13 @@ const styles = StyleSheet.create({
   signCountText: { color: '#07111F', fontSize: 14, fontWeight: '900' },
   avatarSignCountHint: { position: 'absolute', right: 14, top: 52, borderRadius: 8, backgroundColor: '#102337', borderWidth: 1, borderColor: '#1A4960', paddingVertical: 7, paddingHorizontal: 10, zIndex: 3 },
   signCountHintText: { color: '#D8E1EC', fontSize: 11, fontWeight: '700' },
+  tutorialCard: { marginTop: 8, marginBottom: 2, padding: 12, borderRadius: 12, backgroundColor: '#15394B', borderWidth: 1, borderColor: '#16D9D1' },
+  tutorialHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  tutorialTitle: { flex: 1, color: '#69DDD9', fontSize: 11, fontWeight: '900', letterSpacing: 0.35 },
+  tutorialDismissButton: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#20344B', alignItems: 'center', justifyContent: 'center' },
+  tutorialDismissText: { color: '#F7F9FC', fontSize: 19, lineHeight: 22 },
+  tutorialText: { color: '#D8E1EC', fontSize: 12, fontWeight: '700', lineHeight: 18, marginTop: 6 },
+  tutorialPointer: { color: '#69DDD9', fontSize: 10, fontWeight: '900', letterSpacing: 0.25, textAlign: 'center', marginTop: 8 },
   button: { marginTop: 10, borderRadius: 14, backgroundColor: '#16D9D1', paddingVertical: 14, alignItems: 'center' },
   buttonActive: { backgroundColor: '#FF5470' },
   buttonDisabled: { opacity: 0.62 },
@@ -1848,11 +2054,24 @@ const styles = StyleSheet.create({
   recognizedCard: { height: 58, marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#102337', justifyContent: 'center' },
   transcript: { color: '#D8E1EC', textAlign: 'center', fontSize: 14, lineHeight: 18 },
   lscPlan: { color: '#69DDD9', textAlign: 'center', marginTop: 3, fontSize: 12, fontWeight: '700', lineHeight: 16 },
-  suggestionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  suggestionLabel: { color: '#69DDD9', textAlign: 'center', fontSize: 9, fontWeight: '900', letterSpacing: 0.35, lineHeight: 15 },
-  suggestionAction: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7, backgroundColor: '#20344B', borderWidth: 1, borderColor: '#31506A' },
-  suggestionActionText: { color: '#F7F9FC', fontSize: 8, fontWeight: '900', letterSpacing: 0.25, lineHeight: 11 },
-  suggestionText: { color: '#D8E1EC', textAlign: 'center', marginTop: 1, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  signUpdateCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, padding: 12, borderRadius: 12, backgroundColor: '#15394B', borderWidth: 1, borderColor: '#16D9D1' },
+  signUpdateCopy: { flex: 1 },
+  signUpdateTitle: { color: '#69DDD9', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
+  signUpdateDetail: { color: '#D8E1EC', marginTop: 3, fontSize: 11, fontWeight: '700', lineHeight: 15 },
+  signUpdateAction: { color: '#07111F', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: '#16D9D1', fontSize: 10, fontWeight: '900', letterSpacing: 0.25, overflow: 'hidden' },
+  suggestionCard: { marginTop: 8, padding: 12, borderRadius: 12, backgroundColor: '#102337', borderWidth: 1, borderColor: '#31506A' },
+  suggestionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  suggestionLabel: { color: '#69DDD9', fontSize: 10, fontWeight: '900', letterSpacing: 0.45, lineHeight: 15 },
+  suggestionCount: { color: '#A9B8C9', fontSize: 9, fontWeight: '900', letterSpacing: 0.3 },
+  suggestionText: { color: '#F7F9FC', marginTop: 4, fontSize: 15, fontWeight: '800', lineHeight: 20 },
+  suggestionHint: { color: '#A9B8C9', marginTop: 4, fontSize: 10, lineHeight: 14 },
+  suggestionButtons: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  suggestionButtonPrimary: { flex: 1, minHeight: 34, paddingHorizontal: 12, borderRadius: 9, backgroundColor: '#16D9D1', alignItems: 'center', justifyContent: 'center' },
+  suggestionButtonPrimaryText: { color: '#07111F', fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
+  suggestionButtonSecondary: { alignSelf: 'flex-start', minHeight: 34, paddingHorizontal: 12, borderRadius: 9, borderWidth: 1, borderColor: '#31506A', backgroundColor: '#20344B', alignItems: 'center', justifyContent: 'center' },
+  suggestionButtonSecondaryText: { color: '#D8E1EC', fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
+  suggestionButtonDisabled: { opacity: 0.48 },
+  suggestionEmptyText: { color: '#A9B8C9', marginTop: 4, marginBottom: 10, fontSize: 12, lineHeight: 17 },
   error: { color: '#A9B8C9', textAlign: 'center', marginTop: 8, fontSize: 12 },
   permissionGuidance: { alignItems: 'center', marginTop: 8, gap: 7 },
   permissionGuidanceText: { color: '#A9B8C9', textAlign: 'center', fontSize: 11, lineHeight: 15 },
@@ -1872,11 +2091,14 @@ const styles = StyleSheet.create({
   settingsRenderModeActive: { backgroundColor: '#16D9D1' },
   settingsRenderModeText: { color: '#D8E1EC', fontSize: 11, fontWeight: '900' },
   settingsRenderModeTextActive: { color: '#07111F' },
+  settingsLanguageDetail: { color: '#7F91A6', fontSize: 9, lineHeight: 13, marginTop: -11, marginBottom: 18 },
   settingsZoomControl: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 6, borderRadius: 14, backgroundColor: '#071829' },
   settingsZoomButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#20344B', alignItems: 'center', justifyContent: 'center' },
   settingsZoomButtonText: { color: '#F7F9FC', fontSize: 23, fontWeight: '700', lineHeight: 27 },
   settingsZoomValue: { color: '#F7F9FC', fontSize: 16, fontWeight: '900' },
   settingsLibraryCount: { color: '#69DDD9', fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 16 },
+  settingsTutorialButton: { alignSelf: 'center', minHeight: 34, paddingHorizontal: 14, borderRadius: 9, borderWidth: 1, borderColor: '#31506A', marginTop: 10, alignItems: 'center', justifyContent: 'center' },
+  settingsTutorialButtonText: { color: '#D8E1EC', fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
   settingsDivider: {height: 1, backgroundColor: '#31506A', marginVertical: 18},
   settingsAccessCard: {padding: 13, borderRadius: 12, backgroundColor: '#071829', borderWidth: 1, borderColor: '#31506A'},
   settingsAccessTitle: {color: '#F7F9FC', fontSize: 13, fontWeight: '900'},

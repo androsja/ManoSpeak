@@ -9,7 +9,6 @@ Unit tests for phonological_labels.py:
 import os
 import tempfile
 import numpy as np
-import pytest
 from src.phonological_labels import PHONOLOGICAL_LABELS
 from src.train import LSCDataset
 
@@ -59,39 +58,39 @@ class TestPhonologicalLabels:
         assert len(triples) == len(set(triples)), "Duplicate (h, l, m) triples found"
 
     def test_handshape_bounds(self) -> None:
-        for gloss, (h, l, m) in PHONOLOGICAL_LABELS.items():
-            assert 0 <= h <= 63, f"{gloss}: h={h} out of [0,63]"
+        for gloss, (handshape, _location, _movement) in PHONOLOGICAL_LABELS.items():
+            assert 0 <= handshape <= 63, f"{gloss}: h={handshape} out of [0,63]"
 
     def test_location_bounds(self) -> None:
-        for gloss, (h, l, m) in PHONOLOGICAL_LABELS.items():
-            assert 0 <= l <= 31, f"{gloss}: l={l} out of [0,31]"
+        for gloss, (_handshape, location, _movement) in PHONOLOGICAL_LABELS.items():
+            assert 0 <= location <= 31, f"{gloss}: l={location} out of [0,31]"
 
     def test_movement_bounds(self) -> None:
-        for gloss, (h, l, m) in PHONOLOGICAL_LABELS.items():
-            assert 0 <= m <= 31, f"{gloss}: m={m} out of [0,31]"
+        for gloss, (_handshape, _location, movement) in PHONOLOGICAL_LABELS.items():
+            assert 0 <= movement <= 31, f"{gloss}: m={movement} out of [0,31]"
 
     def test_letters_all_in_dactylology_space(self) -> None:
         for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            h, l, m = PHONOLOGICAL_LABELS[letter]
-            assert l == 16, f"Letter '{letter}' has l={l}, expected 16 (dactylology space)"
+            _handshape, location, _movement = PHONOLOGICAL_LABELS[letter]
+            assert location == 16, f"Letter '{letter}' has l={location}, expected 16 (dactylology space)"
 
     def test_nn_in_dactylology_space(self) -> None:
-        h, l, m = PHONOLOGICAL_LABELS["NN"]
-        assert l == 16
+        _handshape, location, _movement = PHONOLOGICAL_LABELS["NN"]
+        assert location == 16
 
     def test_digits_in_dactylology_space(self) -> None:
         for digit in ["1", "4", "5", "6", "7", "8", "9", "10"]:
-            h, l, m = PHONOLOGICAL_LABELS[digit]
-            assert l == 16, f"Digit '{digit}' has l={l}, expected 16"
+            _handshape, location, _movement = PHONOLOGICAL_LABELS[digit]
+            assert location == 16, f"Digit '{digit}' has l={location}, expected 16"
 
     def test_j_and_z_have_trace_movement(self) -> None:
         assert PHONOLOGICAL_LABELS["J"][2] == 12, "J should have m=12 (trace)"
         assert PHONOLOGICAL_LABELS["Z"][2] == 12, "Z should have m=12 (trace)"
 
     def test_yo_points_to_chest(self) -> None:
-        h, l, m = PHONOLOGICAL_LABELS["YO"]
-        assert l == 9, "YO should point to chest (l=9)"
-        assert m == 0, "YO is a static point (m=0)"
+        _handshape, location, movement = PHONOLOGICAL_LABELS["YO"]
+        assert location == 9, "YO should point to chest (l=9)"
+        assert movement == 0, "YO is a static point (m=0)"
 
 
 class TestLSCDatasetLabelExtraction:

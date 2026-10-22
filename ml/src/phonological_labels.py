@@ -1,5 +1,5 @@
 """
-Phonological label table for ManoSpeak — 94 LSC signs.
+Phonological label table for Vozual — 94 LSC signs.
 
 Maps each gloss string → (handshape, location, movement) integer triple.
 
@@ -215,10 +215,10 @@ PHONOLOGICAL_LABELS: dict[str, tuple[int, int, int]] = {
 def _validate() -> None:
     seen: set[tuple[int, int, int]] = set()
     for gloss, triple in PHONOLOGICAL_LABELS.items():
-        h, l, m = triple
-        assert 0 <= h <= 63, f"{gloss}: h={h} out of range [0,63]"
-        assert 0 <= l <= 31, f"{gloss}: l={l} out of range [0,31]"
-        assert 0 <= m <= 31, f"{gloss}: m={m} out of range [0,31]"
+        handshape, location, movement = triple
+        assert 0 <= handshape <= 63, f"{gloss}: h={handshape} out of range [0,63]"
+        assert 0 <= location <= 31, f"{gloss}: l={location} out of range [0,31]"
+        assert 0 <= movement <= 31, f"{gloss}: m={movement} out of range [0,31]"
         assert triple not in seen, f"Duplicate triple {triple} for gloss '{gloss}'"
         seen.add(triple)
 

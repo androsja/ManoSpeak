@@ -27,8 +27,8 @@ const PLANS: Array<{
   price: string;
   detail: string;
 }> = [
-  {id: 'monthly', name: 'PLUS MENSUAL', price: '$14.900 COP / mes', detail: 'Cancela cuando quieras'},
-  {id: 'annual', name: 'PLUS ANUAL', price: '$119.900 COP / año', detail: 'Dos meses de ahorro'},
+  {id: 'monthly', name: 'PLUS MENSUAL', price: '$10.000 COP / mes', detail: 'Cancela cuando quieras'},
+  {id: 'annual', name: 'PLUS ANUAL', price: '$99.900 COP / año', detail: 'Dos meses de ahorro'},
 ];
 
 export function BillingSandboxSheet({

@@ -32,6 +32,19 @@ describe('native speech privacy contract', () => {
     expect(source).toContain('ContextCompat.checkSelfPermission');
   });
 
+  it('recovers an Android recognition cycle that stops delivering callbacks', () => {
+    const source = mobileSource(
+      'android/app/src/main/java/com/androsja/vozual/VoiceListeningService.kt',
+    );
+
+    expect(source).toContain('private var recognitionWatchdog: Runnable? = null');
+    expect(source).toContain('reason = "missing-result-after-end-of-speech"');
+    expect(source).toContain('TERMINAL_CALLBACK_TIMEOUT_MILLIS = 4_000L');
+    expect(source).toContain('RECOGNITION_STALL_TIMEOUT_MILLIS = 20_000L');
+    expect(source).toContain('recreate = true');
+    expect(source).toContain('cancelRecognitionWatchdog()');
+  });
+
   it('rejects a missing local recognizer before starting a foreground service', () => {
     const moduleSource = mobileSource(
       'android/app/src/main/java/com/androsja/vozual/PictureInPictureModule.kt',

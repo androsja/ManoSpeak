@@ -28,7 +28,7 @@ jest.mock('@react-native-firebase/firestore', () => ({
   collection: jest.fn(),
   doc: jest.fn(),
   getDoc: jest.fn(),
-  getDocs: jest.fn(),
+  getDocsFromServer: jest.fn(),
   getFirestore: jest.fn(),
   query: jest.fn(),
   where: jest.fn(),
@@ -37,16 +37,21 @@ jest.mock('@react-native-firebase/firestore', () => ({
 import {
   filterPublishedSigns,
   hasUnpromptedSignChanges,
+  installedPhrasesForSelectedLanguage,
   installedSignsForSelectedLanguage,
+  listSignLanguages,
   mergeSignLanguageStatuses,
   installSignLanguageChanges,
   parsePublishedSign,
+  parsePublishedPhrase,
   parseSignLanguage,
   readInstalledSignPayload,
   type InstalledSign,
+  type InstalledPhrase,
   type SignLibraryState,
+  unpromptedSignChangeCount,
 } from '../SignLanguageService';
-import {getDoc} from '@react-native-firebase/firestore';
+import {getDoc, getDocsFromServer} from '@react-native-firebase/firestore';
 
 const language = parseSignLanguage('lsc-co', {
   code: 'lsc-co',
@@ -75,9 +80,22 @@ const sign = parsePublishedSign('lsc-co-agua', {
   published: true,
 });
 
-function state(installedSigns: Record<string, InstalledSign> = {}): SignLibraryState {
-  return {installedSigns, followedLanguageIds: [], dismissedRevisions: {}};
+function state(
+  installedSigns: Record<string, InstalledSign> = {},
+  installedPhrases: Record<string, InstalledPhrase> = {},
+): SignLibraryState {
+  return {installedSigns, installedPhrases, followedLanguageIds: [], dismissedRevisions: {}};
 }
+
+const phrase = parsePublishedPhrase('lsc-co-agua-necesito', {
+  languageId: 'lsc-co',
+  version: 1,
+  spanish: 'Necesito agua.',
+  glossSequence: ['AGUA'],
+  releaseSha256: 'e'.repeat(64),
+  approved: true,
+  published: true,
+});
 
 describe('SignLanguageService', () => {
   beforeEach(() => {
@@ -93,6 +111,36 @@ describe('SignLanguageService', () => {
     expect(filterPublishedSigns(signs, 'bano').map(item => item.gloss)).toEqual(['BAÑO']);
     expect(filterPublishedSigns(signs, 'sanitario').map(item => item.gloss)).toEqual(['BAÑO']);
     expect(filterPublishedSigns(signs, 'sustantivos').map(item => item.gloss)).toEqual(['AGUA']);
+  });
+
+  it('checks Firebase directly for downloadable sign and phrase changes', async () => {
+    (getDocsFromServer as jest.Mock)
+      .mockResolvedValueOnce({
+        docs: [{
+          id: language.id,
+          data: () => ({
+            code: language.code,
+            name: language.name,
+            region: language.region,
+            published: true,
+          }),
+        }],
+      })
+      .mockResolvedValueOnce({
+        docs: [{id: sign.id, data: () => sign}],
+      })
+      .mockResolvedValueOnce({
+        docs: [{id: phrase.id, data: () => phrase}],
+      });
+
+    await expect(listSignLanguages()).resolves.toEqual([
+      expect.objectContaining({
+        id: language.id,
+        pendingSigns: [expect.objectContaining({gloss: 'AGUA'})],
+        pendingPhrases: [expect.objectContaining({spanish: 'Necesito agua.'})],
+      }),
+    ]);
+    expect(getDocsFromServer).toHaveBeenCalledTimes(3);
   });
 
   it('accepts only independently downloadable approved compiled signs', () => {
@@ -115,6 +163,18 @@ describe('SignLanguageService', () => {
       assetName: '../unsafe.motion.bin',
       assetDocumentPath: 'signs/safe-id/versions/v2',
     })).toThrow('invalid asset name');
+  });
+
+  it('rejects a phrase that is not independently approved and published', () => {
+    expect(() => parsePublishedPhrase('draft-phrase', {
+      ...phrase,
+      approved: false,
+    })).toThrow('not approved');
+    expect(() => parsePublishedPhrase('../unsafe', phrase)).toThrow('invalid ID');
+    expect(() => parsePublishedPhrase('empty-sequence', {
+      ...phrase,
+      glossSequence: [],
+    })).toThrow('empty gloss sequence');
   });
 
   it('keeps the installed library unchanged when a multi-sign download is interrupted', async () => {
@@ -217,6 +277,94 @@ describe('SignLanguageService', () => {
     expect(mockFiles.has(oldPath)).toBe(false);
   });
 
+  it('downloads a new phrase transactionally with its installed signs', async () => {
+    const installed: InstalledSign = {
+      id: sign.id,
+      languageId: sign.languageId,
+      gloss: sign.gloss,
+      version: sign.version,
+      assetName: sign.assetName,
+      sizeBytes: sign.sizeBytes,
+      sha256: sign.sha256,
+      profileSha256: sign.profileSha256,
+      releaseSha256: sign.releaseSha256,
+      speechAliases: sign.speechAliases,
+      categories: sign.categories,
+      lexicalClass: sign.lexicalClass,
+      verbType: sign.verbType,
+      requiresSubjectMarker: sign.requiresSubjectMarker,
+      installedAt: '2026-09-01T00:00:00.000Z',
+      localPath: '/documents/agua.motion.bin',
+    };
+    const status = mergeSignLanguageStatuses(
+      [language],
+      [sign],
+      state({[sign.id]: installed}),
+      [phrase],
+    )[0];
+    mockFiles.set(
+      '/documents/vozual-sign-languages/library.json',
+      JSON.stringify(state({[sign.id]: installed})),
+    );
+    (getDoc as jest.Mock).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => phrase,
+    });
+
+    await expect(installSignLanguageChanges(status)).resolves.toBe(1);
+    await expect(installedPhrasesForSelectedLanguage()).resolves.toEqual([
+      expect.objectContaining({
+        id: phrase.id,
+        spanish: 'Necesito agua.',
+        glossSequence: ['AGUA'],
+      }),
+    ]);
+  });
+
+  it('does not install a phrase that references a missing sign', () => {
+    const invalidPhrase = {...phrase, glossSequence: ['AGUA', 'INEXISTENTE']};
+    const [status] = mergeSignLanguageStatuses([language], [sign], state(), [invalidPhrase]);
+
+    expect(status.phrases).toEqual([]);
+    expect(status.pendingPhrases).toEqual([]);
+  });
+
+  it('does not activate a phrase-only update when its sign is absent locally', async () => {
+    const installed: InstalledSign = {
+      id: sign.id,
+      languageId: sign.languageId,
+      gloss: sign.gloss,
+      version: sign.version,
+      assetName: sign.assetName,
+      sizeBytes: sign.sizeBytes,
+      sha256: sign.sha256,
+      profileSha256: sign.profileSha256,
+      releaseSha256: sign.releaseSha256,
+      speechAliases: sign.speechAliases,
+      categories: sign.categories,
+      lexicalClass: sign.lexicalClass,
+      verbType: sign.verbType,
+      requiresSubjectMarker: sign.requiresSubjectMarker,
+      installedAt: '2026-09-01T00:00:00.000Z',
+      localPath: '/documents/agua.motion.bin',
+    };
+    const [status] = mergeSignLanguageStatuses(
+      [language],
+      [sign],
+      state({[sign.id]: installed}),
+      [phrase],
+    );
+    (getDoc as jest.Mock).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => phrase,
+    });
+
+    await expect(installSignLanguageChanges(status)).rejects.toThrow(
+      'Phrase Necesito agua. has invalid published metadata.',
+    );
+    await expect(installedPhrasesForSelectedLanguage()).resolves.toEqual([]);
+  });
+
   it('rebases stored iOS sandbox paths before reading an installed motion', async () => {
     const statePath = '/documents/vozual-sign-languages/library.json';
     const currentMotionPath = '/documents/vozual-sign-languages/lsc-co/hola.motion.bin';
@@ -281,6 +429,7 @@ describe('SignLanguageService', () => {
     expect(status.installedSignCount).toBe(1);
     expect(status.pendingSigns.map(item => item.gloss)).toEqual(['AGUA']);
     expect(status.changeCount).toBe(1);
+    expect(unpromptedSignChangeCount([status])).toBe(1);
     expect(hasUnpromptedSignChanges([status])).toBe(true);
   });
 
@@ -365,6 +514,7 @@ describe('SignLanguageService', () => {
     dismissedState.dismissedRevisions[language.id] = initial.revision;
     const dismissed = mergeSignLanguageStatuses([language], [sign], dismissedState)[0];
     expect(dismissed.dismissed).toBe(true);
+    expect(unpromptedSignChangeCount([dismissed])).toBe(0);
     expect(hasUnpromptedSignChanges([dismissed])).toBe(false);
   });
 });

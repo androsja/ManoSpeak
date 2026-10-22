@@ -19,6 +19,8 @@ The canonical defaults live in `remoteconfig.template.json` and in the mobile fa
 
 Remote Config may change feature availability and presentation. It must not contain secrets, authoritative balances, raw receipts, audio, transcripts or per-user data. Store prices must come from StoreKit and Google Play Billing rather than a remotely entered string.
 
+`continuous_mode_enabled` and `picture_in_picture_enabled` are shared Android/iOS rollout switches. `continuous_mode_requires_plus` and `pip_requires_plus` define whether those rolled-out features require a verified Plus entitlement. A rollout switch never grants paid access by itself.
+
 ## Proposed Firestore documents
 
 `users/{uid}` contains the account-facing profile:
@@ -73,6 +75,7 @@ Account deletion is fail-closed and ordered: provider reauthentication, Firestor
 - Settings includes direct account deletion plus public privacy and deletion-request links. The activation screen exposes the privacy policy before sign-in.
 - The app synchronizes the signed-in user's profile on a best-effort basis. A Firestore outage or missing database never blocks local translation.
 - The mobile app keeps a monthly, account-scoped usage preview in its private document directory. It measures active avatar playback seconds and never stores audio or transcript content.
+- The mobile app reads the signed-in user's server-owned `access/{uid}` document and unlocks Plus only while `plan` is `plus` and `entitlementExpiresAt` is in the future.
 - The settings screen shows the current launch-access status and measured minutes. It does not enforce a quota while `monetization_enabled` is false.
 - `firestore.rules` reserves entitlement and authoritative usage writes for a future trusted backend. These rules must be deployed only after a Firestore location is selected.
 

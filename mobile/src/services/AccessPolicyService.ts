@@ -18,25 +18,30 @@ export function resolveAccessPolicy(
 ): AccessPolicy {
   const consumedMinutes = Math.floor(Math.max(0, usage.consumedSeconds) / 60);
   const remainingMinutes = Math.max(0, config.freeMonthlyMinutes - consumedMinutes);
-  const paidAccessActive = config.monetizationEnabled && hasPlusEntitlement;
+  // A trusted entitlement remains authoritative even while new purchases are
+  // disabled remotely. Remote Config controls rollout, never paid identity.
+  const paidAccessActive = hasPlusEntitlement;
   const quotaBlocked = config.monetizationEnabled
     && config.quotaEnforcementEnabled
     && !paidAccessActive
     && remainingMinutes <= 0;
 
   return {
-    accessLabel: config.monetizationEnabled
-      ? paidAccessActive ? 'VOZUAL Plus' : 'Plan gratuito'
-      : 'Gratis durante el lanzamiento',
+    accessLabel: paidAccessActive
+      ? 'VOZUAL Plus'
+      : config.monetizationEnabled ? 'Plan gratuito' : 'Gratis durante el lanzamiento',
     consumedMinutes,
     remainingMinutes,
     quotaBlocked,
-    canUsePictureInPicture: !config.monetizationEnabled
-      || !config.pipRequiresPlus
-      || paidAccessActive,
+    canUsePictureInPicture: config.pictureInPictureEnabled && (
+      !config.pipRequiresPlus
+      || paidAccessActive
+    ),
     canUsePhraseMode: !config.monetizationEnabled
       || !config.phraseModeRequiresPlus
       || paidAccessActive,
-    canUseContinuousMode: !config.monetizationEnabled || paidAccessActive,
+    canUseContinuousMode: config.continuousModeEnabled && (
+      !config.continuousModeRequiresPlus || paidAccessActive
+    ),
   };
 }

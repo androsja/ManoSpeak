@@ -19,6 +19,7 @@ import {
   messageForActivationError,
 } from '../services/ActivationErrorMessage';
 import {VOZUAL_PRIVACY_POLICY_URL} from '../services/PrivacyPolicyService';
+import {useI18n} from '../i18n/I18n';
 
 type AccountActivationScreenProps = {
   config: AppAccessConfig;
@@ -31,6 +32,7 @@ export function AccountActivationScreen({
   canClose,
   onClose,
 }: AccountActivationScreenProps) {
+  const {t} = useI18n();
   const [workingProvider, setWorkingProvider] = useState<'google' | 'apple' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const hasProvider = config.googleAuthEnabled
@@ -63,51 +65,51 @@ export function AccountActivationScreen({
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.brandBlock}>
         <Text style={styles.brand}>VOZUAL</Text>
-        <Text style={styles.subtitle}>TRADUCTOR DE HABLA A LSC</Text>
+        <Text style={styles.subtitle}>{t('activation.subtitle')}</Text>
       </View>
 
       <View style={styles.card}>
         <View style={styles.iconCircle}>
           <Text style={styles.icon}>✓</Text>
         </View>
-        <Text style={styles.title}>Activa tu cuenta gratis</Text>
+        <Text style={styles.title}>{t('activation.title')}</Text>
         <Text style={styles.description}>
-          Guarda tu acceso, el uso mensual y las futuras ventajas Plus. Activar la cuenta no genera ningún cobro.
+          {t('activation.description')}
         </Text>
 
         {config.googleAuthEnabled && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Continuar con Google"
+            accessibilityLabel={t('activation.continueGoogleLabel')}
             disabled={workingProvider !== null}
             onPress={() => activate('google')}
             style={({pressed}) => [styles.providerButton, pressed && styles.buttonPressed]}
           >
             {workingProvider === 'google'
               ? <ActivityIndicator color="#07111F" />
-              : <Text style={styles.providerButtonText}>CONTINUAR CON GOOGLE</Text>}
+              : <Text style={styles.providerButtonText}>{t('activation.continueGoogle')}</Text>}
           </Pressable>
         )}
 
         {Platform.OS === 'ios' && config.appleAuthEnabled && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Continuar con Apple"
+            accessibilityLabel={t('activation.continueAppleLabel')}
             disabled={workingProvider !== null}
             onPress={() => activate('apple')}
             style={({pressed}) => [styles.appleButton, pressed && styles.buttonPressed]}
           >
             {workingProvider === 'apple'
               ? <ActivityIndicator color="#F7F9FC" />
-              : <Text style={styles.appleButtonText}>CONTINUAR CON APPLE</Text>}
+              : <Text style={styles.appleButtonText}>{t('activation.continueApple')}</Text>}
           </Pressable>
         )}
 
         {!hasProvider && (
           <View style={styles.pendingBox}>
-            <Text style={styles.pendingTitle}>ACTIVACIÓN EN PREPARACIÓN</Text>
+            <Text style={styles.pendingTitle}>{t('activation.preparing.title')}</Text>
             <Text style={styles.pendingText}>
-              Estamos terminando la conexión segura con Google y Apple. La traducción sigue disponible mientras tanto.
+              {t('activation.preparing.detail')}
             </Text>
           </View>
         )}
@@ -117,30 +119,30 @@ export function AccountActivationScreen({
         {canClose && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Usar VOZUAL gratis sin cuenta"
+            accessibilityLabel={t('activation.useWithoutAccountLabel')}
             disabled={workingProvider !== null}
             onPress={onClose}
             style={styles.closeButton}
           >
-            <Text style={styles.closeButtonText}>USAR GRATIS SIN CUENTA</Text>
+            <Text style={styles.closeButtonText}>{t('activation.useWithoutAccount')}</Text>
           </Pressable>
         )}
 
         <Text style={styles.privacy}>
-          No se realiza ningún cobro al activar. VOZUAL tampoco guarda el audio ni las frases que dices.
+          {t('activation.noChargePrivacy')}
         </Text>
         <Pressable
           accessibilityRole="link"
-          accessibilityLabel="Abrir política de privacidad"
+          accessibilityLabel={t('activation.openPrivacyLabel')}
           onPress={() => {
             Linking.openURL(VOZUAL_PRIVACY_POLICY_URL).catch(() => {
-              setErrorMessage('No pudimos abrir la política. Escríbenos a androsjapps@gmail.com.');
+              setErrorMessage(t('activation.openPrivacyError', {email: 'androsjapps@gmail.com'}));
             });
           }}
         >
-          <Text style={styles.privacyLink}>POLÍTICA DE PRIVACIDAD</Text>
+          <Text style={styles.privacyLink}>{t('activation.privacyPolicy')}</Text>
         </Pressable>
-        <Text style={styles.support}>Soporte: {config.supportEmail}</Text>
+        <Text style={styles.support}>{t('activation.support', {email: config.supportEmail})}</Text>
       </View>
     </ScrollView>
   );

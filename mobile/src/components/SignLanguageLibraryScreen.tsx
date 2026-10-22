@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,11 +15,13 @@ import {
 import {
   filterPublishedSigns,
   installSignLanguageChanges,
+  type InstalledPhrase,
   listSignLanguages,
   selectSignLanguage,
   type PublishedSign,
   type SignLanguageStatus,
 } from '../services/SignLanguageService';
+import {useI18n} from '../i18n/I18n';
 
 type Props = {
   initialSetup: boolean;
@@ -30,6 +32,21 @@ const CATALOG_PAGE_SIZE = 100;
 const LARGE_CATALOG_THRESHOLD = 100;
 const ALL_CATEGORIES = 'all';
 const INSTALLED_CATEGORY = 'installed';
+
+function normalizedGloss(gloss: string): string {
+  return gloss.trim().toLocaleUpperCase('es-CO');
+}
+
+/** Returns downloaded remote phrases whose complete sequence is available locally. */
+export function recommendedPhrasesForInstalledLibrary(
+  phrases: readonly Pick<InstalledPhrase, 'spanish' | 'glossSequence'>[],
+  signs: readonly Pick<PublishedSign, 'gloss'>[],
+): string[] {
+  const availableGlosses = new Set(signs.map(sign => normalizedGloss(sign.gloss)));
+  return phrases
+    .filter(phrase => phrase.glossSequence.every(gloss => availableGlosses.has(normalizedGloss(gloss))))
+    .map(phrase => phrase.spanish);
+}
 
 export function handleLibraryBack(
   catalogLanguageId: string,
@@ -57,6 +74,7 @@ function megabytes(bytes: number): string {
 }
 
 export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
+  const {t} = useI18n();
   const [languages, setLanguages] = useState<SignLanguageStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -100,30 +118,29 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
     [catalogLanguage],
   );
   const possiblePhrases = useMemo(() => {
-    const signs = languages.find(language => language.selected)?.signs ?? languages[0]?.signs ?? [];
-    const publishedPhrases = signs
-      .flatMap(sign => sign.speechAliases)
-      .map(phrase => phrase.trim())
-      .filter(phrase => phrase.split(/\s+/).length >= 2);
-    return Array.from(new Set(publishedPhrases));
+    const language = languages.find(candidate => candidate.selected) ?? languages[0];
+    return recommendedPhrasesForInstalledLibrary(
+      language?.installedPhrases ?? [],
+      language?.installedSigns ?? [],
+    );
   }, [languages]);
   const possiblePhrase = possiblePhrases.length > 0
     ? possiblePhrases[suggestionIndex % possiblePhrases.length]
-    : 'No hay frases disponibles';
+    : t('library.noPhrases');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       setLanguages(await listSignLanguages());
     } catch {
-      setError('No fue posible consultar las lenguas disponibles. Revisa tu conexión.');
+      setError(t('library.loadError'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
   useEffect(() => { setVisibleLimit(CATALOG_PAGE_SIZE); }, [category, search]);
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => (
@@ -143,11 +160,11 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
       const changed = await installSignLanguageChanges(language, setProgress);
       await load();
       Alert.alert(
-        'Biblioteca actualizada',
-        `${changed} ${changed === 1 ? 'cambio aplicado' : 'cambios aplicados'} para ${language.name}. Esta lengua quedó activa.`,
+        t('library.updated.title'),
+        t('library.updated.detail', {count: changed, language: language.name}),
       );
     } catch {
-      Alert.alert('No se pudo descargar', 'Las señas no se instalaron. Intenta nuevamente.');
+      Alert.alert(t('library.downloadError.title'), t('library.downloadError.detail'));
     } finally {
       setActiveLanguageId('');
       setProgress(0);
@@ -159,7 +176,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
       await selectSignLanguage(language.id);
       await load();
     } catch {
-      Alert.alert('No se pudo seleccionar', 'Descarga al menos una seña de esta lengua primero.');
+      Alert.alert(t('library.selectError.title'), t('library.selectError.detail'));
     }
   };
 
@@ -188,7 +205,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
           <Text style={styles.signGloss}>{item.gloss}</Text>
           {aliases.length > 0 ? (
             <Text style={styles.signAliases} numberOfLines={2}>
-              También reconoce: {aliases.join(', ')}
+              {t('library.alsoRecognizes', {aliases: aliases.join(', ')})}
             </Text>
           ) : null}
           {item.categories.length > 0 ? (
@@ -203,7 +220,9 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
           updateAvailable && styles.signStatusUpdate,
         ]}>
           <Text style={styles.signStatusText}>
-            {updateAvailable ? 'ACTUALIZAR' : installed ? 'INSTALADA' : 'DISPONIBLE'}
+            {updateAvailable
+              ? t('library.status.update')
+              : installed ? t('library.status.installed') : t('library.status.available')}
           </Text>
         </View>
       </View>
@@ -215,26 +234,29 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
       <View style={styles.container}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Volver a lenguas de señas"
+          accessibilityLabel={t('library.backLabel')}
           onPress={() => setCatalogLanguageId('')}
           style={styles.backButton}
         >
-          <Text style={styles.backButtonText}>‹ LENGUAS</Text>
+          <Text style={styles.backButtonText}>{t('library.back')}</Text>
         </Pressable>
         <Text style={styles.catalogTitle}>{catalogLanguage.name}</Text>
         <Text style={styles.catalogSummary}>
-          {catalogLanguage.signs.length} recursos publicados · {catalogLanguage.installedSignCount} instalados
+          {t('library.resourcesSummary', {
+            published: catalogLanguage.signs.length,
+            installed: catalogLanguage.installedSignCount,
+          })}
         </Text>
         <Text style={styles.reviewNotice}>
-          Instalar un recurso no equivale a una aprobación lingüística. Vozual solo lo reproduce en producción cuando su interpretación en LSC ha sido revisada.
+          {t('library.reviewNotice')}
         </Text>
         <TextInput
-          accessibilityLabel="Buscar una seña o frase"
+          accessibilityLabel={t('library.searchLabel')}
           autoCapitalize="none"
           autoCorrect={false}
           clearButtonMode="while-editing"
           onChangeText={setSearch}
-          placeholder="Buscar palabra o frase…"
+          placeholder={t('library.searchPlaceholder')}
           placeholderTextColor="#64748B"
           returnKeyType="search"
           style={styles.searchInput}
@@ -249,9 +271,9 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
           {[ALL_CATEGORIES, INSTALLED_CATEGORY, ...categories].map(value => {
             const selected = category === value;
             const label = value === ALL_CATEGORIES
-              ? 'TODAS'
+              ? t('library.filter.all')
               : value === INSTALLED_CATEGORY
-                ? 'INSTALADAS'
+                ? t('library.filter.installed')
                 : categoryLabel(value);
             return (
               <Pressable
@@ -270,11 +292,11 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
         </ScrollView>
         <Text style={styles.resultCount}>
           {requiresDiscoveryChoice
-            ? 'Busca una palabra o elige una categoría'
-            : `${matchingSigns.length} ${matchingSigns.length === 1 ? 'resultado' : 'resultados'}`
+            ? t('library.discoveryPrompt')
+            : t('library.resultCount', {count: matchingSigns.length})
           }
           {!requiresDiscoveryChoice && matchingSigns.length > visibleSigns.length
-            ? ` · mostrando ${visibleSigns.length}`
+            ? t('library.showing', {count: visibleSigns.length})
             : ''}
         </Text>
         <FlatList
@@ -285,8 +307,8 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
           ListEmptyComponent={(
             <Text style={styles.noResults}>
               {requiresDiscoveryChoice
-                ? 'Para encontrar algo rápidamente, escribe una palabra o selecciona una categoría.'
-                : 'No encontramos un recurso publicado con esa búsqueda.'}
+                ? t('library.empty.discovery')
+                : t('library.empty.results')}
             </Text>
           )}
           maxToRenderPerBatch={24}
@@ -309,17 +331,17 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
     <View style={styles.container}>
       <Text style={styles.brand}>VOZUAL</Text>
       <Text style={styles.title}>
-        {initialSetup ? 'Elige tus lenguas de señas' : 'Lenguas de señas'}
+        {initialSetup ? t('library.initialTitle') : t('library.title')}
       </Text>
       <Text style={styles.description}>
-        Vozual se instala sin movimientos de señas. Elige una lengua y descarga sus recursos publicados. La reproducción en producción se habilita únicamente después de su revisión lingüística LSC.
+        {t('library.description')}
       </Text>
 
       {loading ? <ActivityIndicator color="#38BDF8" size="large" /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {!loading && !error && languages.length === 0 ? (
         <Text style={styles.empty}>
-          No pudimos consultar el catálogo. Conéctate a internet para descargar una lengua o continúa sin descargar.
+          {t('library.empty.catalog')}
         </Text>
       ) : null}
 
@@ -329,41 +351,45 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
         const current = language.selected && language.installedSignCount > 0 && language.changeCount === 0;
         const canSelect = language.installedSignCount > 0 && language.changeCount === 0 && !language.selected;
         const label = unavailable
-          ? 'NO DISPONIBLE'
+          ? t('library.action.unavailable')
           : current
-            ? 'EN USO'
+            ? t('library.action.current')
             : canSelect
-              ? 'USAR'
+              ? t('library.action.use')
               : language.pendingSigns.length === 0 && language.removedSigns.length > 0
-                ? `APLICAR ${language.changeCount} CAMBIO${language.changeCount === 1 ? '' : 'S'}`
+                ? t('library.action.applyChanges', {count: language.changeCount})
             : language.installedSignCount > 0
-              ? `DESCARGAR ${language.changeCount}`
-              : `DESCARGAR ${language.signs.length}`;
+              ? t('library.action.download', {count: language.changeCount})
+              : t('library.action.download', {count: language.signs.length});
         return (
           <View key={language.id} style={styles.card}>
             <View style={styles.cardTop}>
               <View style={styles.cardCopy}>
                 <Text style={styles.packName}>{language.name}</Text>
                 <Text style={styles.metadata}>
-                  {language.region} · {language.signs.length} señas · {megabytes(language.totalSizeBytes)}
+                  {t('library.metadata', {
+                    region: language.region,
+                    count: language.signs.length,
+                    size: megabytes(language.totalSizeBytes),
+                  })}
                 </Text>
                 {language.installedSignCount > 0 ? (
-                  <Text style={styles.installed}>{language.installedSignCount} instaladas</Text>
+                  <Text style={styles.installed}>{t('library.installedCount', {count: language.installedSignCount})}</Text>
                 ) : null}
                 {language.changeCount > 0 && language.installedSignCount > 0 ? (
                   <>
                     <Text style={styles.update}>
-                      {language.changeCount} {language.changeCount === 1 ? 'cambio disponible' : 'cambios disponibles'}
+                      {t('library.availableChanges', {count: language.changeCount})}
                     </Text>
                     {language.pendingSigns.length > 0 ? (
                       <Text style={styles.pendingSigns} numberOfLines={2}>
-                        Pendientes: {language.pendingSigns.map(sign => sign.gloss).join(', ')}
+                        {t('library.pending', {signs: language.pendingSigns.map(sign => sign.gloss).join(', ')})}
                       </Text>
                     ) : null}
                   </>
                 ) : null}
                 {downloading ? (
-                  <Text style={styles.progress}>Descargando · {Math.round(progress * 100)}%</Text>
+                  <Text style={styles.progress}>{t('library.downloading', {progress: Math.round(progress * 100)})}</Text>
                 ) : null}
               </View>
               <TouchableOpacity
@@ -375,13 +401,15 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
               </TouchableOpacity>
             </View>
             <TouchableOpacity
-              accessibilityLabel={`Ver señas y frases de ${language.name}`}
+              accessibilityLabel={t('library.openCatalogLabel', {language: language.name})}
               disabled={language.signs.length === 0}
               onPress={() => openCatalog(language)}
               style={[styles.catalogButton, language.signs.length === 0 && styles.catalogButtonDisabled]}
             >
               <Text style={styles.catalogButtonText}>
-                {language.signs.length === 0 ? 'SIN CONTENIDO PUBLICADO' : `VER ${language.signs.length} SEÑAS Y FRASES`}
+                {language.signs.length === 0
+                  ? t('library.noPublishedContent')
+                  : t('library.openCatalog', {count: language.signs.length})}
               </Text>
             </TouchableOpacity>
           </View>
@@ -390,21 +418,21 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
 
       {shouldShowLibraryRetry(loading, error, languages.length) ? (
         <TouchableOpacity style={styles.secondary} onPress={() => void load()}>
-          <Text style={styles.secondaryText}>REINTENTAR</Text>
+          <Text style={styles.secondaryText}>{t('library.retry')}</Text>
         </TouchableOpacity>
       ) : null}
       {!loading && !error && languages.length > 0 ? (
         <View style={styles.suggestionCard}>
-          <Text style={styles.suggestionEyebrow}>PRUEBA UNA FRASE</Text>
+          <Text style={styles.suggestionEyebrow}>{t('library.tryPhrase')}</Text>
           <Text style={styles.suggestionPhrase}>“{possiblePhrase}”</Text>
-          <Text style={styles.suggestionHint}>Usa palabras disponibles en esta lengua.</Text>
+          <Text style={styles.suggestionHint}>{t('library.phraseHint')}</Text>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Mostrar otra frase posible"
+            accessibilityLabel={t('library.nextPhraseLabel')}
             onPress={() => setSuggestionIndex(index => index + 1)}
             style={styles.suggestionButton}
           >
-            <Text style={styles.suggestionButtonText}>OTRA FRASE ↻</Text>
+            <Text style={styles.suggestionButtonText}>{t('library.nextPhrase')}</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -413,7 +441,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue}: Props) {
         onPress={() => onContinue(languages)}
       >
         <Text style={isSkipping ? styles.skipText : styles.continueText}>
-          {isSkipping ? 'AHORA NO' : initialSetup ? 'CONTINUAR' : 'CERRAR'}
+          {isSkipping ? t('library.skip') : initialSetup ? t('library.continue') : t('library.close')}
         </Text>
       </TouchableOpacity>
     </View>

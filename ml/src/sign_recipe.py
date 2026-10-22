@@ -27,8 +27,15 @@ class SignRecipe:
     forward_distance: float
     return_to_rest: bool
     output_fps: int
+    rig_contact_bias: float = 0.0
+    rig_stable_open_hand: bool = False
+    rig_soft_hand_curl: bool = False
+    rig_pointing_hand: bool = False
+    source_start_frame: int = 0
+    source_end_frame: int | None = None
     contact_start_frame: int | None = None
     contact_end_frame: int | None = None
+    arm_trajectory_smoothing_passes: int = 0
     entry_height_cm: float = 0.0
     entry_lateral_cm: float = 0.0
     entry_depth_cm: float = 0.0
@@ -50,9 +57,15 @@ class SignRecipe:
             raise ValueError("The gloss cannot be empty.")
         if frame_count < 2:
             raise ValueError("At least two landmark frames are required.")
-        if not 0 <= self.contact_frame < frame_count:
+        source_end = frame_count - 1 if self.source_end_frame is None else self.source_end_frame
+        if not 0 <= self.source_start_frame < frame_count:
+            raise ValueError("The source start frame is outside the captured sequence.")
+        if not self.source_start_frame < source_end < frame_count:
+            raise ValueError("The source end frame must follow the source start frame.")
+        output_frame_count = source_end - self.source_start_frame + 1
+        if not 0 <= self.contact_frame < output_frame_count:
             raise ValueError("The contact frame is outside the captured sequence.")
-        if not self.contact_frame <= self.release_frame < frame_count:
+        if not self.contact_frame <= self.release_frame < output_frame_count:
             raise ValueError("The release frame must follow the contact frame.")
         contact_start = (
             self.contact_frame
@@ -64,12 +77,26 @@ class SignRecipe:
             if self.contact_end_frame is None
             else self.contact_end_frame
         )
-        if not 0 <= contact_start <= self.contact_frame <= contact_end < frame_count:
+        if not 0 <= contact_start <= self.contact_frame <= contact_end < output_frame_count:
             raise ValueError("The contact window must contain the contact frame.")
         if not 0.0 <= self.forward_distance <= 1.0:
             raise ValueError("Forward distance must be between 0 and 1.")
+        if (
+            not math.isfinite(self.rig_contact_bias)
+            or not 0.0 <= self.rig_contact_bias <= 1.0
+        ):
+            raise ValueError("Rig contact bias must be between 0 and 1.")
+        rig_flags = (
+            self.rig_stable_open_hand,
+            self.rig_soft_hand_curl,
+            self.rig_pointing_hand,
+        )
+        if any(not isinstance(value, bool) for value in rig_flags):
+            raise ValueError("Rig hand options must be true or false.")
         if not 1 <= self.output_fps <= 60:
             raise ValueError("Output FPS must be between 1 and 60.")
+        if not 0 <= self.arm_trajectory_smoothing_passes <= 12:
+            raise ValueError("Arm trajectory smoothing passes must be between 0 and 12.")
         adjustments = (
             self.entry_height_cm,
             self.entry_lateral_cm,
@@ -98,7 +125,7 @@ class SignRecipe:
         # A captured sequence with N samples at FPS represents N / FPS seconds
         # in the authoring timeline.  In particular, a 30-frame 30-fps take
         # must allow its closing keyframe at 1.0 s.
-        duration_seconds = frame_count / self.output_fps
+        duration_seconds = output_frame_count / self.output_fps
         seen_times: set[float] = set()
         for keyframe in self.motion_keyframes:
             kind = str(keyframe.get("kind", "point"))
@@ -113,6 +140,7 @@ class SignRecipe:
                 )
                 facial_values = (
                     float(keyframe.get("jaw_open", 0.0)),
+                    float(keyframe.get("mouth_pucker", 0.0)),
                     float(keyframe.get("eye_wide", 0.0)),
                     float(keyframe.get("brow_raise", 0.0)),
                 )

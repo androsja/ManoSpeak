@@ -15,6 +15,9 @@ export type AppAccessConfig = {
   freeTrialDays: number;
   freeMonthlyMinutes: number;
   freeAllSigns: boolean;
+  continuousModeEnabled: boolean;
+  continuousModeRequiresPlus: boolean;
+  pictureInPictureEnabled: boolean;
   pipRequiresPlus: boolean;
   phraseModeRequiresPlus: boolean;
   freeUsageMeasurement: 'active_translation_seconds';
@@ -35,6 +38,11 @@ export const DEFAULT_APP_ACCESS_CONFIG: AppAccessConfig = {
   freeTrialDays: 90,
   freeMonthlyMinutes: 60,
   freeAllSigns: true,
+  // Availability and account access are independent: Remote Config rolls a
+  // feature out on both platforms, while a verified entitlement unlocks it.
+  continuousModeEnabled: true,
+  continuousModeRequiresPlus: true,
+  pictureInPictureEnabled: true,
   pipRequiresPlus: true,
   phraseModeRequiresPlus: false,
   freeUsageMeasurement: 'active_translation_seconds',
@@ -55,6 +63,9 @@ const REMOTE_DEFAULTS: Record<string, string | number | boolean> = {
   free_trial_days: DEFAULT_APP_ACCESS_CONFIG.freeTrialDays,
   free_monthly_minutes: DEFAULT_APP_ACCESS_CONFIG.freeMonthlyMinutes,
   free_all_signs: DEFAULT_APP_ACCESS_CONFIG.freeAllSigns,
+  continuous_mode_enabled: DEFAULT_APP_ACCESS_CONFIG.continuousModeEnabled,
+  continuous_mode_requires_plus: DEFAULT_APP_ACCESS_CONFIG.continuousModeRequiresPlus,
+  picture_in_picture_enabled: DEFAULT_APP_ACCESS_CONFIG.pictureInPictureEnabled,
   pip_requires_plus: DEFAULT_APP_ACCESS_CONFIG.pipRequiresPlus,
   phrase_mode_requires_plus: DEFAULT_APP_ACCESS_CONFIG.phraseModeRequiresPlus,
   free_usage_measurement: DEFAULT_APP_ACCESS_CONFIG.freeUsageMeasurement,
@@ -108,6 +119,9 @@ export async function loadAppAccessConfig(): Promise<AppAccessConfig> {
         DEFAULT_APP_ACCESS_CONFIG.freeMonthlyMinutes,
       ),
       freeAllSigns: getBoolean(remoteConfig, 'free_all_signs'),
+      continuousModeEnabled: getBoolean(remoteConfig, 'continuous_mode_enabled'),
+      continuousModeRequiresPlus: getBoolean(remoteConfig, 'continuous_mode_requires_plus'),
+      pictureInPictureEnabled: getBoolean(remoteConfig, 'picture_in_picture_enabled'),
       pipRequiresPlus: getBoolean(remoteConfig, 'pip_requires_plus'),
       // Por frase is the free entry mode; Remote Config must not be able to
       // accidentally lock it behind Plus.

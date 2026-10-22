@@ -2,17 +2,31 @@
   "reviewAfter": "2026-12-01",
   "allowedAdvisories": [
     "GHSA-5p2g-fcmc-qvqq",
-    "GHSA-w3rx-r6r6-pgpr"
+    "GHSA-w3rx-r6r6-pgpr",
+    "GHSA-vfj7-8cjw-p6xm"
   ],
   "allowedPackages": [
     "@react-native/community-cli-plugin",
     "@react-native/metro-config",
     "@react-native/virtualized-lists",
+    "@react-native-community/cli",
+    "@react-native-community/cli-clean",
+    "@react-native-community/cli-config",
+    "@react-native-community/cli-config-android",
+    "@react-native-community/cli-config-apple",
+    "@react-native-community/cli-doctor",
+    "@react-native-community/cli-platform-android",
+    "@react-native-community/cli-platform-apple",
+    "@react-native-community/cli-platform-ios",
+    "braces",
+    "fast-glob",
     "image-size",
     "metro",
     "metro-config",
+    "metro-file-map",
     "metro-transform-worker",
+    "micromatch",
     "react-native"
   ],
-  "rationale": "Both advisories affect image-size through Metro's build-time image parser. Metro and image-size are not packaged into the Android runtime, release inputs are repository-controlled, and npm published no fixed image-size release as of 2026-09-05. Any new advisory, critical severity, package, or expired review fails the gate."
+  "rationale": "The image-size advisories affect Metro's build-time image parser. GHSA-vfj7-8cjw-p6xm affects braces through micromatch in the pinned React Native 0.87.1 Metro and CLI build chain; braces 3.0.3 is the latest published version and npm offers only an incompatible React Native 0.72 downgrade. Metro, the React Native CLI, and their transitive build tools are not packaged into the Android runtime, and release inputs are repository-controlled. This exception is limited to the enumerated build-time chain through 2026-12-01. Any new advisory, critical severity, package, or expired review fails the gate."
 }

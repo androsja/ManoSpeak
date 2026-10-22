@@ -16,6 +16,12 @@ ENV/
 # OS/IDE files
 .DS_Store
 .vscode/
+.idea/
+
+# Local app-store screenshots and generated marketing exports
+Tienda/
+mobile/assets/images/shots/
+mobile/assets/images/vozual/app-store-connect/
 
 # Deep Work Plan databases and logs
 .dwp/

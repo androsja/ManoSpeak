@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ManoSpeak — end-to-end training + ONNX export pipeline.
+# Vozual — end-to-end training + ONNX export pipeline.
 #
 # Runs fully UNBUFFERED so progress and milestones stream to the log live.
 # Emits ">>> [HH:MM:SS] ..." milestone lines that a monitor can watch.

@@ -36,6 +36,7 @@ class VoiceListeningService : Service() {
   private var consecutiveErrors = 0
   private var destroyed = false
   private var scheduledRestart: Runnable? = null
+  private var recognitionWatchdog: Runnable? = null
   private var lastPartialResults: ArrayList<String>? = null
   private var speechStarted = false
   private var hasReachedReadyState = false
@@ -107,6 +108,7 @@ class VoiceListeningService : Service() {
     hasReachedReadyState = false
     scheduledRestart?.let(handler::removeCallbacks)
     scheduledRestart = null
+    cancelRecognitionWatchdog()
     releaseRecognizer()
     sendSpeechEvent(EVENT_END)
     if (activeService?.get() === this) activeService = null
@@ -151,6 +153,43 @@ class VoiceListeningService : Service() {
     handler.postDelayed(restart, delayMillis)
   }
 
+  /**
+   * Android's recognizer occasionally emits onEndOfSpeech without following it
+   * with onResults/onError, or accepts a request that later stops producing
+   * callbacks. Recovering natively keeps the microphone session alive even
+   * when React Native is paused in Picture-in-Picture.
+   */
+  private fun armRecognitionWatchdog(
+    sessionId: Long,
+    delayMillis: Long,
+    reason: String,
+  ) {
+    cancelRecognitionWatchdog()
+    val watchdog = Runnable {
+      recognitionWatchdog = null
+      if (!isCurrentSession(sessionId) || !recognitionInProgress) return@Runnable
+      Log.w(TAG, "Recognition watchdog recovering session=$sessionId reason=$reason")
+      if (!lastPartialResults.isNullOrEmpty()) {
+        sendSpeechEvent(EVENT_RESULTS, lastPartialResults)
+      }
+      lastPartialResults = null
+      recognitionInProgress = false
+      hasReachedReadyState = false
+      sendSpeechEvent(EVENT_END)
+      scheduleRecognition(
+        delayMillis = WATCHDOG_RECOVERY_DELAY_MILLIS,
+        recreate = true,
+      )
+    }
+    recognitionWatchdog = watchdog
+    handler.postDelayed(watchdog, delayMillis)
+  }
+
+  private fun cancelRecognitionWatchdog() {
+    recognitionWatchdog?.let(handler::removeCallbacks)
+    recognitionWatchdog = null
+  }
+
   private fun createRecognizer() {
     releaseRecognizer()
     if (
@@ -185,10 +224,16 @@ class VoiceListeningService : Service() {
     val current = recognizer ?: return
     try {
       recognitionInProgress = true
+      hasReachedReadyState = false
       Log.i(
         TAG,
         "Starting service-owned recognition session=$activeSessionId " +
           "language=${currentRecognitionLanguage()}",
+      )
+      armRecognitionWatchdog(
+        sessionId = activeSessionId,
+        delayMillis = RECOGNITION_READY_TIMEOUT_MILLIS,
+        reason = "ready-timeout",
       )
       current.startListening(createRecognitionIntent())
     } catch (error: SecurityException) {
@@ -209,6 +254,8 @@ class VoiceListeningService : Service() {
     // synchronously or asynchronously emit terminal callbacks.
     activeSessionId += 1
     recognitionInProgress = false
+    hasReachedReadyState = false
+    cancelRecognitionWatchdog()
     val previous = recognizer
     recognizer = null
     try {
@@ -235,12 +282,22 @@ class VoiceListeningService : Service() {
         speechStarted = false
         Log.i(TAG, "Service-owned recognition is ready session=$sessionId")
         sendSpeechEvent(EVENT_START)
+        armRecognitionWatchdog(
+          sessionId = sessionId,
+          delayMillis = RECOGNITION_STALL_TIMEOUT_MILLIS,
+          reason = "ready-without-terminal-callback",
+        )
       }
 
       override fun onBeginningOfSpeech() {
         if (!isCurrentSession(sessionId)) return
         speechStarted = true
         Log.i(TAG, "Service-owned recognition detected speech session=$sessionId")
+        armRecognitionWatchdog(
+          sessionId = sessionId,
+          delayMillis = RECOGNITION_STALL_TIMEOUT_MILLIS,
+          reason = "speech-without-result",
+        )
       }
 
       override fun onRmsChanged(rmsdB: Float) = Unit
@@ -249,9 +306,17 @@ class VoiceListeningService : Service() {
 
       override fun onEndOfSpeech() {
         if (!isCurrentSession(sessionId)) return
+        hasReachedReadyState = false
         sendSpeechEvent(EVENT_END)
         // Results or an error always follow this callback. Restarting here can
         // overlap the still-finishing request and produce ERROR_RECOGNIZER_BUSY.
+        // Some providers violate that contract, so recover if the terminal
+        // callback does not arrive within a short grace period.
+        armRecognitionWatchdog(
+          sessionId = sessionId,
+          delayMillis = TERMINAL_CALLBACK_TIMEOUT_MILLIS,
+          reason = "missing-result-after-end-of-speech",
+        )
       }
 
       override fun onError(error: Int) {
@@ -259,7 +324,9 @@ class VoiceListeningService : Service() {
           Log.d(TAG, "Ignoring stale recognition error session=$sessionId code=$error")
           return
         }
+        cancelRecognitionWatchdog()
         recognitionInProgress = false
+        hasReachedReadyState = false
         if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
           Log.w(TAG, "Microphone permission was revoked during recognition")
           sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
@@ -345,7 +412,9 @@ class VoiceListeningService : Service() {
 
       override fun onResults(results: Bundle?) {
         if (!isCurrentSession(sessionId)) return
+        cancelRecognitionWatchdog()
         recognitionInProgress = false
+        hasReachedReadyState = false
         consecutiveErrors = 0
         lastPartialResults = null
         val recognizedValues =
@@ -368,6 +437,11 @@ class VoiceListeningService : Service() {
         sendSpeechEvent(
           EVENT_PARTIAL_RESULTS,
           lastPartialResults,
+        )
+        armRecognitionWatchdog(
+          sessionId = sessionId,
+          delayMillis = RECOGNITION_STALL_TIMEOUT_MILLIS,
+          reason = "partial-result-stalled",
         )
       }
 
@@ -454,6 +528,10 @@ class VoiceListeningService : Service() {
     private const val STOP_REQUEST_CODE = 2702
     private const val OPEN_APP_REQUEST_CODE = 2703
     private const val INITIAL_HANDOFF_DELAY_MILLIS = 350L
+    private const val RECOGNITION_READY_TIMEOUT_MILLIS = 8_000L
+    private const val RECOGNITION_STALL_TIMEOUT_MILLIS = 20_000L
+    private const val TERMINAL_CALLBACK_TIMEOUT_MILLIS = 4_000L
+    private const val WATCHDOG_RECOVERY_DELAY_MILLIS = 250L
     // Google's Android on-device provider does not expose es-CO on every
     // device. These fallbacks remain fully local and preserve Spanish speech
     // recognition without silently switching to a network recognizer.

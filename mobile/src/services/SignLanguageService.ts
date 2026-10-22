@@ -2,7 +2,7 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
+  getDocsFromServer,
   getFirestore,
   query,
   where,
@@ -50,6 +50,23 @@ export type PublishedSign = {
   updatedAt?: unknown;
 };
 
+/**
+ * A reviewed Spanish phrase that can be suggested after its complete sign
+ * sequence has been installed. Phrase metadata is published separately from
+ * motion binaries so the catalogue can grow without a new app build.
+ */
+export type PublishedPhrase = {
+  id: string;
+  languageId: string;
+  version: number;
+  spanish: string;
+  glossSequence: string[];
+  releaseSha256: string;
+  approved: boolean;
+  published: boolean;
+  updatedAt?: unknown;
+};
+
 export type InstalledSign = Pick<PublishedSign,
   | 'id'
   | 'languageId'
@@ -74,11 +91,26 @@ export type InstalledSign = Pick<PublishedSign,
   localPath: string;
 };
 
+export type InstalledPhrase = Pick<PublishedPhrase,
+  | 'id'
+  | 'languageId'
+  | 'version'
+  | 'spanish'
+  | 'glossSequence'
+  | 'releaseSha256'
+> & {
+  installedAt: string;
+};
+
 export type SignLanguageStatus = SignLanguage & {
   signs: PublishedSign[];
   pendingSigns: PublishedSign[];
   removedSigns: InstalledSign[];
   installedSigns: InstalledSign[];
+  phrases: PublishedPhrase[];
+  pendingPhrases: PublishedPhrase[];
+  removedPhrases: InstalledPhrase[];
+  installedPhrases: InstalledPhrase[];
   installedSignCount: number;
   changeCount: number;
   totalSizeBytes: number;
@@ -91,6 +123,7 @@ export type SignLanguageStatus = SignLanguage & {
 
 export type SignLibraryState = {
   installedSigns: Record<string, InstalledSign>;
+  installedPhrases: Record<string, InstalledPhrase>;
   followedLanguageIds: string[];
   dismissedRevisions: Record<string, string>;
   selectedLanguageId?: string;
@@ -98,6 +131,7 @@ export type SignLibraryState = {
 
 const EMPTY_LIBRARY_STATE: SignLibraryState = {
   installedSigns: {},
+  installedPhrases: {},
   followedLanguageIds: [],
   dismissedRevisions: {},
 };
@@ -129,6 +163,16 @@ function normalizeInstalledSigns(value: unknown): Record<string, InstalledSign> 
       localPath: currentLibraryPath(sign.localPath),
     } as InstalledSign];
   }));
+}
+
+function normalizeInstalledPhrases(value: unknown): Record<string, InstalledPhrase> {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([, phrase]) => (
+    isRecord(phrase)
+    && typeof phrase.languageId === 'string'
+    && typeof phrase.spanish === 'string'
+    && Array.isArray(phrase.glossSequence)
+  ))) as Record<string, InstalledPhrase>;
 }
 
 function requiredString(value: unknown, field: string): string {
@@ -224,10 +268,35 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
   };
 }
 
+export function parsePublishedPhrase(id: string, data: unknown): PublishedPhrase {
+  if (!isRecord(data)) throw new Error(`Phrase ${id} is not an object.`);
+  if (!SAFE_PATH_SEGMENT.test(id)) throw new Error(`Phrase ${id} has an invalid ID.`);
+  if (data.approved !== true || data.published !== true) {
+    throw new Error(`Phrase ${id} is not approved and published.`);
+  }
+  const glossSequence = stringArray(data.glossSequence, 'glossSequence')
+    .map(gloss => gloss.toLocaleUpperCase('es-CO'));
+  if (glossSequence.length === 0) {
+    throw new Error(`Phrase ${id} has an empty gloss sequence.`);
+  }
+  return {
+    id,
+    languageId: requiredString(data.languageId, 'languageId'),
+    version: positiveInteger(data.version, 'version'),
+    spanish: requiredString(data.spanish, 'spanish'),
+    glossSequence,
+    releaseSha256: sha256Digest(data.releaseSha256, 'releaseSha256'),
+    approved: true,
+    published: true,
+    updatedAt: data.updatedAt,
+  };
+}
+
 function normalizeState(value: unknown): SignLibraryState {
   if (!isRecord(value)) return {...EMPTY_LIBRARY_STATE};
   return {
     installedSigns: normalizeInstalledSigns(value.installedSigns),
+    installedPhrases: normalizeInstalledPhrases(value.installedPhrases),
     followedLanguageIds: Array.isArray(value.followedLanguageIds)
       ? value.followedLanguageIds.map(String)
       : [],
@@ -301,6 +370,13 @@ function signRevision(signs: readonly PublishedSign[]): string {
     .join('|');
 }
 
+function phraseRevision(phrases: readonly PublishedPhrase[]): string {
+  return phrases
+    .map(phrase => `${phrase.id}:${phrase.version}:${phrase.releaseSha256}`)
+    .sort()
+    .join('|');
+}
+
 function searchableSignText(sign: PublishedSign): string {
   return [sign.gloss, ...sign.speechAliases, ...sign.categories]
     .join(' ')
@@ -330,6 +406,7 @@ export function mergeSignLanguageStatuses(
   languages: readonly SignLanguage[],
   signs: readonly PublishedSign[],
   state: SignLibraryState,
+  phrases: readonly PublishedPhrase[] = [],
 ): SignLanguageStatus[] {
   const followed = new Set(state.followedLanguageIds);
   return languages.map(language => {
@@ -351,15 +428,40 @@ export function mergeSignLanguageStatuses(
         || (local.profileSha256 !== undefined && local.profileSha256 !== sign.profileSha256);
     });
     const removedSigns = installed.filter(sign => !remoteIds.has(sign.id));
-    const revision = signRevision(languageSigns);
+    const availableGlosses = new Set(languageSigns.map(sign => sign.gloss));
+    // A phrase is only distributable when every ordered sign is currently a
+    // public resource of the same language. This closes a publisher mistake
+    // without hiding unrelated signs from the library.
+    const languagePhrases = phrases
+      .filter(phrase => (
+        phrase.languageId === language.id
+        && phrase.glossSequence.every(gloss => availableGlosses.has(gloss))
+      ))
+      .sort((left, right) => left.spanish.localeCompare(right.spanish, 'es-CO'));
+    const remotePhraseIds = new Set(languagePhrases.map(phrase => phrase.id));
+    const installedPhrases = Object.values(state.installedPhrases)
+      .filter(phrase => phrase.languageId === language.id);
+    const pendingPhrases = languagePhrases.filter(phrase => {
+      const local = state.installedPhrases[phrase.id];
+      return !local
+        || local.version !== phrase.version
+        || local.releaseSha256 !== phrase.releaseSha256;
+    });
+    const removedPhrases = installedPhrases.filter(phrase => !remotePhraseIds.has(phrase.id));
+    const revision = `${signRevision(languageSigns)}||${phraseRevision(languagePhrases)}`;
     return {
       ...language,
       signs: languageSigns,
       pendingSigns,
       removedSigns,
       installedSigns: installed,
+      phrases: languagePhrases,
+      pendingPhrases,
+      removedPhrases,
+      installedPhrases,
       installedSignCount: installed.length,
-      changeCount: pendingSigns.length + removedSigns.length,
+      changeCount: pendingSigns.length + removedSigns.length
+        + pendingPhrases.length + removedPhrases.length,
       totalSizeBytes: languageSigns.reduce((total, sign) => total + sign.sizeBytes, 0),
       pendingSizeBytes: pendingSigns.reduce((total, sign) => total + sign.sizeBytes, 0),
       revision,
@@ -370,24 +472,34 @@ export function mergeSignLanguageStatuses(
   }).sort((left, right) => left.name.localeCompare(right.name));
 }
 
-export function hasUnpromptedSignChanges(statuses: readonly SignLanguageStatus[]): boolean {
+export function unpromptedSignChangeCount(statuses: readonly SignLanguageStatus[]): number {
   const hasFollowedLanguage = statuses.some(status => status.followed);
-  return statuses.some(status => (
+  return statuses.reduce((total, status) => (
     status.changeCount > 0
     && !status.dismissed
     && (!hasFollowedLanguage || status.followed)
-  ));
+      ? total + status.changeCount
+      : total
+  ), 0);
+}
+
+export function hasUnpromptedSignChanges(statuses: readonly SignLanguageStatus[]): boolean {
+  return unpromptedSignChangeCount(statuses) > 0;
 }
 
 export async function listSignLanguages(): Promise<SignLanguageStatus[]> {
   const database = getFirestore();
-  const [languageSnapshot, signSnapshot, state] = await Promise.all([
-    getDocs(query(
+  const [languageSnapshot, signSnapshot, phraseSnapshot, state] = await Promise.all([
+    getDocsFromServer(query(
       collection(database, 'signLanguages'),
       where('published', '==', true),
     )),
-    getDocs(query(
+    getDocsFromServer(query(
       collection(database, 'signs'),
+      where('published', '==', true),
+    )),
+    getDocsFromServer(query(
+      collection(database, 'phrases'),
       where('published', '==', true),
     )),
     readLibraryState(),
@@ -404,7 +516,14 @@ export async function listSignLanguages(): Promise<SignLanguageStatus[]> {
       return [];
     }
   });
-  return mergeSignLanguageStatuses(languages, signs, state);
+  const phrases = phraseSnapshot.docs.flatMap(document => {
+    try {
+      return [parsePublishedPhrase(document.id, document.data())];
+    } catch {
+      return [];
+    }
+  });
+  return mergeSignLanguageStatuses(languages, signs, state, phrases);
 }
 
 export async function installedSignsForSelectedLanguage(): Promise<InstalledSign[]> {
@@ -420,6 +539,16 @@ export async function installedSignsForSelectedLanguage(): Promise<InstalledSign
 
 export async function installedSignGlosses(): Promise<string[]> {
   return (await installedSignsForSelectedLanguage()).map(sign => sign.gloss);
+}
+
+export async function installedPhrasesForSelectedLanguage(): Promise<InstalledPhrase[]> {
+  const state = await readLibraryState();
+  const selectedLanguageId = state.selectedLanguageId
+    ?? Object.values(state.installedSigns)[0]?.languageId;
+  if (!selectedLanguageId) return [];
+  return Object.values(state.installedPhrases)
+    .filter(phrase => phrase.languageId === selectedLanguageId)
+    .sort((left, right) => left.spanish.localeCompare(right.spanish, 'es-CO'));
 }
 
 export async function readInstalledSignMotionBase64(gloss: string): Promise<string | undefined> {
@@ -467,7 +596,12 @@ export async function dismissSignLanguageChanges(
 ): Promise<void> {
   const state = await readLibraryState();
   statuses.forEach(status => {
-    if (status.signs.length === 0 && status.removedSigns.length === 0) return;
+    if (
+      status.signs.length === 0
+      && status.phrases.length === 0
+      && status.removedSigns.length === 0
+      && status.removedPhrases.length === 0
+    ) return;
     state.dismissedRevisions[status.id] = status.revision;
   });
   await writeLibraryState(state);
@@ -477,12 +611,18 @@ export async function installSignLanguageChanges(
   status: SignLanguageStatus,
   onProgress?: (fraction: number) => void,
 ): Promise<number> {
-  if (status.pendingSigns.length === 0 && status.removedSigns.length === 0) return 0;
+  if (
+    status.pendingSigns.length === 0
+    && status.removedSigns.length === 0
+    && status.pendingPhrases.length === 0
+    && status.removedPhrases.length === 0
+  ) return 0;
   const languageDirectory = `${LIBRARY_ROOT}/${status.id}`;
   await RNFS.mkdir(languageDirectory);
   const currentState = await readLibraryState();
   const nextState: SignLibraryState = {
     installedSigns: {...currentState.installedSigns},
+    installedPhrases: {...currentState.installedPhrases},
     followedLanguageIds: [...currentState.followedLanguageIds],
     dismissedRevisions: {...currentState.dismissedRevisions},
     selectedLanguageId: currentState.selectedLanguageId,
@@ -496,6 +636,7 @@ export async function installSignLanguageChanges(
     finalPath: string;
   }> = [];
   const temporaryPaths: string[] = [];
+  const stagedPhrases: PublishedPhrase[] = [];
 
   try {
     for (const sign of status.pendingSigns) {
@@ -530,6 +671,27 @@ export async function installSignLanguageChanges(
       onProgress?.(Math.min(1, completedBytes / totalBytes));
     }
 
+    // Validate against the resulting local library, rather than merely the
+    // remote catalogue. A phrase-only update must not become usable on a
+    // device that is missing one of its component signs.
+    const downloadableGlosses = new Set(Object.values(currentState.installedSigns)
+      .filter(sign => sign.languageId === status.id)
+      .map(sign => sign.gloss));
+    for (const item of staged) downloadableGlosses.add(item.sign.gloss);
+    for (const sign of status.removedSigns) downloadableGlosses.delete(sign.gloss);
+    for (const phrase of status.pendingPhrases) {
+      const phraseSnapshot = await getDoc(doc(getFirestore(), `phrases/${phrase.id}`));
+      if (!phraseSnapshot.exists()) throw new Error(`Phrase ${phrase.spanish} is no longer published.`);
+      const publishedPhrase = parsePublishedPhrase(phrase.id, phraseSnapshot.data());
+      if (
+        publishedPhrase.languageId !== status.id
+        || publishedPhrase.version !== phrase.version
+        || publishedPhrase.releaseSha256 !== phrase.releaseSha256
+        || !publishedPhrase.glossSequence.every(gloss => downloadableGlosses.has(gloss))
+      ) throw new Error(`Phrase ${phrase.spanish} has invalid published metadata.`);
+      stagedPhrases.push(publishedPhrase);
+    }
+
     for (const item of staged) {
       if (await RNFS.exists(item.finalPath)) await RNFS.unlink(item.finalPath);
       await RNFS.moveFile(item.temporaryPath, item.finalPath);
@@ -555,6 +717,18 @@ export async function installSignLanguageChanges(
     }
 
     for (const sign of status.removedSigns) delete nextState.installedSigns[sign.id];
+    for (const phrase of stagedPhrases) {
+      nextState.installedPhrases[phrase.id] = {
+        id: phrase.id,
+        languageId: phrase.languageId,
+        version: phrase.version,
+        spanish: phrase.spanish,
+        glossSequence: phrase.glossSequence,
+        releaseSha256: phrase.releaseSha256,
+        installedAt: new Date().toISOString(),
+      };
+    }
+    for (const phrase of status.removedPhrases) delete nextState.installedPhrases[phrase.id];
     if (!nextState.followedLanguageIds.includes(status.id)) {
       nextState.followedLanguageIds.push(status.id);
     }
@@ -597,13 +771,17 @@ export async function removeSignLanguage(languageId: string): Promise<void> {
   const currentState = await readLibraryState();
   const nextState: SignLibraryState = {
     installedSigns: {...currentState.installedSigns},
+    installedPhrases: {...currentState.installedPhrases},
     followedLanguageIds: currentState.followedLanguageIds.filter(id => id !== languageId),
     dismissedRevisions: {...currentState.dismissedRevisions},
     selectedLanguageId: currentState.selectedLanguageId,
   };
   const installed = Object.values(currentState.installedSigns)
     .filter(sign => sign.languageId === languageId);
+  const installedPhrases = Object.values(currentState.installedPhrases)
+    .filter(phrase => phrase.languageId === languageId);
   for (const sign of installed) delete nextState.installedSigns[sign.id];
+  for (const phrase of installedPhrases) delete nextState.installedPhrases[phrase.id];
   delete nextState.dismissedRevisions[languageId];
   if (nextState.selectedLanguageId === languageId) {
     nextState.selectedLanguageId = Object.values(nextState.installedSigns)[0]?.languageId;

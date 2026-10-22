@@ -42,6 +42,7 @@ import {
   RiggedHandDepthLayer,
   RiggedHandEditKeyframe,
   RiggedHandEditPose,
+  EDITOR_FIST_FINGER_CURLS,
   RiggedFacialEdit,
   RiggedFingerName,
   RiggedHandFingerStates,
@@ -2522,13 +2523,20 @@ function applyRiggedHandEditPose(
       const fistAmount = pose.fist;
       const bonePrefix = finger === 'thumb' ? 'thumb' : `f_${finger}`;
       const thumbAdduction = side === 'L' ? 34 : -34;
-      CONFIGURED_FINGER_CURLS[finger].forEach((curl, jointIndex) => {
+      const fistCurls = finger === 'thumb'
+        ? CONFIGURED_FINGER_CURLS[finger]
+        : EDITOR_FIST_FINGER_CURLS[finger];
+      fistCurls.forEach((curl, jointIndex) => {
         const jointAmount = pose.fingerJoints[finger][jointIndex] ?? 0;
-        const signedAmount = Math.abs(jointAmount) > 0.0001
+        const hasExplicitJointEdit = Math.abs(jointAmount) > 0.0001;
+        const hasExplicitFingerEdit = Math.abs(individualAmount) > 0.0001;
+        const signedAmount = hasExplicitJointEdit
           ? THREE.MathUtils.clamp(jointAmount, -1, 1)
-          : Math.abs(individualAmount) > 0.0001
+          : hasExplicitFingerEdit
             ? THREE.MathUtils.clamp(individualAmount, -1, 1)
-            : THREE.MathUtils.clamp(fistAmount, 0, 1);
+            : finger === 'thumb'
+              ? 0
+              : THREE.MathUtils.clamp(fistAmount, 0, 1);
         if (Math.abs(signedAmount) <= 0.0001) return;
         const bone = riggedBone(`DEF-${bonePrefix}.0${jointIndex + 1}.${side}`);
         const rest = bone ? riggedBoneRests.get(bone.name) : undefined;

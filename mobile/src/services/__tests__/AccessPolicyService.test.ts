@@ -10,12 +10,30 @@ const usage = {
 };
 
 describe('AccessPolicyService', () => {
-  it('keeps every feature available before monetization launches', () => {
+  it('keeps Plus features disabled for free users on both platforms', () => {
     const policy = resolveAccessPolicy(DEFAULT_APP_ACCESS_CONFIG, usage);
     expect(policy.accessLabel).toBe('Gratis durante el lanzamiento');
-    expect(policy.canUsePictureInPicture).toBe(true);
+    expect(policy.canUsePictureInPicture).toBe(false);
     expect(policy.canUsePhraseMode).toBe(true);
+    expect(policy.canUseContinuousMode).toBe(false);
     expect(policy.quotaBlocked).toBe(false);
+  });
+
+  it('enables rolled-out Plus features for a paid user', () => {
+    const policy = resolveAccessPolicy(DEFAULT_APP_ACCESS_CONFIG, usage, true);
+    expect(policy.accessLabel).toBe('VOZUAL Plus');
+    expect(policy.canUsePictureInPicture).toBe(true);
+    expect(policy.canUseContinuousMode).toBe(true);
+  });
+
+  it('keeps a feature disabled for everyone when its rollout switch is off', () => {
+    const policy = resolveAccessPolicy({
+      ...DEFAULT_APP_ACCESS_CONFIG,
+      continuousModeEnabled: false,
+      pictureInPictureEnabled: false,
+    }, usage, true);
+    expect(policy.canUsePictureInPicture).toBe(false);
+    expect(policy.canUseContinuousMode).toBe(false);
   });
 
   it('applies Plus feature rules only after monetization is enabled', () => {
@@ -29,7 +47,9 @@ describe('AccessPolicyService', () => {
     const plusPolicy = resolveAccessPolicy(config, usage, true);
     expect(freePolicy.quotaBlocked).toBe(true);
     expect(freePolicy.canUsePictureInPicture).toBe(false);
+    expect(freePolicy.canUseContinuousMode).toBe(false);
     expect(plusPolicy.quotaBlocked).toBe(false);
     expect(plusPolicy.canUsePictureInPicture).toBe(true);
+    expect(plusPolicy.canUseContinuousMode).toBe(true);
   });
 });

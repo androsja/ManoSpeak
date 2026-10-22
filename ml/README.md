@@ -1,4 +1,4 @@
-# Machine Learning Module — ManoSpeak
+# Machine Learning Module — Vozual
 
 This module contains the pipeline for capturing MediaPipe Holistic skeletal coordinates, normalizing coordinates, and training the zero-shot PhonSSM translation model.
 
@@ -51,7 +51,7 @@ rest without editing the Blender scene manually.
 Start the editor from the repository root:
 
 ```bash
-/private/tmp/manospeak-capture-venv/bin/python ml/src/sign_authoring_editor.py
+/private/tmp/vozual-capture-venv/bin/python ml/src/sign_authoring_editor.py
 ```
 
 Authoring flow:

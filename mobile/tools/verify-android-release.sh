@@ -44,10 +44,10 @@ grep -q 'PAGE_ALIGNMENT_16K' <<<"$bundle_config" \
 manifest="$(bundletool dump manifest --bundle="$aab_path" --module=base)"
 grep -q 'package="com.androsja.vozual"' <<<"$manifest" \
   || die "release package is not com.androsja.vozual"
-grep -q 'android:compileSdkVersion="37"' <<<"$manifest" \
-  || die "release compile SDK is not 37"
-grep -q 'android:targetSdkVersion="37"' <<<"$manifest" \
-  || die "release target SDK is not 37"
+grep -q 'android:compileSdkVersion="36"' <<<"$manifest" \
+  || die "release compile SDK is not 36"
+grep -q 'android:targetSdkVersion="36"' <<<"$manifest" \
+  || die "release target SDK is not 36"
 if grep -q 'android:debuggable="true"' <<<"$manifest"; then
   die "release manifest is debuggable"
 fi
@@ -124,5 +124,5 @@ done
 
 (( checked_libraries > 0 )) || die "no ARM64 native libraries were found"
 
-printf 'Android release verification passed: API 37, %s bytes, signed non-debug AAB, 2 ABIs, %s ARM64 libraries aligned to 16 KB.\n' \
+printf 'Android release verification passed: API 36, %s bytes, signed non-debug AAB, 2 ABIs, %s ARM64 libraries aligned to 16 KB.\n' \
   "$aab_bytes" "$checked_libraries"

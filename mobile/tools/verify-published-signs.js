@@ -54,10 +54,17 @@ function plainFirestoreValue(value) {
   return undefined;
 }
 
+function plainFirestoreDocument(document) {
+  return Object.fromEntries(Object.entries(document.fields ?? {}).map(
+    ([key, value]) => [key, plainFirestoreValue(value)],
+  ));
+}
+
 async function verifyPublishedSigns(options = {}) {
   const {project} = configuration();
   const seed = JSON.parse(fs.readFileSync(SEED_PATH, 'utf8'));
   const selectedSigns = selectSignsForPublication(seed.signs, options.glosses ?? []);
+  const selectedGlosses = new Set(selectedSigns.map(sign => sign.data.gloss));
   const verified = [];
   for (const sign of selectedSigns) {
     const metadata = await publicDocument(project, `signs/${sign.id}`);
@@ -89,7 +96,31 @@ async function verifyPublishedSigns(options = {}) {
       bytes: content.byteLength,
     });
   }
-  return {project, verified};
+  const verifiedPhrases = [];
+  const phrasesToVerify = (options.glosses ?? []).length === 0
+    ? (seed.phrases ?? [])
+    : (seed.phrases ?? []).filter(phrase => (
+      phrase.data.glossSequence.some(gloss => selectedGlosses.has(gloss))
+    ));
+  for (const phrase of phrasesToVerify) {
+    const metadata = await publicDocument(project, `phrases/${phrase.id}`);
+    const published = plainFirestoreDocument(metadata);
+    if (
+      published.published !== true
+      || published.approved !== true
+      || Number(published.version) !== phrase.data.version
+      || published.releaseSha256 !== phrase.data.releaseSha256
+      || published.languageId !== phrase.data.languageId
+      || published.spanish !== phrase.data.spanish
+      || !isDeepStrictEqual(published.glossSequence, phrase.data.glossSequence)
+    ) throw new Error(`${phrase.id} has stale public phrase metadata.`);
+    verifiedPhrases.push({
+      id: phrase.id,
+      spanish: phrase.data.spanish,
+      version: phrase.data.version,
+    });
+  }
+  return {project, verified, verifiedPhrases};
 }
 
 if (require.main === module) {

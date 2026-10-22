@@ -138,7 +138,7 @@ def generate_preview(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate a ManoSpeak avatar preview.")
+    parser = argparse.ArgumentParser(description="Generate a Vozual avatar preview.")
     parser.add_argument("landmarks", type=Path)
     parser.add_argument("recipe", type=Path)
     parser.add_argument("avatar", type=Path)

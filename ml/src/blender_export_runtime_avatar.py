@@ -157,7 +157,7 @@ def export_avatar(
         for action in list(bpy.data.actions):
             bpy.data.actions.remove(action)
 
-        hello = load_action(hello_library, "HOLA")
+        load_action(hello_library, "HOLA")
         thanks = load_action(thanks_library, "GRACIAS")
         idle = make_idle(thanks)
         armature.animation_data_create()

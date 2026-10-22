@@ -1,29 +1,28 @@
 import {
-  AVAILABLE_PHRASE_SUGGESTIONS,
   nextPhraseSuggestionIndex,
-  phraseSuggestionsForInstalledGlosses,
+  phraseSuggestionsForInstalledLibrary,
 } from '../PhraseSuggestionService';
-import {resolvePublishedLscPlan} from '../LinguisticCatalogService';
+import type {InstalledPhrase, InstalledSign} from '../SignLanguageService';
 
 describe('PhraseSuggestionService', () => {
-  it('offers only phrases made entirely from approved signs', () => {
-    expect(AVAILABLE_PHRASE_SUGGESTIONS).toEqual([
-      'Buenos días, amigo',
-      'Buenas tardes, amigo',
-      'Buenas noches, amigo',
-      'Adiós, amigo',
-      'Comer carne',
-      'Hola, ¿cómo estás?',
-    ]);
-    expect(resolvePublishedLscPlan('muchas gracias').tokens).toEqual([]);
-  });
+  it('offers only remotely downloaded phrases whose signs are stored on the device', () => {
+    const phrases: InstalledPhrase[] = [{
+      id: 'lsc-co-buenos-dias-amigo',
+      languageId: 'lsc-co',
+      version: 1,
+      spanish: 'Buenos días, amigo.',
+      glossSequence: ['BUENOS DÍAS', 'AMIGO'],
+      releaseSha256: 'a'.repeat(64),
+      installedAt: '2026-09-26T00:00:00.000Z',
+    }];
+    const signs: Pick<InstalledSign, 'gloss'>[] = [
+      {gloss: 'BUENOS DÍAS'},
+      {gloss: 'AMIGO'},
+    ];
 
-  it('filters phrases against the signs stored on the device', () => {
-    expect(phraseSuggestionsForInstalledGlosses(new Set([
-      'BUENOS DÍAS',
-      'AMIGO',
-    ]))).toEqual(['Buenos días, amigo']);
-    expect(phraseSuggestionsForInstalledGlosses(new Set())).toEqual([]);
+    expect(phraseSuggestionsForInstalledLibrary(phrases, signs))
+      .toEqual(['Buenos días, amigo.']);
+    expect(phraseSuggestionsForInstalledLibrary(phrases, [])).toEqual([]);
   });
 
   it('keeps a safe index for the currently available suggestions', () => {

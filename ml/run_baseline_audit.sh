@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-PLAN_DIR="${1:-${REPO_ROOT}/.dwp/plans/PLAN_manospeak_cslr_calibration_v2}"
+PLAN_DIR="${1:-${REPO_ROOT}/.dwp/plans/PLAN_vozual_cslr_calibration_v2}"
 DATA_DIR="${DATA_DIR:-${REPO_ROOT}/datasets/landmarks_unified}"
 CHECKPOINT="${CHECKPOINT:-checkpoints/hand_index_fix/best_model.pt}"
 AUDIT_JSON="${PLAN_DIR}/analysis_results/DATASET_AUDIT.json"

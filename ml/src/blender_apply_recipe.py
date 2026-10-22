@@ -1,4 +1,4 @@
-"""Apply a reusable sign recipe to an imported ManoSpeak avatar draft."""
+"""Apply a reusable sign recipe to an imported Vozual avatar draft."""
 
 from __future__ import annotations
 
@@ -25,9 +25,9 @@ captured_frames = reference.get("rawFrames", [])
 bpy.context.preferences.edit.keyframe_new_interpolation_type = "LINEAR"
 
 armature = next(item for item in bpy.context.scene.objects if item.type == "ARMATURE")
-wrist_target = bpy.data.objects["ManoSpeakWristTarget"]
-elbow_pole = bpy.data.objects["ManoSpeakElbowPole"]
-orientation_target = bpy.data.objects["ManoSpeakHandOrientation"]
+wrist_target = bpy.data.objects["VozualWristTarget"]
+elbow_pole = bpy.data.objects["VozualElbowPole"]
+orientation_target = bpy.data.objects["VozualHandOrientation"]
 rig_side = recipe["active_hand"]
 rig_suffix = ".l" if rig_side == "left" else ".r"
 hand = armature.pose.bones[f"hand{rig_suffix}"]
@@ -243,7 +243,6 @@ def captured_target(
     shoulder_capture = Vector(shoulder_point)
     wrist_capture = Vector(wrist_point)
     elbow_capture = Vector(elbow_point) if tracked(elbow_point) else (shoulder_capture + wrist_capture) * 0.5
-    hand_points = captured[hand_start : hand_start + 21]
     wrist_delta = wrist_capture - shoulder_capture
     # Keep body-relative depth. MediaPipe Hand z is wrist-relative and erased
     # the visible movement toward the camera in signs such as GRACIAS.
@@ -432,6 +431,7 @@ def animate_facial_expression() -> None:
     """Key the avatar's existing facial shape keys from local recipe values."""
     morphs = {
         "jaw_open": ("Jaw_Open", "jawOpen", "Mouth_Drop_Lower", "mouthLowerDownLeft", "mouthLowerDownRight"),
+        "mouth_pucker": ("Mouth_Pucker", "mouthPucker", "Mouth_Funnel", "mouthFunnel"),
         "eye_wide": ("Eye_Wide_L", "Eye_Wide_R", "eyeWideLeft", "eyeWideRight"),
         "brow_raise": ("Brow_Raise_Inner_L", "Brow_Raise_Inner_R", "browInnerUp", "browOuterUpLeft", "browOuterUpRight"),
     }

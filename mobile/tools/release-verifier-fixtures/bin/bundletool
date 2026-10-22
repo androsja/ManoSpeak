@@ -8,8 +8,8 @@ case "${2:-}" in
   manifest)
     printf '<manifest package="%s" android:compileSdkVersion="%s"><uses-sdk android:targetSdkVersion="%s" /></manifest>\n' \
       "${MOCK_PACKAGE:-com.androsja.vozual}" \
-      "${MOCK_COMPILE_SDK:-37}" \
-      "${MOCK_TARGET_SDK:-37}"
+      "${MOCK_COMPILE_SDK:-36}" \
+      "${MOCK_TARGET_SDK:-36}"
     ;;
   *)
     printf 'Unexpected bundletool fixture arguments.\n' >&2

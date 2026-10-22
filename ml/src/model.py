@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# ManoSpeak stores MediaPipe Holistic landmarks as pose, left hand, right hand,
+# Vozual stores MediaPipe Holistic landmarks as pose, left hand, right hand,
 # then face. Both preprocessing implementations use this exact 543-point order.
 _HAND_START = 33
 _HAND_END = 75  # exclusive: 42 landmarks x 3 coordinates = 126 features

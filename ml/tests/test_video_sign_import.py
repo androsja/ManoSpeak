@@ -1,6 +1,7 @@
 import numpy as np
 
 from src.video_sign_import import (
+    LOCAL_HOLISTIC_MODEL_COMPLEXITY,
     audit_hand_tracking,
     build_recipe,
     choose_active_hand,
@@ -10,6 +11,10 @@ from src.video_sign_import import (
     resample_landmark_sequence,
     write_landmark_skeleton_preview,
 )
+
+
+def test_video_import_uses_the_packaged_holistic_model() -> None:
+    assert LOCAL_HOLISTIC_MODEL_COMPLEXITY == 1
 
 
 def empty_frame() -> list[list[float]]:

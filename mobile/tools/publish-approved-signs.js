@@ -6,6 +6,7 @@ const path = require('path');
 const {execFileSync} = require('child_process');
 const {
   buildPublishedSigns,
+  phraseReleaseSha256,
   signReleaseSha256,
 } = require('./build-published-signs');
 
@@ -153,6 +154,27 @@ function reconcileSignVersion(existing, signData) {
   };
 }
 
+function isCurrentPublishedPhrase(existing, phraseData) {
+  if (!existing) return false;
+  const existingReleaseSha256 = existing.releaseSha256
+    ?? phraseReleaseSha256(existing);
+  return existing.published === true
+    && existing.approved === true
+    && Number(existing.version) === phraseData.version
+    && existingReleaseSha256 === phraseData.releaseSha256;
+}
+
+function reconcilePhraseVersion(existing, phraseData) {
+  if (!existing) return phraseData;
+  const remoteVersion = Math.max(0, Number(existing.version) || 0);
+  const existingReleaseSha256 = existing.releaseSha256
+    ?? phraseReleaseSha256(existing);
+  const version = existingReleaseSha256 === phraseData.releaseSha256
+    ? Math.max(1, remoteVersion)
+    : remoteVersion + 1;
+  return {...phraseData, version};
+}
+
 function requestedGlosses(argumentsList) {
   const glosses = [];
   for (let index = 0; index < argumentsList.length; index += 1) {
@@ -190,10 +212,16 @@ async function publishApprovedSigns(options = {}) {
   const seed = JSON.parse(fs.readFileSync(build.firestorePath, 'utf8'));
   const selectedSigns = selectSignsForPublication(seed.signs, options.glosses ?? []);
   const partialPublication = (options.glosses ?? []).length > 0;
+  const selectedGlosses = new Set(selectedSigns.map(sign => sign.data.gloss));
   await writeDocument(token, project, `signLanguages/${seed.language.id}`, seed.language.data);
   const approvedIds = new Set(seed.signs.map(sign => sign.id));
   const existingDocuments = await listDocuments(token, project, 'signs');
   const existingSigns = new Map(existingDocuments.map(document => [
+    document.name.split('/').pop(),
+    plainFirestoreDocument(document),
+  ]));
+  const existingPhraseDocuments = await listDocuments(token, project, 'phrases');
+  const existingPhrases = new Map(existingPhraseDocuments.map(document => [
     document.name.split('/').pop(),
     plainFirestoreDocument(document),
   ]));
@@ -308,7 +336,82 @@ async function publishApprovedSigns(options = {}) {
     }
     published.push({id: sign.id, gloss: sign.data.gloss, version: sign.data.version});
   }
-  return {project, published, unchanged, retired};
+
+  const publishedPhrases = [];
+  const unchangedPhrases = [];
+  const retiredPhrases = [];
+  const approvedPhraseIds = new Set((seed.phrases ?? []).map(phrase => phrase.id));
+  // A single-sign editor publication only evaluates phrases that use that
+  // sign. This lets the editor publish confirmed phrase proposals immediately
+  // after their final required sign becomes available, without retiring other
+  // language phrases during a partial upload.
+  const phrasesToPublish = partialPublication
+    ? (seed.phrases ?? []).filter(phrase => (
+      phrase.data.glossSequence.some(gloss => selectedGlosses.has(gloss))
+    ))
+    : (seed.phrases ?? []);
+  if (!partialPublication) {
+    for (const [existingId, existing] of existingPhrases) {
+      if (approvedPhraseIds.has(existingId)) continue;
+      if (
+        existing.languageId !== seed.language.id
+        && !existingId.startsWith(`${seed.language.id}-`)
+      ) continue;
+      await writeDocument(token, project, `phrases/${existingId}`, {
+        ...existing,
+        published: false,
+        approved: false,
+        status: 'retired',
+        updatedAt: new Date().toISOString(),
+      });
+      retiredPhrases.push(existingId);
+    }
+  }
+
+  // Phrases are published after their signs. A client can therefore never
+  // observe a newly suggested phrase before all of its downloadable signs
+  // have been made public.
+  for (const phrase of phrasesToPublish) {
+    phrase.data = reconcilePhraseVersion(existingPhrases.get(phrase.id), phrase.data);
+    const existing = existingPhrases.get(phrase.id);
+    if (isCurrentPublishedPhrase(existing, phrase.data)) {
+      unchangedPhrases.push({id: phrase.id, spanish: phrase.data.spanish, version: phrase.data.version});
+      continue;
+    }
+    await writeDocument(token, project, `phrases/${phrase.id}`, {
+      ...phrase.data,
+      published: false,
+      status: 'uploading',
+      updatedAt: new Date().toISOString(),
+    });
+    await writeDocument(token, project, `phrases/${phrase.id}`, {
+      ...phrase.data,
+      published: true,
+      status: 'published',
+      updatedAt: new Date().toISOString(),
+    });
+    const publishedDocument = plainFirestoreDocument(await readDocument(
+      token,
+      project,
+      `phrases/${phrase.id}`,
+    ));
+    if (
+      publishedDocument.published !== true
+      || publishedDocument.approved !== true
+      || Number(publishedDocument.version) !== phrase.data.version
+      || publishedDocument.releaseSha256 !== phrase.data.releaseSha256
+    ) throw new Error(`${phrase.id} failed its final publication check.`);
+    publishedPhrases.push({id: phrase.id, spanish: phrase.data.spanish, version: phrase.data.version});
+  }
+  return {
+    project,
+    published,
+    unchanged,
+    retired,
+    publishedPhrases,
+    unchangedPhrases,
+    retiredPhrases,
+  };
 }
 
 if (require.main === module) {
@@ -323,9 +426,11 @@ if (require.main === module) {
 module.exports = {
   gcloudExecutable,
   isCurrentPublishedSign,
+  isCurrentPublishedPhrase,
   plainFirestoreDocument,
   publishApprovedSigns,
   reconcileSignVersion,
+  reconcilePhraseVersion,
   requestedGlosses,
   selectSignsForPublication,
 };

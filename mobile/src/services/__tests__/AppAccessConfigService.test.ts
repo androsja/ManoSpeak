@@ -20,4 +20,11 @@ describe('AppAccessConfigService', () => {
       /\.apps\.googleusercontent\.com$/,
     );
   });
+
+  it('rolls out premium translation surfaces with Plus required by default', () => {
+    expect(DEFAULT_APP_ACCESS_CONFIG.continuousModeEnabled).toBe(true);
+    expect(DEFAULT_APP_ACCESS_CONFIG.continuousModeRequiresPlus).toBe(true);
+    expect(DEFAULT_APP_ACCESS_CONFIG.pictureInPictureEnabled).toBe(true);
+    expect(DEFAULT_APP_ACCESS_CONFIG.pipRequiresPlus).toBe(true);
+  });
 });

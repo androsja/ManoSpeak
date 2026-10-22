@@ -76,7 +76,7 @@ run_step() {
 run_gradle_release() {
   (
     cd "$mobile_root/android"
-    ./gradlew clean :app:testReleaseUnitTest :app:lintRelease :app:bundleRelease
+    ./gradlew clean :app:verifyReleaseUnitTestConfiguration :app:lintRelease :app:bundleRelease
   )
 }
 

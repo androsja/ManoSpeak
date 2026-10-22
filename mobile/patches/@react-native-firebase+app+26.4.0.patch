@@ -1,0 +1,10 @@
+diff --git a/node_modules/@react-native-firebase/app/ios_config.sh b/node_modules/@react-native-firebase/app/ios_config.sh
+index a35f763..b78fac1 100755
+--- a/node_modules/@react-native-firebase/app/ios_config.sh
++++ b/node_modules/@react-native-firebase/app/ios_config.sh
+@@ -55,1 +55,1 @@ function getFirebaseJsonKeyValue () {
+-    ruby -Ku -e "require 'rubygems';require 'json'; output=JSON.parse('$1'); puts output[$_JSON_ROOT]['$2']"
++    /usr/bin/ruby --disable-gems -Ku -rjson -e 'output=JSON.parse(File.read(ARGV[0])); puts output["react-native"][ARGV[1]]' "${_SEARCH_RESULT}" "$2"
+@@ -91,1 +91,1 @@ done
+-  if ! _RN_ROOT_EXISTS=$(ruby -Ku -e "require 'json'; output=JSON.parse('$_JSON_OUTPUT_RAW'); puts output[$_JSON_ROOT]"); then
++  if ! _RN_ROOT_EXISTS=$(/usr/bin/ruby --disable-gems -Ku -rjson -e 'output=JSON.parse(File.read(ARGV[0])); puts output["react-native"]' "${_SEARCH_RESULT}"); then

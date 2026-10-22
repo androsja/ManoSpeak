@@ -7,10 +7,13 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.os.Bundle
 import android.util.Rational
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.RequiresApi
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.ReactApplication
@@ -22,6 +25,22 @@ class MainActivity : ReactActivity() {
   private var nativePipAvatar: NativePipAvatarView? = null
   private var pipListeningMode = "continuous"
   private var pipMicrophoneActive = false
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+
+    // Android 15+ enforces edge-to-edge. React Native owns the layout insets
+    // through SafeAreaProvider; configuring the native window keeps that
+    // behavior consistent on Android 10 through current Android releases.
+    WindowCompat.enableEdgeToEdge(window)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      window.isNavigationBarContrastEnforced = false
+    }
+    WindowInsetsControllerCompat(window, window.decorView).apply {
+      isAppearanceLightStatusBars = false
+      isAppearanceLightNavigationBars = false
+    }
+  }
 
   override fun onResume() {
     super.onResume()

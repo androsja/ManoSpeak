@@ -18,6 +18,13 @@ describe('Android release configuration', () => {
     path.join(process.cwd(), 'android/app/src/main/AndroidManifest.xml'),
     'utf8',
   );
+  const mainActivity = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      'android/app/src/main/java/com/androsja/vozual/MainActivity.kt',
+    ),
+    'utf8',
+  );
 
   it('targets the installed stable Android API 36', () => {
     expect(rootGradle).toContain('compileSdkVersion = 36');
@@ -48,5 +55,12 @@ describe('Android release configuration', () => {
     expect(manifest).toContain(
       'android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove"',
     );
+  });
+
+  it('configures edge-to-edge windows while preserving readable system controls', () => {
+    expect(mainActivity).toContain('WindowCompat.enableEdgeToEdge(window)');
+    expect(mainActivity).toContain('window.isNavigationBarContrastEnforced = false');
+    expect(mainActivity).toContain('isAppearanceLightStatusBars = false');
+    expect(mainActivity).toContain('isAppearanceLightNavigationBars = false');
   });
 });

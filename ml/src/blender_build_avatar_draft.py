@@ -40,15 +40,15 @@ def world_head(bone_name: str) -> Vector:
 # The anatomical route is driven by two world-space targets. The recipe
 # applier writes their animation after it has aligned captured body contact to
 # the avatar's actual proportions.
-wrist_target = bpy.data.objects.new("ManoSpeakWristTarget", None)
+wrist_target = bpy.data.objects.new("VozualWristTarget", None)
 wrist_target.location = world_head(f"hand{rig_suffix}")
 bpy.context.scene.collection.objects.link(wrist_target)
-elbow_pole = bpy.data.objects.new("ManoSpeakElbowPole", None)
+elbow_pole = bpy.data.objects.new("VozualElbowPole", None)
 elbow_pole.location = world_head(f"forearm_stretch{rig_suffix}")
 bpy.context.scene.collection.objects.link(elbow_pole)
 
 ik_constraint = hand.constraints.new("IK")
-ik_constraint.name = "ManoSpeakWristIK"
+ik_constraint.name = "VozualWristIK"
 ik_constraint.target = wrist_target
 ik_constraint.pole_target = elbow_pole
 ik_constraint.pole_angle = 0.0 if rig_suffix == ".l" else math.pi
@@ -60,22 +60,22 @@ ik_constraint.iterations = 128
 ik_constraint.influence = 0.0
 
 upper_track = upper_arm.constraints.new("DAMPED_TRACK")
-upper_track.name = "ManoSpeakElbowTrack"
+upper_track.name = "VozualElbowTrack"
 upper_track.target = elbow_pole
 upper_track.track_axis = "TRACK_Y"
 forearm_track = forearm.constraints.new("DAMPED_TRACK")
-forearm_track.name = "ManoSpeakWristTrack"
+forearm_track.name = "VozualWristTrack"
 forearm_track.target = wrist_target
 forearm_track.track_axis = "TRACK_Y"
 
-orientation_target = bpy.data.objects.new("ManoSpeakHandOrientation", None)
+orientation_target = bpy.data.objects.new("VozualHandOrientation", None)
 orientation_target.rotation_mode = "QUATERNION"
 orientation_target.rotation_quaternion = (
     armature.matrix_world @ hand.matrix
 ).to_quaternion()
 bpy.context.scene.collection.objects.link(orientation_target)
 orientation_lock = hand.constraints.new("COPY_ROTATION")
-orientation_lock.name = "ManoSpeakRigidHandWorldLock"
+orientation_lock.name = "VozualRigidHandWorldLock"
 orientation_lock.target = orientation_target
 orientation_lock.target_space = "WORLD"
 orientation_lock.owner_space = "WORLD"

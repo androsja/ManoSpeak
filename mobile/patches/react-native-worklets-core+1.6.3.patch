@@ -1,0 +1,17 @@
+diff --git a/node_modules/react-native-worklets-core/ios/Worklets.mm b/node_modules/react-native-worklets-core/ios/Worklets.mm
+index 403d88b..9f9294e 100644
+--- a/node_modules/react-native-worklets-core/ios/Worklets.mm
++++ b/node_modules/react-native-worklets-core/ios/Worklets.mm
+@@ -41,1 +41,2 @@ void installApi(std::shared_ptr<facebook::react::CallInvoker> callInvoker,
++#ifndef RCT_NEW_ARCH_ENABLED
+ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(install) {
+@@ -49,3 +50,4 @@ void installApi(std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+   }
+   return @false;
+ }
++#endif
+@@ -57,3 +59,3 @@ void installApi(std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+ // Don't compile this code when we build for the old architecture.
+-#ifdef RCT_NEW_ARCH_ENABLED
++#if defined(RCT_NEW_ARCH_ENABLED) && 0
+ - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:

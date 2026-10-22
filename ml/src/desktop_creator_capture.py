@@ -321,7 +321,7 @@ def run_capture(
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     camera.set(cv2.CAP_PROP_FPS, 30)
 
-    window_name = "ManoSpeak private avatar capture"
+    window_name = "Vozual private avatar capture"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     frames: list[list[list[float]]] = []
@@ -448,7 +448,7 @@ def run_capture(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Capture local Mac webcam landmarks for a ManoSpeak avatar draft.")
+    parser = argparse.ArgumentParser(description="Capture local Mac webcam landmarks for a Vozual avatar draft.")
     parser.add_argument("--gloss", default="HOLA", help="Gloss used only to name the private reference file.")
     parser.add_argument("--camera", type=int, default=0, help="macOS camera index, usually 0 for the built-in camera.")
     parser.add_argument(

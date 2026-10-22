@@ -2,12 +2,14 @@
 #import <Firebase/Firebase.h>
 
 #import <React/RCTBundleURLProvider.h>
+#import <ReactAppDependencyProvider/RCTAppDependencyProvider.h>
 
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
   [FIRApp configure];
+  self.dependencyProvider = [RCTAppDependencyProvider new];
   self.moduleName = @"Vozual";
   self.initialProps = @{};
 

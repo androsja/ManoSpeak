@@ -22,3 +22,20 @@ index c362e6a..e4fe074 100644
  @RequiresApi(api = Build.VERSION_CODES.N)
 +@OptIn(markerClass = FrameworkAPI.class)
  public class OnnxruntimeModule extends ReactContextBaseJavaModule {
+diff --git a/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm b/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm
+index 8155f92..f4dbe5b 100644
+--- a/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm
++++ b/node_modules/onnxruntime-react-native/ios/OnnxruntimeModule.mm
+@@ -25,6 +25,7 @@ - (void)setBridge:(RCTBridge*)bridge {
+ /**
+  * React native binding API to install onnxruntime JSI API
+  */
++#ifndef RCT_NEW_ARCH_ENABLED
+ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(install) {
+   @try {
+     RCTCxxBridge* cxxBridge = (RCTCxxBridge*)_bridge;
+@@ -46,3 +47,4 @@ - (void)setBridge:(RCTBridge*)bridge {
+     return @false;
+   }
+ }
++#endif

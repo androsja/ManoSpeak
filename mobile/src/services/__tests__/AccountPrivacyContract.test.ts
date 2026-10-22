@@ -20,12 +20,12 @@ describe('Android account privacy contract', () => {
     );
 
     expect(appSource).toContain('deleteActivationAccount');
-    expect(listenerSource).toContain('ELIMINAR CUENTA Y DATOS');
+    expect(listenerSource).toContain("t('settings.deleteAccountAction')");
     expect(listenerSource).toContain('VOZUAL_ACCOUNT_DELETION_URL');
     expect(listenerSource).toContain('VOZUAL_PRIVACY_POLICY_URL');
     expect(privacyConstants).toContain('/eliminar-cuenta');
     expect(privacyConstants).toContain('/privacidad');
-    expect(activationSource).toContain('USAR GRATIS SIN CUENTA');
+    expect(activationSource).toContain("t('activation.useWithoutAccount')");
     expect(activationSource).toContain('VOZUAL_PRIVACY_POLICY_URL');
   });
 

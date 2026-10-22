@@ -16,6 +16,7 @@ jest.mock('../../services/SignLanguageService', () => ({}));
 
 import {
   handleLibraryBack,
+  recommendedPhrasesForInstalledLibrary,
   shouldShowLibraryRetry,
 } from '../SignLanguageLibraryScreen';
 
@@ -43,5 +44,29 @@ describe('SignLanguageLibraryScreen Android Back behavior', () => {
     expect(shouldShowLibraryRetry(false, 'network unavailable', 0)).toBe(true);
     expect(shouldShowLibraryRetry(true, '', 0)).toBe(false);
     expect(shouldShowLibraryRetry(false, '', 1)).toBe(false);
+  });
+
+  test('shows remote downloaded phrases only when every required sign is installed', () => {
+    const suggestions = recommendedPhrasesForInstalledLibrary([{
+      spanish: 'Yo quiero comer carne.',
+      glossSequence: ['YO', 'QUERER', 'COMER', 'CARNE'],
+    }, {
+      spanish: 'Yo quiero comer.',
+      glossSequence: ['YO', 'QUERER', 'COMER'],
+    }, {
+      spanish: 'Hola, ¿cómo estás?',
+      glossSequence: ['HOLA', '¿CÓMO ESTÁS?'],
+    }], [
+      {gloss: 'YO'},
+      {gloss: 'QUERER'},
+      {gloss: 'COMER'},
+      {gloss: 'CARNE'},
+      {gloss: 'HOLA'},
+    ]);
+
+    expect(suggestions).toContain('Yo quiero comer carne.');
+    expect(suggestions).toContain('Yo quiero comer.');
+    expect(suggestions).not.toContain('Yo quiero agua.');
+    expect(suggestions).not.toContain('Hola, ¿cómo estás?');
   });
 });

@@ -42,6 +42,12 @@ if __package__ in (None, ""):
         upsert_editor_entry,
         write_published_motion_manifest,
     )
+    from src.phrase_authoring import (
+        PhraseDraft,
+        append_phrase_drafts,
+        new_phrase_drafts,
+        phrase_drafts_for_gloss,
+    )
     from src.sign_catalog import (
         CATEGORIES,
         CATEGORY_ALL,
@@ -75,6 +81,12 @@ else:
         upsert_editor_entry,
         write_published_motion_manifest,
     )
+    from .phrase_authoring import (
+        PhraseDraft,
+        append_phrase_drafts,
+        new_phrase_drafts,
+        phrase_drafts_for_gloss,
+    )
     from .sign_catalog import (
         CATEGORIES,
         CATEGORY_ALL,
@@ -94,6 +106,7 @@ else:
     )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+PHRASE_SOURCE_PATH = REPO_ROOT / "mobile/assets/data/lsc_recommended_phrases.json"
 AVATAR_PROFILE_OVERRIDES_PATH = (
     REPO_ROOT / "mobile/assets/motions/avatar_profile_overrides.json"
 )
@@ -2959,7 +2972,9 @@ class SignAuthoringEditor:
                 )
                 return
             close_search()
-            self._publish_approved_signs_to_firebase(pending)
+            self._publish_approved_signs_to_firebase(
+                pending, include_phrase_suggestions=True
+            )
 
         def delete_selected() -> None:
             selected = results.selection()
@@ -4842,6 +4857,78 @@ class SignAuthoringEditor:
                 f"Palabras de {gloss} guardadas. Publícalas en Firebase cuando quieras."
             )
 
+    def _phrase_drafts_for_published_gloss(
+        self, gloss: str
+    ) -> tuple[PhraseDraft, ...]:
+        """Create reviewable phrase proposals from the sign being published."""
+
+        recipe_path: Path | None = None
+        created_paths = getattr(self, "created_sign_paths", {})
+        candidate = created_paths.get(gloss) if isinstance(created_paths, dict) else None
+        if isinstance(candidate, tuple) and candidate:
+            recipe_path = candidate[0]
+        current_gloss = self.gloss.get().strip().upper() if hasattr(self, "gloss") else ""
+        if recipe_path is None and current_gloss == gloss:
+            recipe_path = getattr(self, "recipe_path", None)
+        if not isinstance(recipe_path, Path):
+            return ()
+        try:
+            recipe = json.loads(recipe_path.read_text(encoding="utf-8"))
+            return phrase_drafts_for_gloss(
+                gloss,
+                self._speech_aliases_for_recipe(gloss, recipe_path),
+                str(recipe.get("lexical_class", "noun")),
+            )
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return ()
+
+    def _confirm_phrase_suggestions_for_firebase(
+        self, glosses: list[str]
+    ) -> tuple[PhraseDraft, ...]:
+        """Add three human-confirmed phrase drafts for each newly sent sign."""
+
+        candidates = tuple(
+            draft
+            for gloss in glosses
+            for draft in self._phrase_drafts_for_published_gloss(gloss)
+        )
+        if not candidates:
+            return ()
+        try:
+            drafts = new_phrase_drafts(PHRASE_SOURCE_PATH, candidates)
+        except ValueError as error:
+            messagebox.showwarning(
+                "Frases propuestas no disponibles",
+                str(error),
+                parent=self.root,
+            )
+            return ()
+        if not drafts:
+            return ()
+        preview = "\n".join(
+            f"• {draft.spanish}  ({' → '.join(draft.gloss_sequence)})"
+            for draft in drafts
+        )
+        approved = messagebox.askyesno(
+            "Revisar frases propuestas",
+            "VOZUAL Editor preparó estas frases para la nueva palabra:\n\n"
+            f"{preview}\n\n"
+            "Confirma solo si las secuencias LSC son correctas. Se publicarán "
+            "con la seña cuando todas sus señas requeridas estén disponibles.",
+            parent=self.root,
+        )
+        if not approved:
+            return ()
+        try:
+            return append_phrase_drafts(PHRASE_SOURCE_PATH, drafts)
+        except ValueError as error:
+            messagebox.showwarning(
+                "No se pudieron guardar las frases propuestas",
+                str(error),
+                parent=self.root,
+            )
+            return ()
+
     def _publish_current_sign_to_firebase(self) -> None:
         """Export and publish only the sign currently being reviewed."""
 
@@ -4881,18 +4968,28 @@ class SignAuthoringEditor:
                 parent=self.root,
             )
             return
-        self._publish_approved_signs_to_firebase(gloss)
+        self._publish_approved_signs_to_firebase(
+            gloss, include_phrase_suggestions=True
+        )
 
     def _publish_approved_signs_to_firebase(
-        self, gloss: str | list[str]
+        self, gloss: str | list[str], *, include_phrase_suggestions: bool = False
     ) -> None:
         """Publish selected new or changed owner-approved signs to Firebase."""
 
         glosses = [gloss] if isinstance(gloss, str) else list(dict.fromkeys(gloss))
         label = ", ".join(glosses)
+        generated_phrases: tuple[PhraseDraft, ...] = ()
+        if include_phrase_suggestions:
+            generated_phrases = self._confirm_phrase_suggestions_for_firebase(glosses)
         self._start_progress("PUBLICANDO EN FIREBASE… verificando cambios aprobados.")
+        phrase_suffix = (
+            f" y {len(generated_phrases)} frases propuestas"
+            if generated_phrases
+            else ""
+        )
         self.status.set(
-            f"Enviando {label} a Firebase. No cierres VOZUAL Editor."
+            f"Enviando {label}{phrase_suffix} a Firebase. No cierres VOZUAL Editor."
         )
         threading.Thread(
             target=self._publish_approved_signs_in_background,
@@ -4937,7 +5034,12 @@ class SignAuthoringEditor:
             published = details.get("published", [])
             unchanged = details.get("unchanged", [])
             retired = details.get("retired", [])
-            if not isinstance(published, list) or not isinstance(unchanged, list):
+            published_phrases = details.get("publishedPhrases", [])
+            if (
+                not isinstance(published, list)
+                or not isinstance(unchanged, list)
+                or not isinstance(published_phrases, list)
+            ):
                 raise ValueError("Invalid publication result")
         except (json.JSONDecodeError, TypeError, ValueError):
             self._finish_firebase_publication_failure(
@@ -4947,13 +5049,18 @@ class SignAuthoringEditor:
             return
         self._refresh_created_signs()
         self._refresh_firebase_suggestion_statuses()
-        if published:
+        if published or published_phrases:
             published_labels = [
                 f"{item.get('gloss', 'SEÑA')} v{item.get('version', '?')}"
                 for item in published
                 if isinstance(item, dict)
             ]
-            summary = ", ".join(published_labels)
+            published_phrase_labels = [
+                str(item.get("spanish", "FRASE"))
+                for item in published_phrases
+                if isinstance(item, dict)
+            ]
+            summary = ", ".join(published_labels + published_phrase_labels)
             self.step_status.set(
                 f"ENVIADA A FIREBASE ✓  {summary}."
             )
@@ -4961,9 +5068,20 @@ class SignAuthoringEditor:
                 "Terminaste. Vozual móvil detectará esta actualización y permitirá descargarla."
             )
             messagebox.showinfo(
-                "Seña enviada correctamente",
+                "Publicación enviada correctamente",
                 f"Firebase: {project}\n\n"
-                f"Enviada y verificada:\n• " + "\n• ".join(published_labels)
+                + (
+                    "Señas enviadas y verificadas:\n• "
+                    + "\n• ".join(published_labels)
+                    if published_labels
+                    else ""
+                )
+                + (
+                    "\n\nFrases enviadas y verificadas:\n• "
+                    + "\n• ".join(published_phrase_labels)
+                    if published_phrase_labels
+                    else ""
+                )
                 + "\n\nYa terminaste: no necesitas pulsar ningún otro botón."
                 + (f"\nRetiradas: {len(retired)}" if retired else "")
                 + "\n\nLa app móvil avisará que hay una actualización y solo la descargará si el usuario acepta.",

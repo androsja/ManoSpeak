@@ -40,9 +40,9 @@ def predict_triple(model: PhonSSM, landmarks_path: str, device: torch.device) ->
         out = model(tensor)
 
     h = int(out["handshape"][:, :, :-1].max(dim=1).values.argmax(dim=1).item())
-    l = int(out["location"][:, :, :-1].max(dim=1).values.argmax(dim=1).item())
+    location = int(out["location"][:, :, :-1].max(dim=1).values.argmax(dim=1).item())
     m = int(out["movement"][:, :, :-1].max(dim=1).values.argmax(dim=1).item())
-    return (h, l, m)
+    return (h, location, m)
 
 
 def extract_gloss(file_path: str) -> str:

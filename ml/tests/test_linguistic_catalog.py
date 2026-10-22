@@ -5,8 +5,13 @@ from src.linguistic_catalog import (
     CATALOG_PATH,
     editor_metadata,
     find_entry,
+    is_mobile_compilation_eligible,
     load_catalog,
+    owner_approval_status,
+    owner_review_fingerprint,
     preview_renderable_plan,
+    set_owner_approval,
+    set_owner_review_fingerprint,
     speech_forms,
     synchronize_curated_catalog,
     upsert_editor_entry,
@@ -63,22 +68,63 @@ def test_editor_and_mobile_use_the_same_forms_for_every_published_sign() -> None
         assert mobile_forms == editor_forms, gloss
 
 
-def test_preview_inserts_only_published_subject_markers() -> None:
-    assert preview_renderable_plan("necesito ayuda") == (["YO", "NECESITAR", "AYUDAR"], [])
-    assert preview_renderable_plan("necesitamos ayuda") == (
+def test_preview_inserts_only_published_subject_markers(tmp_path) -> None:
+    catalog_path = tmp_path / "catalog.json"
+    catalog = load_catalog()
+    for entry in catalog["entries"]:
+        if entry.get("motion", {}).get("published"):
+            entry.setdefault("review", {})["ownerApproval"] = {
+                "status": "approved",
+                "approvedBy": "project_owner",
+                "approvedAt": "2026-08-26T00:00:00+00:00",
+            }
+    catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+    assert preview_renderable_plan("necesito ayuda", catalog_path) == (["YO", "NECESITAR", "AYUDAR"], [])
+    assert preview_renderable_plan("necesitamos ayuda", catalog_path) == (
         ["NECESITAR", "AYUDAR"],
         ["NOSOTROS"],
     )
-    assert preview_renderable_plan("yo no quiero comer") == (
+    assert preview_renderable_plan("yo no quiero comer", catalog_path) == (
         ["YO", "NO", "QUERER", "COMER"],
         [],
     )
-    assert preview_renderable_plan("el médico come") == (["MÉDICO", "COMER"], [])
-    assert preview_renderable_plan("el come") == (["EL", "COMER"], [])
-    assert preview_renderable_plan("el médico come con perro") == (
+    assert preview_renderable_plan("el médico come", catalog_path) == (["MÉDICO", "COMER"], [])
+    assert preview_renderable_plan("el come", catalog_path) == (["EL", "COMER"], [])
+    assert preview_renderable_plan("el médico come con perro", catalog_path) == (
         ["MÉDICO", "COMER", "PERRO"],
         [],
     )
+
+
+def test_owner_approval_is_explicit_and_controls_compilation(tmp_path) -> None:
+    catalog_path = tmp_path / "catalog.json"
+    catalog = load_catalog()
+    source_entry = next(
+        entry for entry in catalog["entries"] if entry["gloss"] == "GRACIAS"
+    )
+    source_entry.setdefault("review", {}).pop("ownerApproval", None)
+    catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+    entry = find_entry("GRACIAS", catalog_path)
+    assert entry is not None
+    assert owner_approval_status(entry) == "pending"
+    assert is_mobile_compilation_eligible(entry) is False
+
+    set_owner_approval("GRACIAS", True, catalog_path)
+    approved_entry = find_entry("GRACIAS", catalog_path)
+    assert approved_entry is not None
+    assert owner_approval_status(approved_entry) == "approved"
+    assert is_mobile_compilation_eligible(approved_entry) is True
+
+    set_owner_review_fingerprint("GRACIAS", "reviewed-content-v1", catalog_path)
+    reviewed_entry = find_entry("GRACIAS", catalog_path)
+    assert owner_review_fingerprint(reviewed_entry) == "reviewed-content-v1"
+
+    set_owner_approval("GRACIAS", False, catalog_path)
+    pending_entry = find_entry("GRACIAS", catalog_path)
+    assert owner_approval_status(pending_entry) == "pending"
+    assert owner_review_fingerprint(pending_entry) is None
 
 
 def test_every_curated_verb_has_a_complete_set_of_spoken_forms() -> None:
@@ -165,7 +211,14 @@ def test_published_manifest_counts_each_motion_clip_once(tmp_path) -> None:
     write_published_motion_manifest(manifest_path=manifest)
 
     published = json.loads(manifest.read_text(encoding="utf-8"))["publishedGlosses"]
-    assert published.count("EL") == 1
+    expected = sorted(
+        {
+            str(entry["motion"]["clip"])
+            for entry in load_catalog(CATALOG_PATH)["entries"]
+            if is_mobile_compilation_eligible(entry)
+        }
+    )
+    assert published == expected
     assert len(published) == len(set(published))
 
 

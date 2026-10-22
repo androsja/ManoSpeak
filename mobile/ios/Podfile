@@ -17,6 +17,11 @@ $RNFirebaseDisableSPM = true
 use_frameworks! :linkage => :static
 $RNFirebaseAsStaticFramework = true
 
+# VOZUAL uses the microphone recognizer, not VisionCamera frame processors.
+# Disabling this optional extension avoids the legacy RCTCxxBridge installer
+# that is not compatible with React Native 0.87's new architecture.
+$VCEnableFrameProcessors = false
+
 target 'Vozual' do
   config = use_native_modules!
 
@@ -53,6 +58,17 @@ target 'Vozual' do
           search_paths = Array(config.build_settings['HEADER_SEARCH_PATHS'])
           react_common = '"${PODS_ROOT}/../../node_modules/react-native/ReactCommon"'
           config.build_settings['HEADER_SEARCH_PATHS'] = search_paths | ['$(inherited)', react_common]
+        end
+
+        # These two native modules still use the legacy bridge API internally.
+        # Compile their bridge shim with the legacy flag while the application
+        # itself remains on React Native's new architecture.
+        if ['react-native-worklets-core', 'onnxruntime-react-native'].include?(target.name)
+          flags = Array(config.build_settings['OTHER_CPLUSPLUSFLAGS'])
+          flags = flags.flat_map { |flag| flag.to_s.gsub('-DRCT_NEW_ARCH_ENABLED=1', '-DRCT_NEW_ARCH_ENABLED=0') }
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] = flags | ['$(inherited)', '-DRCT_NEW_ARCH_ENABLED=0']
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] =
+            Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS']) | ['$(inherited)', 'RCT_NEW_ARCH_ENABLED=0']
         end
       end
     end

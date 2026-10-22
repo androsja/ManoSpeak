@@ -81,6 +81,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Reviewed phrase suggestions are compact metadata. The app downloads them
+    // into the same transactional local-library state as their referenced
+    // signs, then exposes a phrase only when every required sign is present.
+    match /phrases/{phraseId} {
+      // Keep this predicate queryable. The client independently rejects any
+      // document that is not approved or does not satisfy the exact schema.
+      allow read: if resource.data.published == true;
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

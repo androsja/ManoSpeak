@@ -103,7 +103,7 @@ def export_records(records: list[CalibrationRecord], output_dir: Path, prefix: s
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Import ManoSpeak Android calibration samples.")
+    parser = argparse.ArgumentParser(description="Import Vozual Android calibration samples.")
     parser.add_argument("input_dir", type=Path)
     parser.add_argument("output_dir", type=Path)
     parser.add_argument("--validation_count", type=int, default=6)

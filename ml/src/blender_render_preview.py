@@ -1,4 +1,4 @@
-"""Render a ManoSpeak Blender animation as numbered PNG preview frames."""
+"""Render a Vozual Blender animation as numbered PNG preview frames."""
 
 from __future__ import annotations
 

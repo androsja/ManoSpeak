@@ -101,6 +101,15 @@ export type RiggedFingerJointEdits = Record<RiggedFingerName, [number, number, n
 export type RiggedFingerState = 'captured' | 'extended' | 'closed';
 export type RiggedHandFingerStates = Partial<Record<RiggedFingerName, RiggedFingerState>>;
 
+/** Model-local flexion profile for the editor's natural fist control. */
+export const EDITOR_FIST_FINGER_CURLS: Readonly<Record<RiggedFingerName, readonly number[]>> = {
+  thumb: [0, 0, 0],
+  index: [52, 68, 62],
+  middle: [54, 70, 64],
+  ring: [56, 72, 66],
+  pinky: [58, 74, 68],
+};
+
 export type RiggedHandEditPose = {
   elbowRotation: number;
   wristPitch: number;

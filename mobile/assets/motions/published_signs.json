@@ -7,6 +7,7 @@
     "AMIGO",
     "AYER",
     "AYUDAR",
+    "BAÑO",
     "BIEN",
     "BLANCO",
     "BUENAS NOCHES",
@@ -18,7 +19,12 @@
     "COMER",
     "CUÁNDO",
     "DINERO",
+    "GRACIAS",
     "HOLA",
-    "NO ENTIENDO"
+    "MAL",
+    "NO ENTIENDO",
+    "QUERER",
+    "YO",
+    "¿CÓMO ESTÁS?"
   ]
 }
