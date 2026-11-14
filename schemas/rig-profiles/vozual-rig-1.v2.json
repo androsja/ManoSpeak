@@ -1,0 +1,45 @@
+{
+  "schema": "vozual.rig-capability-profile",
+  "schemaVersion": 2,
+  "id": "vozual-rig-1",
+  "revision": 2,
+  "sha256": "7bc3e1af091014e977f8aaa07dba14da85ce55300e38f596891093feb88fb013",
+  "asset": {
+    "sourceArchive": "Personaje/2/black dress stylized young woman 3d character rigged short/Blender.zip",
+    "exporter": "mobile/tools/prepare-rigged-avatar.py",
+    "neutralReferencePoseId": "rest",
+    "coordinateSystem": "gltf-right-handed-y-up"
+  },
+  "anthropometricsM": {
+    "shoulderWidth": 0.089151,
+    "torsoReferenceHeight": 0.318013,
+    "leftUpperArmLength": 0.275958,
+    "leftForearmLength": 0.202408,
+    "leftHandLength": 0.173782
+  },
+  "deformChains": {
+    "left": ["DEF-spine.003", "DEF-shoulder.L", "DEF-upper_arm.L", "DEF-upper_arm.L.001", "DEF-forearm.L", "DEF-forearm.L.001", "DEF-hand.L"],
+    "right": ["DEF-spine.003", "DEF-shoulder.R", "DEF-upper_arm.R", "DEF-upper_arm.R.001", "DEF-forearm.R", "DEF-forearm.R.001", "DEF-hand.R"]
+  },
+  "palmBases": {
+    "left": [0.854276, 0.071593, -0.514866],
+    "right": [-0.858007, 0.074004, -0.508279]
+  },
+  "capabilities": {
+    "manual.fingerJoints": "structurally_verified",
+    "manual.palmOrientation": "structurally_verified",
+    "arm.parentHierarchy": "structurally_verified",
+    "arm.reachability": "unsupported",
+    "endpointGeometry": "unsupported",
+    "contactSolving": "unsupported",
+    "collisionSolving": "unsupported",
+    "facialMorphTargets": "unsupported"
+  },
+  "conformance": {
+    "structuralChain": "passed-temporary-export",
+    "positionToleranceM": 0.015,
+    "orientationToleranceDeg": 4,
+    "contactToleranceM": 0.01,
+    "productionCertified": false
+  }
+}
