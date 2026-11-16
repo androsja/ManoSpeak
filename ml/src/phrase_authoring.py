@@ -70,6 +70,7 @@ def phrase_drafts_for_gloss(
     surface = _spanish_surface(normalized_gloss, speech_aliases)
     normalized_class = lexical_class.strip().lower()
 
+    templates: tuple[tuple[str, str, tuple[str, ...]], ...]
     if normalized_class == "verb":
         first_person = _first_person_verb_surface(surface, speech_aliases)
         templates = (

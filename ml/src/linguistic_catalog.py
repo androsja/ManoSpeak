@@ -10,7 +10,7 @@ from typing import Any
 
 from .sign_catalog import (
     DISALLOWED_SPEECH_FORMS_BY_GLOSS,
-    authoring_linguistic_defaults,
+    AuthoringMetadata, authoring_linguistic_defaults,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -125,7 +125,7 @@ def speech_forms(entry: dict[str, Any] | None) -> list[str]:
     return forms
 
 
-def editor_metadata(gloss: str) -> dict[str, object]:
+def editor_metadata(gloss: str) -> AuthoringMetadata:
     """Provide editor defaults from the catalog for existing and new records."""
 
     entry = find_entry(gloss)

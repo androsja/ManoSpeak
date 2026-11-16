@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass
+from typing import TypedDict
 
 
 @dataclass(frozen=True)
@@ -142,6 +143,10 @@ VERB_SPEECH_FORMS: dict[str, tuple[str, ...]] = {
         "iba", "ibas", "íbamos", "ibais", "iban",
         "iré", "irás", "irá", "iremos", "iréis", "irán",
         "iría", "irías", "iríamos", "iríais", "irían",
+    ),
+    "CAMINAR": _regular_verb_forms("caminar") + (
+        "camine", "camines", "caminemos", "caminéis", "caminen",
+        "caminando", "caminado", "caminada",
     ),
     "VENIR": (
         "venir", "vengo", "vienes", "viene", "venimos", "venís", "vienen",
@@ -531,6 +536,7 @@ SIGN_LEARNING_PATH: tuple[SignCatalogEntry, ...] = (
     SignCatalogEntry("Verbos frecuentes", "QUERER"),
     SignCatalogEntry("Verbos frecuentes", "TENER"),
     SignCatalogEntry("Verbos frecuentes", "IR"),
+    SignCatalogEntry("Verbos frecuentes", "CAMINAR"),
     SignCatalogEntry("Verbos frecuentes", "VENIR"),
     SignCatalogEntry("Verbos frecuentes", "HACER"),
     SignCatalogEntry("Verbos frecuentes", "VER"),
@@ -768,7 +774,15 @@ _LEGACY_CONCEPT_GLOSSES = {
 }
 
 
-def authoring_linguistic_defaults(gloss: str) -> dict[str, object]:
+class AuthoringMetadata(TypedDict):
+    categories: list[str]
+    lexical_class: str
+    verb_type: str
+    review_status: str
+    speech_aliases: list[str]
+
+
+def authoring_linguistic_defaults(gloss: str) -> AuthoringMetadata:
     """Return safe authoring metadata for a curated, not-yet-published gloss."""
     normalized = gloss.strip().upper()
     concept_gloss = _LEGACY_CONCEPT_GLOSSES.get(normalized, normalized)

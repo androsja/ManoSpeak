@@ -152,7 +152,7 @@ def first_tracked(index: int) -> Vector:
 
 
 baseline_shoulder = first_tracked(pose_indices[0])
-baseline_hand_points = next(
+baseline_hand_points: list[list[float]] = next(
     (
         captured[hand_start : hand_start + 21]
         for captured in captured_frames

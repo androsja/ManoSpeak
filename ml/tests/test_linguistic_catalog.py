@@ -53,7 +53,9 @@ def test_catalog_has_unique_canonical_glosses() -> None:
     glosses = [entry["gloss"] for entry in catalog["entries"]]
 
     assert len(glosses) == len(set(glosses))
-    assert find_entry("ÉL")["motion"]["clip"] == "EL"
+    entry = find_entry("ÉL")
+    assert entry is not None
+    assert entry["motion"]["clip"] == "EL"
 
 
 def test_editor_and_mobile_use_the_same_forms_for_every_published_sign() -> None:

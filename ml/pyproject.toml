@@ -26,3 +26,12 @@ mypy = "^1.0.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+explicit_package_bases = true
+
+# These APIs are supplied by Blender/the desktop host or lack typing metadata.
+# Keep checking our callers; only their external imports are dynamic.
+[[tool.mypy.overrides]]
+module = ["bpy", "mathutils", "webview", "pandas", "scipy.*", "onnxruntime.*"]
+ignore_missing_imports = true

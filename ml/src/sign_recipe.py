@@ -6,11 +6,25 @@ import json
 import math
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, SupportsFloat, SupportsIndex, SupportsInt
 
 HandSide = Literal["left", "right"]
 PalmOrientation = Literal["camera", "up", "down", "in", "out"]
 BodyAnchor = Literal["none", "chin", "mouth", "forehead", "cheek", "chest"]
+
+
+def numeric_value(value: object) -> float:
+    """Convert numeric JSON/editor values while rejecting non-numeric objects."""
+    if isinstance(value, (str, bytes, bytearray, SupportsFloat, SupportsIndex)):
+        return float(value)
+    raise TypeError("Expected a numeric value.")
+
+
+def integer_value(value: object) -> int:
+    """Convert integer editor values without accepting containers or null."""
+    if isinstance(value, (str, bytes, bytearray, SupportsInt, SupportsIndex)):
+        return int(value)
+    raise TypeError("Expected an integer value.")
 
 
 @dataclass(frozen=True)
@@ -132,17 +146,17 @@ class SignRecipe:
             if kind not in {"entry", "point", "exit"}:
                 raise ValueError("Motion point kind must be entry, point or exit.")
             try:
-                time_seconds = float(keyframe["time_seconds"])
+                time_seconds = numeric_value(keyframe["time_seconds"])
                 values = (
-                    float(keyframe.get("height_cm", 0.0)),
-                    float(keyframe.get("lateral_cm", 0.0)),
-                    float(keyframe.get("depth_cm", 0.0)),
+                    numeric_value(keyframe.get("height_cm", 0.0)),
+                    numeric_value(keyframe.get("lateral_cm", 0.0)),
+                    numeric_value(keyframe.get("depth_cm", 0.0)),
                 )
                 facial_values = (
-                    float(keyframe.get("jaw_open", 0.0)),
-                    float(keyframe.get("mouth_pucker", 0.0)),
-                    float(keyframe.get("eye_wide", 0.0)),
-                    float(keyframe.get("brow_raise", 0.0)),
+                    numeric_value(keyframe.get("jaw_open", 0.0)),
+                    numeric_value(keyframe.get("mouth_pucker", 0.0)),
+                    numeric_value(keyframe.get("eye_wide", 0.0)),
+                    numeric_value(keyframe.get("brow_raise", 0.0)),
                 )
             except (KeyError, TypeError, ValueError) as error:
                 raise ValueError("Motion points require numeric time and offsets.") from error

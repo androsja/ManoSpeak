@@ -3,15 +3,27 @@ import hashlib
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 from torch.utils.data import DataLoader, Subset
 
-from model import PhonSSM
-from audit_dataset import parse_sample_identity
-from phonological_labels import PHONOLOGICAL_LABELS
-from train import LSCDataset, collate_fn, select_device
+if TYPE_CHECKING or __package__:
+    from .model import PhonSSM
+else:
+    from model import PhonSSM
+if TYPE_CHECKING or __package__:
+    from .audit_dataset import parse_sample_identity
+else:
+    from audit_dataset import parse_sample_identity
+if TYPE_CHECKING or __package__:
+    from .phonological_labels import PHONOLOGICAL_LABELS
+else:
+    from phonological_labels import PHONOLOGICAL_LABELS
+if TYPE_CHECKING or __package__:
+    from .train import LSCDataset, collate_fn, select_device
+else:
+    from train import LSCDataset, collate_fn, select_device
 
 
 def strongest_nonblank(logits: torch.Tensor, length: int, blank_index: int) -> int:

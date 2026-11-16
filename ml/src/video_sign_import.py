@@ -143,10 +143,10 @@ def audit_hand_tracking(
     ]
     palm_orientation_flip_frames = [
         index
-        for index in range(1, len(normals))
-        if normals[index] is not None
-        and normals[index - 1] is not None
-        and float(np.dot(normals[index], normals[index - 1])) < -0.25
+        for index, (previous_normal, current_normal) in enumerate(zip(normals, normals[1:]), start=1)
+        if current_normal is not None
+        and previous_normal is not None
+        and float(np.dot(current_normal, previous_normal)) < -0.25
     ]
     palm_collapse_frames = [
         index
@@ -437,7 +437,7 @@ def write_tracking_preview(
     height, width = image.shape[:2]
     writer = cv2.VideoWriter(
         str(output_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
+        cv2.VideoWriter.fourcc(*"mp4v"),
         fps if fps > 0.0 else 30.0,
         (width, height),
     )
@@ -476,7 +476,7 @@ def write_landmark_skeleton_preview(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     writer = cv2.VideoWriter(
         str(output_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
+        cv2.VideoWriter.fourcc(*"mp4v"),
         fps if fps > 0.0 else 30.0,
         (width, height),
     )

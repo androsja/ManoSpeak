@@ -5,11 +5,15 @@ Pipeline: PyTorch .pt → ONNX fp32 → ONNX INT8 (dynamic quantization)
 Output:   mobile/assets/models/phonssm.onnx
 """
 
+from typing import TYPE_CHECKING
 import os
 import argparse
 import numpy as np
 import torch
-from model import PhonSSM
+if TYPE_CHECKING or __package__:
+    from .model import PhonSSM
+else:
+    from model import PhonSSM
 
 
 def export(model_path: str, output_path: str) -> None:
@@ -32,7 +36,7 @@ def export(model_path: str, output_path: str) -> None:
     print("1/3 Exporting PyTorch → ONNX fp32...")
     torch.onnx.export(
         model,
-        dummy,
+        (dummy,),
         onnx_fp32_path,
         input_names=["landmarks"],
         output_names=["handshape", "location", "movement"],

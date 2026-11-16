@@ -1,8 +1,12 @@
+from typing import TYPE_CHECKING
 import os
 import argparse
 import numpy as np
 import torch
-from model import PhonSSM
+if TYPE_CHECKING or __package__:
+    from .model import PhonSSM
+else:
+    from model import PhonSSM
 
 def main():
     parser = argparse.ArgumentParser(description="Export PyTorch PhonSSM model to INT8 TFLite.")

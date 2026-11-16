@@ -70,7 +70,7 @@ def create_video_writer(path: Path, fps: float, frame_size: tuple[int, int]) -> 
     for codec in ("avc1", "mp4v"):
         writer = cv2.VideoWriter(
             str(path),
-            cv2.VideoWriter_fourcc(*codec),
+            cv2.VideoWriter.fourcc(*codec),
             fps,
             frame_size,
         )
@@ -115,7 +115,7 @@ def record_video(
     recording_started_at: float | None = None
     finished_at: float | None = None
     canceled = False
-    pending_frame = first_frame
+    pending_frame: np.ndarray | None = first_frame
 
     try:
         while True:

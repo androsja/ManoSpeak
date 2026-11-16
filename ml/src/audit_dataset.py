@@ -10,14 +10,23 @@ import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
 import numpy as np
 import torch
 
-from convert_lsc50 import convert_sample
-from lsc50_labels import LSC50_LABELS
-from phonological_labels import PHONOLOGICAL_LABELS
+if TYPE_CHECKING or __package__:
+    from .convert_lsc50 import convert_sample
+else:
+    from convert_lsc50 import convert_sample
+if TYPE_CHECKING or __package__:
+    from .lsc50_labels import LSC50_LABELS
+else:
+    from lsc50_labels import LSC50_LABELS
+if TYPE_CHECKING or __package__:
+    from .phonological_labels import PHONOLOGICAL_LABELS
+else:
+    from phonological_labels import PHONOLOGICAL_LABELS
 
 
 @dataclass(frozen=True)

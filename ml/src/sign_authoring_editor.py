@@ -14,10 +14,11 @@ import threading
 import time
 import tkinter as tk
 import unicodedata
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any, TypedDict
 from tkinter import filedialog, messagebox, ttk
 from urllib.parse import parse_qs, quote
 
@@ -58,7 +59,7 @@ if __package__ in (None, ""):
         missing_glosses_for_phrase,
         suggested_signs,
     )
-    from src.sign_recipe import SignRecipe
+    from src.sign_recipe import SignRecipe, numeric_value, integer_value
     from src.video_reference_recorder import record_video
     from src.video_sign_import import (
         build_recipe,
@@ -97,7 +98,7 @@ else:
         missing_glosses_for_phrase,
         suggested_signs,
     )
-    from .sign_recipe import SignRecipe
+    from .sign_recipe import SignRecipe, numeric_value, integer_value
     from .video_reference_recorder import record_video
     from .video_sign_import import (
         build_recipe,
@@ -126,6 +127,14 @@ FINGER_STATE_TO_PROFILE = {
 }
 PROFILE_TO_FINGER_STATE = {
     value: key for key, value in FINGER_STATE_TO_PROFILE.items()
+}
+HAND_PRESENTATION_OPTIONS = ("capturada", "mano en pico (dedos reunidos)")
+HAND_PRESENTATION_TO_PROFILE = {
+    "capturada": None,
+    "mano en pico (dedos reunidos)": "pinched",
+}
+PROFILE_TO_HAND_PRESENTATION = {
+    "pinched": "mano en pico (dedos reunidos)",
 }
 
 DURATION_MODE_MATCH_RECORDING = "IGUAL A LA GRABACIÓN"
@@ -161,7 +170,33 @@ def _resolved_avatar_duration_seconds(
     return requested_avatar_duration_seconds
 
 
-def _normalized_rig_hand_keyframes(value: object) -> list[dict[str, object]]:
+class RigHandPose(TypedDict):
+    elbowRotation: float
+    wristPitch: float
+    wristYaw: float
+    wristRoll: float
+    horizontalOffset: float
+    verticalOffset: float
+    depthOffset: float
+    fist: float
+    pinch: float
+    fingers: dict[str, float]
+    fingerJoints: dict[str, list[float]]
+
+
+class RigHandKeyframe(TypedDict):
+    frame: int
+    transitionFrames: int
+    smile: float
+    mouthPucker: float
+    mouthOpening: float
+    eyeWidening: float
+    browRaise: float
+    left: RigHandPose
+    right: RigHandPose
+
+
+def _normalized_rig_hand_keyframes(value: object) -> list[RigHandKeyframe]:
     """Validate browser-authored avatar keyframes before they touch source assets."""
 
     if not isinstance(value, list) or len(value) > 256:
@@ -171,14 +206,14 @@ def _normalized_rig_hand_keyframes(value: object) -> list[dict[str, object]]:
         if isinstance(raw, bool):
             raise ValueError("Avatar edit values must be numeric.")
         try:
-            number = float(raw)
+            number = numeric_value(raw)
         except (TypeError, ValueError) as error:
             raise ValueError("Avatar edit values must be numeric.") from error
         if not math.isfinite(number) or not minimum <= number <= maximum:
             raise ValueError("A hand edit value is outside its supported range.")
         return number
 
-    def normalized_pose(raw: object) -> dict[str, object]:
+    def normalized_pose(raw: object) -> RigHandPose:
         pose = raw if isinstance(raw, dict) else {}
         fingers = pose.get("fingers", {})
         if not isinstance(fingers, dict):
@@ -214,6 +249,7 @@ def _normalized_rig_hand_keyframes(value: object) -> list[dict[str, object]]:
             ),
             "depthOffset": bounded_number(pose.get("depthOffset", 0.0), -1.0, 1.0),
             "fist": bounded_number(pose.get("fist", 0.0), 0.0, 1.0),
+            "pinch": bounded_number(pose.get("pinch", 0.0), 0.0, 1.0),
             "fingers": {
                 finger: bounded_number(fingers.get(finger, 0.0), -1.0, 1.0)
                 for finger in RIG_EDIT_FINGERS
@@ -223,7 +259,7 @@ def _normalized_rig_hand_keyframes(value: object) -> list[dict[str, object]]:
             },
         }
 
-    keyframes_by_frame: dict[int, dict[str, object]] = {}
+    keyframes_by_frame: dict[int, RigHandKeyframe] = {}
     for raw_keyframe in value:
         if not isinstance(raw_keyframe, dict):
             raise ValueError("Each hand keyframe must be a JSON object.")
@@ -246,11 +282,36 @@ def _normalized_rig_hand_keyframes(value: object) -> list[dict[str, object]]:
     return [keyframes_by_frame[frame] for frame in sorted(keyframes_by_frame)]
 
 
+def _normalized_hand_profile_values(
+    value: object,
+    minimum: float,
+    maximum: float,
+) -> dict[str, float | None]:
+    """Normalize bilateral editor values while accepting the legacy left scalar."""
+
+    raw_values = value if isinstance(value, dict) else {"left": value}
+    normalized: dict[str, float | None] = {"left": None, "right": None}
+    for side in normalized:
+        raw = raw_values.get(side)
+        if raw is None:
+            continue
+        if isinstance(raw, bool):
+            raise ValueError("Hand profile edit values must be numeric.")
+        try:
+            number = numeric_value(raw)
+        except (TypeError, ValueError) as error:
+            raise ValueError("Hand profile edit values must be numeric.") from error
+        if not math.isfinite(number):
+            raise ValueError("Hand profile edit values must be finite.")
+        normalized[side] = max(minimum, min(maximum, number))
+    return normalized
+
+
 def _merge_rig_hand_keyframes(
     profiles: object,
     gloss: str,
-    keyframes: list[dict[str, object]],
-) -> dict[str, object]:
+    keyframes: Sequence[Mapping[str, object]],
+) -> dict[str, Any]:
     """Update one sign without replacing any of its other avatar corrections."""
 
     updated = dict(profiles) if isinstance(profiles, dict) else {}
@@ -272,7 +333,7 @@ class _MobilePreviewRequestHandler(SimpleHTTPRequestHandler):
 
     def __init__(
         self,
-        *args: object,
+        *args: Any,
         profile_path: Path | None = None,
         runtime_profile_path: Path | None = None,
         catalog_path: Path | None = None,
@@ -281,7 +342,7 @@ class _MobilePreviewRequestHandler(SimpleHTTPRequestHandler):
         candidate_motion_path: Path | None = None,
         published_motion_path: Path | None = None,
         reviewed_change_callback: Callable[[str], None] | None = None,
-        **kwargs: object,
+        **kwargs: Any,
     ) -> None:
         self.profile_path = profile_path
         self.runtime_profile_path = runtime_profile_path
@@ -429,6 +490,20 @@ class _MobilePreviewRequestHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - inherited HTTP method name
         request_path, _, query = self.path.partition("?")
+        if request_path == "/api/refresh-preview":
+            try:
+                if self.profile_path is None or self.runtime_profile_path is None:
+                    raise ValueError("This preview was not opened from the VOZUAL editor.")
+                source_profiles = json.loads(
+                    self.profile_path.read_text(encoding="utf-8")
+                )
+                if not isinstance(source_profiles, dict):
+                    raise ValueError("The avatar profiles file must contain an object.")
+                self._write_json(self.runtime_profile_path, source_profiles)
+                self._send_json(200, {"ok": True})
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+                self._send_json(400, {"ok": False, "error": str(error)})
+            return
         if request_path != "/api/sign-approval":
             super().do_GET()
             return
@@ -483,10 +558,12 @@ class _MobilePreviewRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, self._compilation_review_payload(gloss))
                 return
             keyframes = _normalized_rig_hand_keyframes(payload.get("keyframes"))
-            raw_spread = payload.get("indexMiddleSpread")
-            spread = None if raw_spread is None else max(0.0, min(0.08, float(raw_spread)))
-            raw_roll = payload.get("forearmAxialRollDegrees")
-            roll = None if raw_roll is None else max(-180.0, min(180.0, float(raw_roll)))
+            spreads = _normalized_hand_profile_values(
+                payload.get("indexMiddleSpread"), 0.0, 0.08
+            )
+            rolls = _normalized_hand_profile_values(
+                payload.get("forearmAxialRollDegrees"), -180.0, 180.0
+            )
             if self.profile_path is None or self.runtime_profile_path is None:
                 raise ValueError("This preview was not opened from the VOZUAL editor.")
 
@@ -497,16 +574,15 @@ class _MobilePreviewRequestHandler(SimpleHTTPRequestHandler):
             updated_source = _merge_rig_hand_keyframes(
                 source_profiles, gloss, keyframes
             )
-            if spread is not None:
-                source_profile = dict(updated_source.get(gloss, {}))
-                source_profile["rigLeftIndexMiddleSpread"] = round(spread, 3)
-                updated_source[gloss] = source_profile
-            if spread is not None or roll is not None:
+            if any(value is not None for value in (*spreads.values(), *rolls.values())):
                 profile = dict(updated_source.get(gloss, {}))
-                if spread is not None:
-                    profile["rigLeftIndexMiddleSpread"] = round(spread, 3)
-                if roll is not None:
-                    profile["rigLeftForearmAxialRollDegrees"] = round(roll, 1)
+                for side, profile_prefix in (("left", "Left"), ("right", "Right")):
+                    spread = spreads[side]
+                    roll = rolls[side]
+                    if spread is not None:
+                        profile[f"rig{profile_prefix}IndexMiddleSpread"] = round(spread, 3)
+                    if roll is not None:
+                        profile[f"rig{profile_prefix}ForearmAxialRollDegrees"] = round(roll, 1)
                 updated_source[gloss] = profile
             self._write_json(self.profile_path, updated_source)
 
@@ -519,16 +595,15 @@ class _MobilePreviewRequestHandler(SimpleHTTPRequestHandler):
             updated_runtime = _merge_rig_hand_keyframes(
                 runtime_profiles, gloss, keyframes
             )
-            if spread is not None:
-                runtime_profile = dict(updated_runtime.get(gloss, {}))
-                runtime_profile["rigLeftIndexMiddleSpread"] = round(spread, 3)
-                updated_runtime[gloss] = runtime_profile
-            if spread is not None or roll is not None:
+            if any(value is not None for value in (*spreads.values(), *rolls.values())):
                 profile = dict(updated_runtime.get(gloss, {}))
-                if spread is not None:
-                    profile["rigLeftIndexMiddleSpread"] = round(spread, 3)
-                if roll is not None:
-                    profile["rigLeftForearmAxialRollDegrees"] = round(roll, 1)
+                for side, profile_prefix in (("left", "Left"), ("right", "Right")):
+                    spread = spreads[side]
+                    roll = rolls[side]
+                    if spread is not None:
+                        profile[f"rig{profile_prefix}IndexMiddleSpread"] = round(spread, 3)
+                    if roll is not None:
+                        profile[f"rig{profile_prefix}ForearmAxialRollDegrees"] = round(roll, 1)
                 updated_runtime[gloss] = profile
             self._write_json(self.runtime_profile_path, updated_runtime)
             self._notify_reviewed_change(gloss)
@@ -584,8 +659,16 @@ class SignAuthoringEditor:
             finger: tk.StringVar(value="capturado") for finger in FINGER_NAMES
         }
         self.loaded_finger_states = self._default_finger_state_snapshot()
+        self.left_hand_presentation = tk.StringVar(value="capturada")
+        self.right_hand_presentation = tk.StringVar(value="capturada")
+        self.loaded_left_hand_presentation = "capturada"
+        self.loaded_right_hand_presentation = "capturada"
         self.left_index_middle_spread = tk.DoubleVar(value=0.025)
         self.loaded_index_middle_spread = 0.025
+        self.rig_left_soft_hand_curl = tk.BooleanVar(value=False)
+        self.rig_right_soft_hand_curl = tk.BooleanVar(value=False)
+        self.loaded_rig_left_soft_hand_curl = False
+        self.loaded_rig_right_soft_hand_curl = False
         self.forward = tk.DoubleVar(value=0.45)
         self.return_to_rest = tk.BooleanVar(value=True)
         self.entry_height_cm = tk.DoubleVar(value=0.0)
@@ -625,6 +708,7 @@ class SignAuthoringEditor:
         self.mobile_preview_gloss: str | None = None
         self.mobile_preview_root: Path | None = None
         self.embedded_preview_nonce: str | None = None
+        self.embedded_preview_return_window: tk.Toplevel | None = None
         self.mobile_preview_signatures: dict[
             str, tuple[tuple[str, int, int], ...]
         ] = {}
@@ -748,6 +832,18 @@ class SignAuthoringEditor:
             pady=8,
             font=("Arial", 9, "bold"),
         ).pack(side="right", anchor="n")
+        tk.Button(
+            header,
+            text="LECTOR JSON DEL AVATAR",
+            command=self._open_kinematic_json_reader,
+            bg="#26384e",
+            fg=text,
+            activebackground="#344b65",
+            activeforeground=text,
+            relief="flat",
+            font=("Arial", 9, "bold"),
+            cursor="pointinghand",
+        ).pack(side="right", anchor="n", padx=(0, 10), pady=2)
 
         # Stage state is still used to keep status messages synchronized, but
         # the three-card tutorial was removed: the two visible work areas make
@@ -1600,6 +1696,36 @@ class SignAuthoringEditor:
             highlightthickness=0,
             troughcolor="#26374b",
         ).grid(row=4, column=2, columnspan=4, sticky="ew", padx=2, pady=(4, 0))
+        tk.Label(
+            finger_panel,
+            text="Forma completa",
+            fg=muted,
+            bg=card_soft,
+            font=("Arial", 8, "bold"),
+        ).grid(row=5, column=0, sticky="w", pady=(8, 0))
+        for column, variable in ((1, self.left_hand_presentation), (4, self.right_hand_presentation)):
+            ttk.Combobox(
+                finger_panel,
+                textvariable=variable,
+                values=HAND_PRESENTATION_OPTIONS,
+                state="readonly",
+                width=22,
+            ).grid(row=5, column=column, columnspan=3, sticky="ew", padx=2, pady=(8, 0))
+        for column, label, flag_variable in (
+            (0, "Mano izquierda: dedos juntos y curvados (sin puño)", self.rig_left_soft_hand_curl),
+            (3, "Mano derecha: dedos juntos y curvados (sin puño)", self.rig_right_soft_hand_curl),
+        ):
+            tk.Checkbutton(
+                finger_panel,
+                text=label,
+                variable=flag_variable,
+                bg=card_soft,
+                fg=text,
+                selectcolor=card,
+                activebackground=card_soft,
+                activeforeground=text,
+                anchor="w",
+            ).grid(row=6, column=column, columnspan=3, sticky="w", pady=(8, 0))
 
         tk.Label(inspector, text="Distancia hacia adelante", fg=muted, bg=card_soft, font=("Arial", 9, "bold")).pack(anchor="w", pady=(14, 0))
         tk.Scale(inspector, variable=self.forward, from_=0.0, to=1.0, resolution=0.05, orient="horizontal", bg=card_soft, fg=text, highlightthickness=0, troughcolor="#26374b").pack(fill="x")
@@ -1700,7 +1826,7 @@ class SignAuthoringEditor:
 
         editor = tk.Frame(adjustments, bg=card_soft)
         editor.grid(row=3, column=0, columnspan=5, sticky="ew", pady=(10, 0))
-        for column, (label, variable, lower, upper, increment) in enumerate(
+        for column, (label, control_variable, lower, upper, increment) in enumerate(
             (
                 ("Momento", self.motion_kind, None, None, None),
                 ("Segundo", self.motion_time_seconds, 0.0, 5.0, 0.05),
@@ -1716,15 +1842,16 @@ class SignAuthoringEditor:
             if column == 0:
                 ttk.Combobox(
                     box,
-                    textvariable=variable,
+                    textvariable=control_variable,
                     values=("entry", "point", "exit"),
                     state="readonly",
                     width=9,
                 ).pack(fill="x", pady=(3, 0))
             else:
+                assert lower is not None and upper is not None and increment is not None
                 tk.Spinbox(
                     box,
-                    textvariable=variable,
+                    textvariable=control_variable,
                     from_=lower,
                     to=upper,
                     increment=increment,
@@ -1744,7 +1871,7 @@ class SignAuthoringEditor:
             font=("Arial", 9, "bold"),
         )
         face_controls.grid(row=4, column=0, columnspan=5, sticky="ew", pady=(10, 0))
-        for column, (label, variable, explanation) in enumerate(
+        for column, (label, face_variable, explanation) in enumerate(
             (
                 ("Apertura de boca", self.face_jaw_open, "0 neutral · 1 abierta"),
                 ("Boca redonda (O)", self.face_mouth_pucker, "0 neutral · 1 labios redondos"),
@@ -1757,7 +1884,7 @@ class SignAuthoringEditor:
             face_controls.grid_columnconfigure(column, weight=1)
             tk.Label(box, text=label, fg=muted, bg=card_soft, font=("Arial", 8, "bold")).pack(anchor="w")
             tk.Scale(
-                box, variable=variable, from_=0.0, to=1.0, resolution=0.05,
+                box, variable=face_variable, from_=0.0, to=1.0, resolution=0.05,
                 orient="horizontal", showvalue=True, bg=card_soft, fg=text,
                 highlightthickness=0, troughcolor="#26374b", activebackground=accent,
             ).pack(fill="x")
@@ -2013,25 +2140,25 @@ class SignAuthoringEditor:
             )
         if not self.motion_keyframes:
             return
-        points = sorted(self.motion_keyframes, key=lambda point: float(point["time_seconds"]))
-        if current <= float(points[0]["time_seconds"]):
+        points = sorted(self.motion_keyframes, key=lambda point: numeric_value(point["time_seconds"]))
+        if current <= numeric_value(points[0]["time_seconds"]):
             point = points[0]
-        elif current >= float(points[-1]["time_seconds"]):
+        elif current >= numeric_value(points[-1]["time_seconds"]):
             point = points[-1]
         else:
             before, after = points[0], points[-1]
-            for left, right in zip(points, points[1:]):
-                if float(left["time_seconds"]) <= current <= float(right["time_seconds"]):
-                    before, after = left, right
+            for left_point, right_point in zip(points, points[1:]):
+                if numeric_value(left_point["time_seconds"]) <= current <= numeric_value(right_point["time_seconds"]):
+                    before, after = left_point, right_point
                     break
-            left_time = float(before["time_seconds"])
-            right_time = float(after["time_seconds"])
+            left_time = numeric_value(before["time_seconds"])
+            right_time = numeric_value(after["time_seconds"])
             fraction = 0.0 if right_time == left_time else (current - left_time) / (right_time - left_time)
             point = {
                 "kind": "point",
                 "time_seconds": current,
                 **{
-                    name: float(before.get(name, 0.0)) + (float(after.get(name, 0.0)) - float(before.get(name, 0.0))) * fraction
+                    name: numeric_value(before.get(name, 0.0)) + (numeric_value(after.get(name, 0.0)) - numeric_value(before.get(name, 0.0))) * fraction
                     for name in (
                         "height_cm", "lateral_cm", "depth_cm",
                         "jaw_open", "mouth_pucker", "eye_wide", "brow_raise",
@@ -2040,13 +2167,13 @@ class SignAuthoringEditor:
             }
         self.motion_kind.set(str(point["kind"]))
         self.motion_time_seconds.set(round(current, 3))
-        self.motion_height_cm.set(float(point["height_cm"]))
-        self.motion_lateral_cm.set(float(point["lateral_cm"]))
-        self.motion_depth_cm.set(float(point["depth_cm"]))
-        self.face_jaw_open.set(float(point.get("jaw_open", 0.0)))
-        self.face_mouth_pucker.set(float(point.get("mouth_pucker", 0.0)))
-        self.face_eye_wide.set(float(point.get("eye_wide", 0.0)))
-        self.face_brow_raise.set(float(point.get("brow_raise", 0.0)))
+        self.motion_height_cm.set(numeric_value(point["height_cm"]))
+        self.motion_lateral_cm.set(numeric_value(point["lateral_cm"]))
+        self.motion_depth_cm.set(numeric_value(point["depth_cm"]))
+        self.face_jaw_open.set(numeric_value(point.get("jaw_open", 0.0)))
+        self.face_mouth_pucker.set(numeric_value(point.get("mouth_pucker", 0.0)))
+        self.face_eye_wide.set(numeric_value(point.get("eye_wide", 0.0)))
+        self.face_brow_raise.set(numeric_value(point.get("brow_raise", 0.0)))
 
     def _update_timeline_preview(self, current: float) -> None:
         if self.timeline_preview_label is None or self.tracking_capture is None:
@@ -2108,8 +2235,8 @@ class SignAuthoringEditor:
         connections = ((0, 1), (0, 5), (0, 9), (0, 13), (0, 17), (1, 2), (2, 3), (3, 4), (5, 6), (6, 7), (7, 8), (9, 10), (10, 11), (11, 12), (13, 14), (14, 15), (15, 16), (17, 18), (18, 19), (19, 20))
         for first, second in connections:
             cv2.line(frame, points[first], points[second], (40, 255, 220), 2, cv2.LINE_AA)
-        for point in points:
-            cv2.circle(frame, point, 4, (40, 255, 220), -1, cv2.LINE_AA)
+        for pixel_point in points:
+            cv2.circle(frame, pixel_point, 4, (40, 255, 220), -1, cv2.LINE_AA)
         cv2.putText(frame, f"AJUSTE PREVIO X:{lateral:+.1f} Y:{vertical:+.1f} Z:{depth:+.1f} cm", (12, height - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (40, 255, 220), 2, cv2.LINE_AA)
 
     def _reset_motion_adjustments(self) -> None:
@@ -2157,7 +2284,7 @@ class SignAuthoringEditor:
         for item in self.motion_tree.get_children():
             self.motion_tree.delete(item)
         labels = {"entry": "ENTRADA", "point": "PUNTO", "exit": "SALIDA"}
-        self.motion_keyframes.sort(key=lambda point: float(point["time_seconds"]))
+        self.motion_keyframes.sort(key=lambda point: numeric_value(point["time_seconds"]))
         for index, point in enumerate(self.motion_keyframes):
             self.motion_tree.insert(
                 "",
@@ -2165,10 +2292,10 @@ class SignAuthoringEditor:
                 iid=str(index),
                 values=(
                     labels[str(point["kind"])],
-                    f"{float(point['time_seconds']):.2f} s",
-                    f"{float(point['height_cm']):+.1f} cm",
-                    f"{float(point['lateral_cm']):+.1f} cm",
-                    f"{float(point['depth_cm']):+.1f} cm",
+                    f"{numeric_value(point['time_seconds']):.2f} s",
+                    f"{numeric_value(point['height_cm']):+.1f} cm",
+                    f"{numeric_value(point['lateral_cm']):+.1f} cm",
+                    f"{numeric_value(point['depth_cm']):+.1f} cm",
                 ),
             )
 
@@ -2182,14 +2309,14 @@ class SignAuthoringEditor:
             return
         point = self.motion_keyframes[index]
         self.motion_kind.set(str(point["kind"]))
-        self.motion_time_seconds.set(float(point["time_seconds"]))
-        self.motion_height_cm.set(float(point["height_cm"]))
-        self.motion_lateral_cm.set(float(point["lateral_cm"]))
-        self.motion_depth_cm.set(float(point["depth_cm"]))
-        self.face_jaw_open.set(float(point.get("jaw_open", 0.0)))
-        self.face_mouth_pucker.set(float(point.get("mouth_pucker", 0.0)))
-        self.face_eye_wide.set(float(point.get("eye_wide", 0.0)))
-        self.face_brow_raise.set(float(point.get("brow_raise", 0.0)))
+        self.motion_time_seconds.set(numeric_value(point["time_seconds"]))
+        self.motion_height_cm.set(numeric_value(point["height_cm"]))
+        self.motion_lateral_cm.set(numeric_value(point["lateral_cm"]))
+        self.motion_depth_cm.set(numeric_value(point["depth_cm"]))
+        self.face_jaw_open.set(numeric_value(point.get("jaw_open", 0.0)))
+        self.face_mouth_pucker.set(numeric_value(point.get("mouth_pucker", 0.0)))
+        self.face_eye_wide.set(numeric_value(point.get("eye_wide", 0.0)))
+        self.face_brow_raise.set(numeric_value(point.get("brow_raise", 0.0)))
 
     def _edited_motion_point(self) -> dict[str, object] | None:
         try:
@@ -2199,9 +2326,9 @@ class SignAuthoringEditor:
                 raise ValueError
             point = self._motion_point(self.motion_kind.get(), time_seconds)
             if any(
-                abs(float(point[name])) > 30.0
+                abs(numeric_value(point[name])) > 30.0
                 for name in ("height_cm", "lateral_cm", "depth_cm")
-            ) or any(not 0.0 <= float(point[name]) <= 1.0 for name in ("jaw_open", "mouth_pucker", "eye_wide", "brow_raise")):
+            ) or any(not 0.0 <= numeric_value(point[name]) <= 1.0 for name in ("jaw_open", "mouth_pucker", "eye_wide", "brow_raise")):
                 raise ValueError
             return point
         except (tk.TclError, ValueError):
@@ -2216,8 +2343,8 @@ class SignAuthoringEditor:
         point = self._edited_motion_point()
         if point is None:
             return
-        time_seconds = float(point["time_seconds"])
-        if any(abs(float(existing["time_seconds"]) - time_seconds) < 0.001 for existing in self.motion_keyframes):
+        time_seconds = numeric_value(point["time_seconds"])
+        if any(abs(numeric_value(existing["time_seconds"]) - time_seconds) < 0.001 for existing in self.motion_keyframes):
             messagebox.showerror(
                 "Segundo duplicado",
                 "Ya existe un parámetro en ese segundo. Selecciónalo y actualízalo.",
@@ -2232,10 +2359,10 @@ class SignAuthoringEditor:
         point = self._edited_motion_point()
         if index is None or point is None:
             return
-        time_seconds = float(point["time_seconds"])
+        time_seconds = numeric_value(point["time_seconds"])
         if any(
             other_index != index
-            and abs(float(existing["time_seconds"]) - time_seconds) < 0.001
+            and abs(numeric_value(existing["time_seconds"]) - time_seconds) < 0.001
             for other_index, existing in enumerate(self.motion_keyframes)
         ):
             messagebox.showerror(
@@ -3954,7 +4081,7 @@ class SignAuthoringEditor:
         catalog = catalog_path or (
             REPO_ROOT / "mobile/assets/data/lsc_linguistic_catalog.json"
         )
-        published: list[object]
+        published: Sequence[object]
         if catalog.is_file():
             entries = load_catalog(catalog).get("entries", [])
             published = sorted(
@@ -4257,6 +4384,186 @@ class SignAuthoringEditor:
         )
         return manifest
 
+    def _open_kinematic_json_reader(self) -> None:
+        """Open the second editor screen for a v3 authored motion JSON."""
+
+        background = "#07111f"
+        card = "#111e2e"
+        text = "#f5f8fc"
+        muted = "#9fb0c4"
+        accent = "#20d6ce"
+        dialog = tk.Toplevel(self.root, bg=background)
+        dialog.title("VOZUAL · Lector JSON del avatar")
+        dialog.geometry("1120x720")
+        dialog.minsize(980, 650)
+        dialog.configure(bg=background)
+        self.root.withdraw()
+
+        def return_to_editor() -> None:
+            if self.embedded_preview_return_window is dialog:
+                self.embedded_preview_return_window = None
+            dialog.destroy()
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
+
+        dialog.protocol("WM_DELETE_WINDOW", return_to_editor)
+        selected_path = tk.StringVar(
+            value=str(REPO_ROOT / "mobile/assets/motions/hola.motion.v3.json")
+        )
+        summary = tk.StringVar(value="Selecciona un JSON v3 para validarlo y simularlo.")
+        simulate_button: tk.Button | None = None
+
+        body = tk.Frame(dialog, bg=background, padx=28, pady=24)
+        body.pack(fill="both", expand=True)
+        tk.Button(
+            body,
+            text="← VOLVER AL EDITOR",
+            command=return_to_editor,
+            bg="#26384e",
+            fg=text,
+            activebackground="#344b65",
+            activeforeground=text,
+            relief="flat",
+            font=("Arial", 9, "bold"),
+            cursor="pointinghand",
+        ).pack(anchor="w", pady=(0, 18), ipadx=10, ipady=5)
+        tk.Label(body, text="LECTOR JSON DEL AVATAR", fg=text, bg=background, font=("Arial", 19, "bold")).pack(anchor="w")
+        tk.Label(
+            body,
+            text="Pantalla 2 · compila el JSON con el motor móvil y abre el mismo avatar sin instalar nada en Android.",
+            fg=accent,
+            bg=background,
+            font=("Arial", 10, "bold"),
+            wraplength=650,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 16))
+        picker = tk.Frame(body, bg=card, padx=12, pady=12)
+        picker.pack(fill="x")
+        tk.Label(picker, text="ARCHIVO JSON V3", fg=muted, bg=card, font=("Arial", 9, "bold")).pack(anchor="w")
+        row = tk.Frame(picker, bg=card)
+        row.pack(fill="x", pady=(7, 0))
+        tk.Entry(row, textvariable=selected_path, bg="#0d1928", fg=text, insertbackground=text, relief="flat", font=("Arial", 10)).pack(side="left", fill="x", expand=True, ipady=7)
+
+        def choose_json() -> None:
+            chosen = filedialog.askopenfilename(
+                parent=dialog,
+                title="Elegir movimiento cinemático JSON",
+                initialdir=str(REPO_ROOT / "mobile/assets/motions"),
+            )
+            if chosen:
+                selected_path.set(chosen)
+
+        tk.Button(row, text="ELEGIR", command=choose_json, bg="#26384e", fg=text, activebackground="#344b65", activeforeground=text, relief="flat", font=("Arial", 9, "bold"), cursor="pointinghand").pack(side="left", padx=(8, 0), ipady=7)
+        tk.Label(body, textvariable=summary, fg=muted, bg=background, font=("Arial", 10), wraplength=650, justify="left").pack(anchor="w", pady=(16, 12))
+
+        def simulate() -> None:
+            nonlocal simulate_button
+            path = Path(selected_path.get()).expanduser()
+            if not path.is_file():
+                messagebox.showerror("No se encontró el JSON", "Elige un archivo .motion.v3.json existente.", parent=dialog)
+                return
+            if simulate_button is not None:
+                simulate_button.configure(state="disabled", text="VALIDANDO Y ABRIENDO AVATAR…")
+            summary.set("El Editor está usando el compilador y runtime de mobile. No se modifica la app Android.")
+            self._stop_mobile_preview_server()
+            threading.Thread(target=build_preview, args=(path,), daemon=True).start()
+
+        def build_preview(path: Path) -> None:
+            try:
+                server, url, preview_root, gloss = self._build_kinematic_json_runtime_preview(path)
+            except (OSError, TypeError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as error:
+                self.root.after(0, partial(fail_preview, str(error)))
+                return
+            self.root.after(0, lambda: finish_preview(server, url, preview_root, gloss))
+
+        def fail_preview(details: str) -> None:
+            if simulate_button is not None:
+                simulate_button.configure(state="normal", text="VER JSON EN EL AVATAR")
+            summary.set("El JSON no pudo validarse. Corrige el archivo antes de simularlo.")
+            messagebox.showerror("No se pudo abrir la simulación", details, parent=dialog)
+
+        def finish_preview(server: ThreadingHTTPServer, url: str, preview_root: Path, gloss: str) -> None:
+            self.mobile_preview_server = server
+            self.mobile_preview_url = url
+            self.mobile_preview_gloss = gloss
+            self.mobile_preview_root = preview_root
+            if simulate_button is not None:
+                simulate_button.configure(state="normal", text="ABRIR AVATAR DE NUEVO")
+            summary.set(f"{gloss} está listo en el mismo avatar y runtime de Vozual móvil.")
+            self.embedded_preview_return_window = dialog
+            self._show_embedded_mobile_preview(url, gloss)
+
+        simulate_button = tk.Button(
+            body,
+            text="ABRIR AVATAR",
+            command=simulate,
+            bg=accent,
+            fg=background,
+            activebackground="#63e5df",
+            activeforeground=background,
+            relief="flat",
+            font=("Arial", 11, "bold"),
+            cursor="pointinghand",
+        )
+        simulate_button.pack(fill="x", ipady=10)
+        tk.Label(
+            body,
+            text="Esto es una vista de desarrollo. Abrir un JSON no lo publica ni altera la biblioteca de señas.",
+            fg="#6f8298",
+            bg=background,
+            font=("Arial", 9),
+            wraplength=650,
+            justify="left",
+        ).pack(anchor="w", pady=(12, 0))
+
+    def _build_kinematic_json_runtime_preview(
+        self,
+        motion_path: Path,
+    ) -> tuple[ThreadingHTTPServer, str, Path, str]:
+        """Compile one v3 JSON and serve it through the mobile avatar runtime."""
+
+        motion_path = motion_path.resolve()
+        motion = json.loads(motion_path.read_text(encoding="utf-8"))
+        if not isinstance(motion, dict) or motion.get("schemaVersion") != 3:
+            raise ValueError("El lector solo acepta JSON de movimiento cinemático schemaVersion 3.")
+        glosses = motion.get("linguisticIntent", {}).get("glossSequence", [])
+        gloss = str(glosses[0] if isinstance(glosses, list) and glosses else motion.get("id", "SEÑA")).strip().upper()
+        if not gloss:
+            raise ValueError("El JSON debe declarar linguisticIntent.glossSequence.")
+
+        mobile_root = REPO_ROOT / "mobile"
+        preview_root = self._mobile_preview_root()
+        runtime_dir = preview_root / "runtime"
+        motions_dir = runtime_dir / "motions"
+        if preview_root.exists():
+            shutil.rmtree(preview_root)
+        motions_dir.mkdir(parents=True)
+        asset_name = gloss.lower()
+        profile_path = REPO_ROOT / "schemas/rig-profiles/vozual-rig-1.v1.json"
+        compiled_plan = motions_dir / f"{asset_name}.runtime-plan.json"
+        node = self._node_executable()
+        subprocess.run(
+            [str(node), str(mobile_root / "tools/compile-authored-motion.cjs"), "--input", str(motion_path), "--profile", str(profile_path), "--output", str(compiled_plan), "--sample-rate", "120"],
+            cwd=mobile_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        (motions_dir / "published_signs.json").write_text(json.dumps({"publishedGlosses": [gloss]}, ensure_ascii=False), encoding="utf-8")
+        shutil.copy2(mobile_root / "assets/motions/avatar_profile_overrides.json", motions_dir / "avatar_profiles.json")
+        esbuild = mobile_root / "node_modules/.bin/esbuild"
+        if not esbuild.is_file():
+            raise FileNotFoundError("No se encontró esbuild. Ejecuta npm install dentro de mobile.")
+        subprocess.run([str(esbuild), "tools/avatar-runtime.ts", "--bundle", "--minify", "--format=iife", "--platform=browser", f"--outfile={runtime_dir / 'runtime.js'}"], cwd=mobile_root, check=True, capture_output=True, text=True)
+        shutil.copy2(mobile_root / "tools/avatar/json-reader.html", runtime_dir / "index.html")
+        shutil.copy2(mobile_root / "assets/models/vozual_woman_avatar_hands_v4.glb", runtime_dir / "vozual_woman_avatar.glb")
+        handler = partial(_MobilePreviewRequestHandler, directory=str(runtime_dir))
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server, f"http://127.0.0.1:{int(server.server_address[1])}/?gloss={quote(gloss, safe='')}", preview_root, gloss
+
     def _stop_mobile_preview_server(self) -> None:
         server = self.mobile_preview_server
         preview_root = self.mobile_preview_root
@@ -4310,7 +4617,11 @@ class SignAuthoringEditor:
             )
             return False
         self.embedded_preview_nonce = nonce
-        self.root.withdraw()
+        preview_return_window = self.embedded_preview_return_window
+        if preview_return_window is not None and preview_return_window.winfo_exists():
+            preview_return_window.withdraw()
+        else:
+            self.root.withdraw()
         self.root.after(250, self._poll_embedded_preview_closed)
         return True
 
@@ -4330,9 +4641,16 @@ class SignAuthoringEditor:
             if payload.get("nonce") == nonce and payload.get("closed") is True:
                 self.embedded_preview_nonce = None
                 response_path.unlink(missing_ok=True)
-                self.root.deiconify()
-                self.root.lift()
-                self.root.focus_force()
+                preview_return_window = self.embedded_preview_return_window
+                self.embedded_preview_return_window = None
+                if preview_return_window is not None and preview_return_window.winfo_exists():
+                    preview_return_window.deiconify()
+                    preview_return_window.lift()
+                    preview_return_window.focus_force()
+                else:
+                    self.root.deiconify()
+                    self.root.lift()
+                    self.root.focus_force()
                 return
         self.root.after(250, self._poll_embedded_preview_closed)
 
@@ -5188,7 +5506,7 @@ class SignAuthoringEditor:
 
     @staticmethod
     def _mobile_install_failure_details(
-        error: OSError | subprocess.CalledProcessError,
+        error: OSError | TypeError | ValueError | subprocess.CalledProcessError,
     ) -> str:
         """Keep the actionable Gradle output instead of only bundle warnings."""
         if isinstance(error, subprocess.CalledProcessError):
@@ -5568,8 +5886,9 @@ class SignAuthoringEditor:
                     )
                 )
             )
-        if not legacy_work_action and isinstance(data.get("linguistic_categories"), list):
-            self.linguistic_categories.set(", ".join(str(category) for category in data["linguistic_categories"])
+        stored_categories = data.get("linguistic_categories")
+        if not legacy_work_action and isinstance(stored_categories, list):
+            self.linguistic_categories.set(", ".join(str(category) for category in stored_categories)
             )
         if not legacy_work_action:
             self.lexical_class.set(str(data.get("lexical_class", self.lexical_class.get())))
@@ -5583,7 +5902,7 @@ class SignAuthoringEditor:
         self.landmark_path = landmark_path
         reference = json.loads(landmark_path.read_text(encoding="utf-8"))
         self.reference_frames = reference.get("rawFrames", [])
-        self.reference_fps = int(data.get("output_fps", reference.get("fps", 30)) or 30)
+        self.reference_fps = integer_value(data.get("output_fps", reference.get("fps", 30)) or 30)
         final_duration_seconds = float(self.duration_seconds.get())
         if self.reference_frames:
             final_duration_seconds = (
@@ -5596,7 +5915,7 @@ class SignAuthoringEditor:
         self.anchor.set(str(data.get("contact_anchor", "chin")))
         self.contact_palm.set(str(data.get("palm_at_contact", "camera")))
         self.release_palm.set(str(data.get("palm_at_release", "up")))
-        self.forward.set(float(data.get("forward_distance", 0.45)))
+        self.forward.set(numeric_value(data.get("forward_distance", 0.45)))
         self.return_to_rest.set(bool(data.get("return_to_rest", True)))
         self._load_avatar_finger_states(gloss)
         self._load_motion_adjustments(data)
@@ -5931,6 +6250,8 @@ class SignAuthoringEditor:
             font=("Arial", 10, "bold"),
         ).pack(side="left", fill="x", expand=True, padx=(5, 0), ipady=5)
 
+        last_photo: list[ImageTk.PhotoImage | None] = [None]
+
         def show_next_frame() -> None:
             if not running["value"] or not window.winfo_exists():
                 return
@@ -5942,10 +6263,10 @@ class SignAuthoringEditor:
                 ok, frame = capture.read()
             if ok:
                 image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                image.thumbnail((940, 620), Image.LANCZOS)
+                image.thumbnail((940, 620), Image.Resampling.LANCZOS)
                 photo = ImageTk.PhotoImage(image)
                 video_label.configure(image=photo)
-                video_label.image = photo
+                last_photo[0] = photo
             window.after(delay_ms, show_next_frame)
 
         def toggle_pause() -> None:
@@ -6054,7 +6375,7 @@ class SignAuthoringEditor:
         self.anchor.set(str(data["contact_anchor"]))
         self.contact_palm.set(str(data["palm_at_contact"]))
         self.release_palm.set(str(data["palm_at_release"]))
-        self.forward.set(float(data["forward_distance"]))
+        self.forward.set(numeric_value(data["forward_distance"]))
         self.return_to_rest.set(bool(data["return_to_rest"]))
         self._load_avatar_finger_states(self.loaded_review_gloss)
         self._load_motion_adjustments(data)
@@ -6320,7 +6641,7 @@ class SignAuthoringEditor:
         self.anchor.set(str(data["contact_anchor"]))
         self.contact_palm.set(str(data["palm_at_contact"]))
         self.release_palm.set(str(data["palm_at_release"]))
-        self.forward.set(float(data["forward_distance"]))
+        self.forward.set(numeric_value(data["forward_distance"]))
         self.return_to_rest.set(bool(data["return_to_rest"]))
         self._load_avatar_finger_states(self.loaded_review_gloss)
         self._load_motion_adjustments(data)
@@ -6407,9 +6728,36 @@ class SignAuthoringEditor:
         except (OSError, json.JSONDecodeError):
             profiles = {}
         profile = profiles.get(gloss, {}) if isinstance(profiles, dict) else {}
+        self.left_index_middle_spread.set(0.025)
+        self.loaded_index_middle_spread = 0.025
+        self.left_hand_presentation.set("capturada")
+        self.right_hand_presentation.set("capturada")
+        self.loaded_left_hand_presentation = "capturada"
+        self.loaded_right_hand_presentation = "capturada"
+        self.rig_left_soft_hand_curl.set(False)
+        self.rig_right_soft_hand_curl.set(False)
+        self.loaded_rig_left_soft_hand_curl = False
+        self.loaded_rig_right_soft_hand_curl = False
         if isinstance(profile, dict):
+            self.left_hand_presentation.set(
+                PROFILE_TO_HAND_PRESENTATION.get(
+                    str(profile.get("rigLeftHandShape", "")), "capturada"
+                )
+            )
+            self.right_hand_presentation.set(
+                PROFILE_TO_HAND_PRESENTATION.get(
+                    str(profile.get("rigRightHandShape", "")), "capturada"
+                )
+            )
+            self.loaded_left_hand_presentation = self.left_hand_presentation.get()
+            self.loaded_right_hand_presentation = self.right_hand_presentation.get()
             self.left_index_middle_spread.set(float(profile.get("rigLeftIndexMiddleSpread", 0.025)))
             self.loaded_index_middle_spread = self.left_index_middle_spread.get()
+            legacy_soft_curl = bool(profile.get("rigSoftHandCurl", False))
+            self.rig_left_soft_hand_curl.set(bool(profile.get("rigLeftSoftHandCurl", legacy_soft_curl)))
+            self.rig_right_soft_hand_curl.set(bool(profile.get("rigRightSoftHandCurl", legacy_soft_curl)))
+            self.loaded_rig_left_soft_hand_curl = self.rig_left_soft_hand_curl.get()
+            self.loaded_rig_right_soft_hand_curl = self.rig_right_soft_hand_curl.get()
         snapshot = self._finger_states_from_profile(
             profile if isinstance(profile, dict) else {}
         )
@@ -6425,11 +6773,11 @@ class SignAuthoringEditor:
 
     @staticmethod
     def _merge_finger_states_into_profiles(
-        profiles: dict[str, object],
+        profiles: Mapping[str, Any],
         gloss: str,
         current: dict[str, dict[str, str]],
         previous: dict[str, dict[str, str]],
-    ) -> tuple[dict[str, object], bool]:
+    ) -> tuple[dict[str, Any], bool]:
         updated = dict(profiles)
         stored_profile = updated.get(gloss, {})
         profile = dict(stored_profile) if isinstance(stored_profile, dict) else {}
@@ -6482,6 +6830,63 @@ class SignAuthoringEditor:
             profile["rigLeftIndexMiddleSpread"] = spread
             updated[gloss] = profile
             changed = True
+        hand_presentations = (
+            (
+                "rigLeftHandShape",
+                "rigLeftFingerStates",
+                "rigLeftSoftHandCurl",
+                self.left_hand_presentation.get(),
+                self.loaded_left_hand_presentation,
+            ),
+            (
+                "rigRightHandShape",
+                "rigRightFingerStates",
+                "rigRightSoftHandCurl",
+                self.right_hand_presentation.get(),
+                self.loaded_right_hand_presentation,
+            ),
+        )
+        for shape_key, states_key, soft_curl_key, presentation, loaded_presentation in hand_presentations:
+            if presentation == loaded_presentation:
+                continue
+            profile = dict(updated.get(gloss, {})) if isinstance(updated.get(gloss, {}), dict) else {}
+            hand_shape = HAND_PRESENTATION_TO_PROFILE[presentation]
+            if hand_shape is None:
+                profile.pop(shape_key, None)
+            else:
+                profile[shape_key] = hand_shape
+                profile.pop(states_key, None)
+                profile.pop(soft_curl_key, None)
+            if profile:
+                updated[gloss] = profile
+            else:
+                updated.pop(gloss, None)
+            changed = True
+            if shape_key == "rigLeftHandShape":
+                self.loaded_left_hand_presentation = presentation
+            else:
+                self.loaded_right_hand_presentation = presentation
+        soft_curl_values = (
+            ("rigLeftSoftHandCurl", self.rig_left_soft_hand_curl.get(), self.loaded_rig_left_soft_hand_curl),
+            ("rigRightSoftHandCurl", self.rig_right_soft_hand_curl.get(), self.loaded_rig_right_soft_hand_curl),
+        )
+        for key, soft_hand_curl, loaded_soft_hand_curl in soft_curl_values:
+            if soft_hand_curl == loaded_soft_hand_curl:
+                continue
+            profile = dict(updated.get(gloss, {})) if isinstance(updated.get(gloss, {}), dict) else {}
+            if soft_hand_curl:
+                profile[key] = True
+            else:
+                profile.pop(key, None)
+            if profile:
+                updated[gloss] = profile
+            else:
+                updated.pop(gloss, None)
+            changed = True
+            if key == "rigLeftSoftHandCurl":
+                self.loaded_rig_left_soft_hand_curl = soft_hand_curl
+            else:
+                self.loaded_rig_right_soft_hand_curl = soft_hand_curl
         if changed:
             AVATAR_PROFILE_OVERRIDES_PATH.write_text(
                 json.dumps(updated, ensure_ascii=False, indent=2) + "\n",
@@ -6500,12 +6905,12 @@ class SignAuthoringEditor:
 
         if raw_frame_count <= 0:
             return 0
-        source_start = int(data.get("source_start_frame", 0))
+        source_start = integer_value(data.get("source_start_frame", 0))
         raw_source_end = data.get("source_end_frame")
         source_end = (
             raw_frame_count - 1
             if raw_source_end is None
-            else int(raw_source_end)
+            else integer_value(raw_source_end)
         )
         return max(0, source_end - source_start + 1)
 
@@ -6518,7 +6923,7 @@ class SignAuthoringEditor:
             ("exit_lateral_cm", self.exit_lateral_cm),
             ("exit_depth_cm", self.exit_depth_cm),
         ):
-            variable.set(float(data.get(key, 0.0)))
+            variable.set(numeric_value(data.get(key, 0.0)))
         captured_duration = (
             self._recipe_output_frame_count(data, len(self.reference_frames))
             / max(1, self.reference_fps)
@@ -6547,16 +6952,16 @@ class SignAuthoringEditor:
             {
                 "kind": "entry",
                 "time_seconds": 0.0,
-                "height_cm": float(data.get("entry_height_cm", 0.0)),
-                "lateral_cm": float(data.get("entry_lateral_cm", 0.0)),
-                "depth_cm": float(data.get("entry_depth_cm", 0.0)),
+                "height_cm": numeric_value(data.get("entry_height_cm", 0.0)),
+                "lateral_cm": numeric_value(data.get("entry_lateral_cm", 0.0)),
+                "depth_cm": numeric_value(data.get("entry_depth_cm", 0.0)),
             },
             {
                 "kind": "exit",
                 "time_seconds": duration,
-                "height_cm": float(data.get("exit_height_cm", 0.0)),
-                "lateral_cm": float(data.get("exit_lateral_cm", 0.0)),
-                "depth_cm": float(data.get("exit_depth_cm", 0.0)),
+                "height_cm": numeric_value(data.get("exit_height_cm", 0.0)),
+                "lateral_cm": numeric_value(data.get("exit_lateral_cm", 0.0)),
+                "depth_cm": numeric_value(data.get("exit_depth_cm", 0.0)),
             },
         ]
 

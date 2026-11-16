@@ -2,6 +2,7 @@ import io
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 from src import sign_authoring_editor
 from src.sign_authoring_editor import SignAuthoringEditor
@@ -202,8 +203,9 @@ def test_mobile_preview_normalizes_generic_hand_keyframes() -> None:
                     "wristRoll": -24,
                     "horizontalOffset": -0.25,
                     "verticalOffset": 0.3,
-                    "depthOffset": 0.65,
+                "depthOffset": 0.65,
                 "fist": 0.75,
+                "pinch": 1.0,
                 "fingers": {"index": -0.4},
                 "fingerJoints": {"index": [0.2, 0.5, 0.8]},
                 },
@@ -224,6 +226,7 @@ def test_mobile_preview_normalizes_generic_hand_keyframes() -> None:
     assert normalized[1]["left"]["verticalOffset"] == 0.3
     assert normalized[1]["left"]["depthOffset"] == 0.65
     assert normalized[1]["left"]["fist"] == 0.75
+    assert normalized[1]["left"]["pinch"] == 1.0
     assert normalized[1]["left"]["fingers"]["index"] == -0.4
     assert normalized[1]["left"]["fingerJoints"]["index"] == [0.2, 0.5, 0.8]
     assert normalized[1]["left"]["fingerJoints"]["thumb"] == [0.0, 0.0, 0.0]
@@ -269,9 +272,11 @@ def test_mobile_preview_saves_hand_keyframes_to_source_and_runtime(
                     },
                 }
             ],
+            "indexMiddleSpread": {"left": 0.031, "right": 0.046},
+            "forearmAxialRollDegrees": {"left": -12, "right": 24},
         }
     ).encode("utf-8")
-    handler = sign_authoring_editor._MobilePreviewRequestHandler.__new__(
+    handler: Any = sign_authoring_editor._MobilePreviewRequestHandler.__new__(
         sign_authoring_editor._MobilePreviewRequestHandler
     )
     handler.path = "/api/rig-hand-keyframes"
@@ -304,6 +309,19 @@ def test_mobile_preview_saves_hand_keyframes_to_source_and_runtime(
         assert profile["rigHandKeyframes"][0]["browRaise"] == 0.25
         assert profile["rigHandKeyframes"][0]["left"]["wristRoll"] == -20
         assert profile["rigHandKeyframes"][0]["left"]["depthOffset"] == 0.7
+        assert profile["rigLeftIndexMiddleSpread"] == 0.031
+        assert profile["rigRightIndexMiddleSpread"] == 0.046
+        assert profile["rigLeftForearmAxialRollDegrees"] == -12
+        assert profile["rigRightForearmAxialRollDegrees"] == 24
+
+
+def test_mobile_preview_accepts_legacy_left_hand_profile_scalars() -> None:
+    assert sign_authoring_editor._normalized_hand_profile_values(
+        0.035, 0.0, 0.08
+    ) == {"left": 0.035, "right": None}
+    assert sign_authoring_editor._normalized_hand_profile_values(
+        -22, -180.0, 180.0
+    ) == {"left": -22.0, "right": None}
 
 
 def test_mobile_preview_distinguishes_library_state_from_hand_corrections() -> None:
@@ -328,6 +346,20 @@ def test_mobile_preview_distinguishes_library_state_from_hand_corrections() -> N
     assert 'id="rig-joint-base"' in preview
     assert 'id="rig-joint-middle"' in preview
     assert 'id="rig-joint-tip"' in preview
+    assert 'id="rig-hacer-fingertips"' in preview
+    assert "APLICAR MANO EN PICO" in preview
+    assert "function applyHacerFingertipsPreset()" in preview
+    assert "hand.pinch = 1" in preview
+    assert "targetProfile.indexMiddleSpread = pose.indexMiddleSpread" in preview
+    assert "rigEditorHandProfiles[rigEditorHand.value]" in preview
+    assert "rigHandProfilesSignature(rigEditorHandProfiles)" in preview
+    assert "right: rigEditorHandProfiles.right.indexMiddleSpread" in preview
+    assert "right: rigEditorHandProfiles.right.forearmAxialRollDegrees" in preview
+    assert "all five fingertips meet as one soft cone" in preview
+    assert (
+        "document.getElementById('rig-hacer-fingertips')"
+        ".addEventListener('click', applyHacerFingertipsPreset);"
+    ) in preview
     assert "+${value}% DELANTE" in preview
     assert "${value}% DERECHA" in preview
     assert "${value}% ARRIBA" in preview
@@ -384,7 +416,7 @@ def test_mobile_preview_owner_approval_updates_catalog_and_manifest(
     request_body = json.dumps({"gloss": "BLANCO", "approved": True}).encode(
         "utf-8"
     )
-    handler = sign_authoring_editor._MobilePreviewRequestHandler.__new__(
+    handler: Any = sign_authoring_editor._MobilePreviewRequestHandler.__new__(
         sign_authoring_editor._MobilePreviewRequestHandler
     )
     handler.path = "/api/sign-approval"
@@ -434,7 +466,7 @@ def test_mobile_preview_publishes_candidate_and_approves_it_in_one_action(
     request_body = json.dumps({"gloss": "CABALLO", "approved": True}).encode(
         "utf-8"
     )
-    handler = sign_authoring_editor._MobilePreviewRequestHandler.__new__(
+    handler: Any = sign_authoring_editor._MobilePreviewRequestHandler.__new__(
         sign_authoring_editor._MobilePreviewRequestHandler
     )
     handler.path = "/api/sign-approval"
@@ -477,7 +509,7 @@ def test_mobile_preview_owner_approval_get_lists_approved_signs(
     )
     catalog_path = tmp_path / "catalog.json"
     catalog_path.write_text(source_catalog.read_text(encoding="utf-8"), encoding="utf-8")
-    handler = sign_authoring_editor._MobilePreviewRequestHandler.__new__(
+    handler: Any = sign_authoring_editor._MobilePreviewRequestHandler.__new__(
         sign_authoring_editor._MobilePreviewRequestHandler
     )
     handler.path = "/api/sign-approval?gloss=BLANCO"
@@ -660,7 +692,7 @@ def test_publication_is_blocked_until_current_mobile_preview_is_reviewed(
     landmarks = tmp_path / "hola.landmarks.json"
     recipe.write_text("recipe", encoding="utf-8")
     landmarks.write_text("landmarks", encoding="utf-8")
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.root = object()
     editor.created_sign_paths = {"HOLA": (recipe, landmarks)}
     editor.mobile_preview_signatures = {}
@@ -702,13 +734,15 @@ def test_approved_review_survives_reopening_the_editor(
     landmarks = tmp_path / "alla.landmarks.json"
     recipe.write_text("recipe", encoding="utf-8")
     landmarks.write_text("landmarks", encoding="utf-8")
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.created_sign_paths = {"ALLÁ": (recipe, landmarks)}
     editor.mobile_preview_signatures = {}
     persisted: list[str] = []
-    editor._persist_mobile_preview_review = (
-        lambda gloss, _signature: persisted.append(gloss) or True
-    )
+    def persist_review(gloss: str, _signature: object) -> bool:
+        persisted.append(gloss)
+        return True
+
+    editor._persist_mobile_preview_review = persist_review
     monkeypatch.setattr(
         sign_authoring_editor,
         "find_entry",
@@ -737,7 +771,7 @@ def test_saved_preview_approval_refreshes_the_main_firebase_button(
     landmarks.write_text("landmarks", encoding="utf-8")
     button_updates: list[dict[str, object]] = []
     refreshed: list[str] = []
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.mobile_preview_gloss = "HOLA"
     editor.mobile_preview_signatures = {}
     editor.mobile_preview_button = type(
@@ -791,9 +825,10 @@ def test_mobile_preview_uses_the_native_app_bridge_without_a_browser(
             "after": lambda _self, _delay, callback: callbacks.append(callback),
         },
     )()
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.root = root
     editor.embedded_preview_nonce = None
+    editor.embedded_preview_return_window = None
 
     assert editor._show_embedded_mobile_preview(
         "http://127.0.0.1:54321/?gloss=BIEN",
@@ -838,7 +873,7 @@ def test_firebase_status_labels_distinguish_remote_and_local_state() -> None:
 def test_firebase_publication_runs_the_independent_sign_publisher(
     monkeypatch,
 ) -> None:
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     captured: dict[str, object] = {}
     editor.root = type(
         "ImmediateRoot",
@@ -882,7 +917,7 @@ def test_firebase_button_exports_and_publishes_only_the_loaded_sign(
 ) -> None:
     recipe = Path("buenos-dias.recipe.json")
     landmarks = Path("buenos-dias.landmarks.json")
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.root = object()
     editor._owner_approval_target = lambda: (
         "BUENOS DÍAS",
@@ -891,12 +926,11 @@ def test_firebase_button_exports_and_publishes_only_the_loaded_sign(
     )
     editor._published_mobile_glosses = lambda: {"BUENOS DÍAS", "HOLA"}
     confirmation_requests: list[tuple[list[str], bool]] = []
-    editor._confirm_mobile_previews = lambda glosses, **kwargs: (
-        confirmation_requests.append(
-            (glosses, bool(kwargs.get("request_confirmation", True)))
-        )
-        or glosses == ["BUENOS DÍAS"]
-    )
+    def confirm_previews(glosses: list[str], **kwargs: bool) -> bool:
+        confirmation_requests.append((glosses, kwargs.get("request_confirmation", True)))
+        return glosses == ["BUENOS DÍAS"]
+
+    editor._confirm_mobile_previews = confirm_previews
 
     exported: list[tuple[str, Path, Path]] = []
     registered: list[tuple[str, Path]] = []
@@ -945,13 +979,13 @@ def test_recipe_voice_override_does_not_restore_deleted_defaults(
         '{"speech_aliases": ["hermana"], "speech_aliases_overridden": true}',
         encoding="utf-8",
     )
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
 
     assert editor._speech_aliases_for_recipe("HERMANO", recipe_path) == ["hermana"]
 
 
 def test_loaded_sign_review_is_not_blocked_by_another_queue_selection() -> None:
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.loaded_review_gloss = "GRACIAS"
     editor._selected_created_gloss = lambda silent=False: ("AYER", Path("ayer.recipe.json"), Path("ayer.landmarks.json"))
 
@@ -1013,7 +1047,7 @@ def test_mobile_preview_registers_a_new_catalog_candidate_first(
         def start(self) -> None:
             started.append(True)
 
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.recipe_path = recipe
     editor.landmark_path = landmarks
     editor.gloss = _StatusValue("ALLÁ")
@@ -1040,7 +1074,7 @@ def test_mobile_preview_registers_a_new_catalog_candidate_first(
 
 
 def test_empty_legacy_timeline_uses_the_captured_duration() -> None:
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.reference_frames = [[] for _index in range(24)]
     editor.reference_fps = 30
     editor.duration_seconds = _StatusValue(1.2)
@@ -1101,6 +1135,55 @@ def test_finger_editor_does_not_touch_profiles_when_controls_are_unchanged() -> 
     assert profiles == original
 
 
+def test_hand_presentation_control_persists_and_clears_pinched_shape(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    profile_path = tmp_path / "avatar_profile_overrides.json"
+    profile_path.write_text(
+        json.dumps({"HACER": {"forceTwoHands": True}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sign_authoring_editor,
+        "AVATAR_PROFILE_OVERRIDES_PATH",
+        profile_path,
+    )
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor.left_finger_states = {
+        finger: _StatusValue("capturado")
+        for finger in sign_authoring_editor.FINGER_NAMES
+    }
+    editor.right_finger_states = {
+        finger: _StatusValue("capturado")
+        for finger in sign_authoring_editor.FINGER_NAMES
+    }
+    editor.loaded_finger_states = editor._default_finger_state_snapshot()
+    editor.left_index_middle_spread = _StatusValue(0.025)
+    editor.loaded_index_middle_spread = 0.025
+    editor.left_hand_presentation = _StatusValue(
+        "mano en pico (dedos reunidos)"
+    )
+    editor.right_hand_presentation = _StatusValue("capturada")
+    editor.loaded_left_hand_presentation = "capturada"
+    editor.loaded_right_hand_presentation = "capturada"
+    editor.rig_left_soft_hand_curl = _StatusValue(False)
+    editor.rig_right_soft_hand_curl = _StatusValue(False)
+    editor.loaded_rig_left_soft_hand_curl = False
+    editor.loaded_rig_right_soft_hand_curl = False
+
+    assert editor._save_avatar_finger_states("HACER") is True
+    stored = json.loads(profile_path.read_text(encoding="utf-8"))
+    assert stored["HACER"]["rigLeftHandShape"] == "pinched"
+    assert stored["HACER"]["forceTwoHands"] is True
+
+    editor.left_hand_presentation.set("capturada")
+    assert editor._save_avatar_finger_states("HACER") is True
+    stored = json.loads(profile_path.read_text(encoding="utf-8"))
+    assert "rigLeftHandShape" not in stored["HACER"]
+    assert stored["HACER"]["forceTwoHands"] is True
+
+
 def test_legacy_timeline_is_scaled_inside_the_captured_sequence() -> None:
     fitted = SignAuthoringEditor._fit_motion_keyframes_to_duration(
         [
@@ -1111,7 +1194,7 @@ def test_legacy_timeline_is_scaled_inside_the_captured_sequence() -> None:
         0.8,
     )
 
-    assert [round(float(point["time_seconds"]), 3) for point in fitted] == [
+    assert [round(sign_authoring_editor.numeric_value(point["time_seconds"]), 3) for point in fitted] == [
         0.0,
         0.4,
         0.8,
@@ -1119,7 +1202,7 @@ def test_legacy_timeline_is_scaled_inside_the_captured_sequence() -> None:
 
 
 def test_using_suggestion_loads_it_then_requests_a_different_random_word() -> None:
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.current_suggestion = SignCatalogEntry(
         category="Necesidades y emergencia",
         gloss="EMERGENCIA",
@@ -1161,7 +1244,7 @@ def test_using_suggestion_loads_it_then_requests_a_different_random_word() -> No
 def test_random_suggestion_excludes_the_word_just_prepared(monkeypatch) -> None:
     previous = SignCatalogEntry("Necesidades y emergencia", "EMERGENCIA")
     next_word = SignCatalogEntry("Necesidades y emergencia", "HOSPITAL")
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.created_sign_paths = {}
     editor.suggestion_category = _StatusValue("Necesidades y emergencia")
     editor.suggestion_label = _StatusValue()
@@ -1202,7 +1285,7 @@ def test_firebase_uploaded_glosses_exclude_every_remote_state() -> None:
 
 
 def test_suggestion_excludes_gloss_already_uploaded_to_firebase(monkeypatch) -> None:
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.created_sign_paths = {}
     editor.firebase_published_glosses = {"GRACIAS"}
     editor.suggestion_category = _StatusValue("Todas las categorías")
@@ -1211,11 +1294,11 @@ def test_suggestion_excludes_gloss_already_uploaded_to_firebase(monkeypatch) -> 
     editor._aliases_for_gloss = lambda _gloss: []
     captured_existing: list[set[str]] = []
 
-    monkeypatch.setattr(
-        sign_authoring_editor,
-        "suggested_signs",
-        lambda existing, _category: captured_existing.append(existing) or (),
-    )
+    def capture_suggestions(existing: set[str], _category: str) -> tuple[()]:
+        captured_existing.append(existing)
+        return ()
+
+    monkeypatch.setattr(sign_authoring_editor, "suggested_signs", capture_suggestions)
 
     editor._refresh_sign_suggestions()
 
@@ -1250,7 +1333,7 @@ def test_random_pending_sign_excludes_approved_and_previous(monkeypatch) -> None
 
 
 def test_publish_all_signs_exports_every_pending_sign(monkeypatch) -> None:
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.root = object()
     editor.created_sign_paths = {
         "HOLA": (Path("hola.recipe.json"), Path("hola.landmarks.json")),
@@ -1290,7 +1373,7 @@ def test_publish_all_signs_exports_every_pending_sign(monkeypatch) -> None:
 def test_owner_check_exports_and_adds_only_the_reviewed_sign(monkeypatch) -> None:
     recipe = Path("bien.recipe.json")
     landmarks = Path("bien.landmarks.json")
-    editor = SignAuthoringEditor.__new__(SignAuthoringEditor)
+    editor: Any = SignAuthoringEditor.__new__(SignAuthoringEditor)
     editor.root = object()
     editor.loaded_review_gloss = "BIEN"
     editor.recipe_path = recipe

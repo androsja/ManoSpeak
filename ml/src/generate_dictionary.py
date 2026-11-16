@@ -8,15 +8,25 @@ canonical dictionary key.
 Outputs a JSON file mapping "h,l,m" → gloss string (Spanish).
 """
 
+from typing import TYPE_CHECKING
 import os
 import json
 import argparse
 import numpy as np
 import torch
 from collections import Counter
-from model import PhonSSM
-from normalizers import normalize_landmarks
-from phonological_labels import PHONOLOGICAL_LABELS
+if TYPE_CHECKING or __package__:
+    from .model import PhonSSM
+else:
+    from model import PhonSSM
+if TYPE_CHECKING or __package__:
+    from .normalizers import normalize_landmarks
+else:
+    from normalizers import normalize_landmarks
+if TYPE_CHECKING or __package__:
+    from .phonological_labels import PHONOLOGICAL_LABELS
+else:
+    from phonological_labels import PHONOLOGICAL_LABELS
 
 
 def load_model(model_path: str, device: torch.device) -> PhonSSM:

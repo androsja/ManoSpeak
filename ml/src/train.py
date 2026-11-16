@@ -1,7 +1,7 @@
 # ruff: noqa: E402
 import argparse
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
@@ -10,9 +10,18 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset, WeightedRandomSampler
-from model import PhonSSM
-from normalizers import normalize_landmarks, apply_gaussian_jitter, apply_time_warping, apply_micro_scaling
-from phonological_labels import PHONOLOGICAL_LABELS
+if TYPE_CHECKING or __package__:
+    from .model import PhonSSM
+else:
+    from model import PhonSSM
+if TYPE_CHECKING or __package__:
+    from .normalizers import normalize_landmarks, apply_gaussian_jitter, apply_time_warping, apply_micro_scaling
+else:
+    from normalizers import normalize_landmarks, apply_gaussian_jitter, apply_time_warping, apply_micro_scaling
+if TYPE_CHECKING or __package__:
+    from .phonological_labels import PHONOLOGICAL_LABELS
+else:
+    from phonological_labels import PHONOLOGICAL_LABELS
 
 
 class LSCDataset(Dataset):

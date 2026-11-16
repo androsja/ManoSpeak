@@ -64,6 +64,7 @@ def test_priority_vocabulary_covers_accessibility_health_and_services() -> None:
 def test_new_verbs_reuse_one_sign_for_conjugated_voice_forms() -> None:
     escribir = authoring_linguistic_defaults("ESCRIBIR")
     ayudar = authoring_linguistic_defaults("AYUDAR")
+    caminar = authoring_linguistic_defaults("CAMINAR")
 
     assert escribir["lexical_class"] == "verb"
     assert isinstance(escribir["speech_aliases"], list)
@@ -79,6 +80,17 @@ def test_new_verbs_reuse_one_sign_for_conjugated_voice_forms() -> None:
         ayudar["speech_aliases"]
     )
     assert "auxilio" not in ayudar["speech_aliases"]
+    assert caminar["lexical_class"] == "verb"
+    assert caminar["categories"] == ["verbos_acciones"]
+    assert {
+        "caminar",
+        "camino",
+        "caminamos",
+        "caminó",
+        "caminarán",
+        "camine",
+        "caminando",
+    }.issubset(caminar["speech_aliases"])
 
     polite_forms = {
         "LLAMAR": "llame",

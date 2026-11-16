@@ -3,11 +3,14 @@ import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from phonological_labels import PHONOLOGICAL_LABELS
+if TYPE_CHECKING or __package__:
+    from .phonological_labels import PHONOLOGICAL_LABELS
+else:
+    from phonological_labels import PHONOLOGICAL_LABELS
 
 
 @dataclass(frozen=True)
