@@ -17,6 +17,7 @@ import {
   CapturedHandTrackingAudit,
   RiggedHandTrackingRepair,
 } from '../src/services/CapturedHandTrackingQuality';
+import {LegacyMotionDocument, parseLegacyMotionDocument} from '../src/services/LegacyMotionLoader';
 
 type AvatarProfile = {
   activeHand?: 'left' | 'right';
@@ -61,6 +62,7 @@ type SignAudit = {
   handTrackingStatus: 'CLEAN' | 'REVIEW' | 'HIGH';
   findings: string[];
   status: 'PASS' | 'REVIEW' | 'ERROR';
+  semantic?: SignMotion['semantic'];
 };
 
 type FaceAudit = {
@@ -279,7 +281,7 @@ function mergedProfile(
 
 function auditSign(
   gloss: string,
-  motion: SignMotion & {avatarProfile?: AvatarProfile},
+  motion: LegacyMotionDocument,
   profileOverride?: AvatarProfile,
 ): SignAudit {
   const findings = validateMotion(motion);
@@ -402,6 +404,7 @@ function auditSign(
     handTrackingStatus,
     findings,
     status: structuralError ? 'ERROR' : findings.length > 0 ? 'REVIEW' : 'PASS',
+    semantic: motion.semantic,
   };
 }
 
@@ -473,7 +476,10 @@ function main() {
   const glosses = catalog.publishedGlosses ?? [];
   const audits = glosses.map(gloss => {
     const motionPath = path.join(MOTION_DIRECTORY, `${gloss.toLowerCase()}.motion.json`);
-    const motion = JSON.parse(fs.readFileSync(motionPath, 'utf8')) as SignMotion & {avatarProfile?: AvatarProfile};
+    const motion = parseLegacyMotionDocument(
+      JSON.parse(fs.readFileSync(motionPath, 'utf8')),
+      motionPath,
+    );
     return auditSign(gloss, motion, overrides[gloss.toUpperCase()]);
   });
 

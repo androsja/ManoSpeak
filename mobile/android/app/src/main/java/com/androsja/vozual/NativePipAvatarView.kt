@@ -25,6 +25,7 @@ class NativePipAvatarView(context: Context) : WebView(context) {
   private var renderMode = DEFAULT_RENDER_MODE
   private var avatarZoom = DEFAULT_AVATAR_ZOOM
   private var playbackSpeed = DEFAULT_PLAYBACK_SPEED
+  private var playbackPaused = false
   private var pendingGloss = IDLE_GLOSS
   private var playbackId = 0
 
@@ -61,8 +62,14 @@ class NativePipAvatarView(context: Context) : WebView(context) {
     if (!runtimeReady) return
     playbackId += 1
     val installScript = installedMotionScript(pendingGloss)
-    val script = "$installScript window.playVozualClip(${JSONObject.quote(pendingGloss)}, $playbackId, $playbackSpeed, $continuePhrase); true;"
+    val script = "$installScript window.playVozualClip(${JSONObject.quote(pendingGloss)}, $playbackId, $playbackSpeed, $continuePhrase); window.setVozualPlaybackPaused?.($playbackPaused); true;"
     evaluateJavascript(script, null)
+  }
+
+  fun setPlaybackPaused(paused: Boolean) {
+    playbackPaused = paused
+    if (!runtimeReady) return
+    evaluateJavascript("window.setVozualPlaybackPaused?.($paused); true;", null)
   }
 
   private fun installedMotionScript(gloss: String): String {
@@ -152,7 +159,7 @@ class NativePipAvatarView(context: Context) : WebView(context) {
     private const val MIN_AVATAR_ZOOM = 0.85
     private const val MAX_AVATAR_ZOOM = 1.3
     private const val DEFAULT_PLAYBACK_SPEED = 1.0
-    private const val MIN_PLAYBACK_SPEED = 1.0
+    private const val MIN_PLAYBACK_SPEED = 0.5
     private const val MAX_PLAYBACK_SPEED = 4.0
     private val ALLOWED_RENDER_MODES = setOf("points", "rigged")
   }
@@ -165,6 +172,7 @@ object NativePipAvatarController {
   private var renderMode = "rigged"
   private var avatarZoom = 1.0
   private var playbackSpeed = 1.0
+  private var playbackPaused = false
   private val pendingSigns = ArrayDeque<String>()
   private var playingSign = false
   private var phraseInProgress = false
@@ -179,6 +187,7 @@ object NativePipAvatarController {
       view.play("IDLE")
       playNextIfAvailable()
     }
+    view.setPlaybackPaused(playbackPaused)
   }
 
   fun detach(view: NativePipAvatarView) {
@@ -191,6 +200,13 @@ object NativePipAvatarController {
     playbackSpeed = speed
     viewReference?.get()?.post {
       viewReference?.get()?.configure(renderMode, avatarZoom, playbackSpeed)
+    }
+  }
+
+  fun setPlaybackPaused(paused: Boolean) {
+    playbackPaused = paused
+    viewReference?.get()?.post {
+      viewReference?.get()?.setPlaybackPaused(playbackPaused)
     }
   }
 
@@ -221,6 +237,7 @@ object NativePipAvatarController {
     playingSign = false
     phraseInProgress = false
     pendingGloss = "IDLE"
+    playbackPaused = false
     viewReference?.get()?.post {
       viewReference?.get()?.play("IDLE")
       PictureInPictureModule.startNativeAnimationClock()

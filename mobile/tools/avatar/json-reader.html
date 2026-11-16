@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>VOZUAL · Avatar JSON</title>
+    <style>
+      :root { color-scheme: dark; font-family: Arial, sans-serif; }
+      * { box-sizing: border-box; }
+      body { min-height: 100vh; margin: 0; padding: 24px; display: grid; grid-template-columns: minmax(420px, 1fr) minmax(300px, 390px); gap: 24px; background: #07111f; color: #f5f8fc; }
+      #avatar { min-height: 0; height: calc(100vh - 48px); border-radius: 24px; overflow: hidden; background: #202a38; box-shadow: 0 20px 60px #0008; }
+      #avatar canvas { display: block; width: 100% !important; height: 100% !important; }
+      aside { display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 22px; border-radius: 20px; background: #111e2e; }
+      .eyebrow { color: #20d6ce; font-size: 12px; font-weight: 900; letter-spacing: 1px; }
+      h1 { margin: 0; font-size: 34px; }
+      p { margin: 0; color: #a9b8c9; font-size: 15px; line-height: 1.5; }
+      button { min-height: 54px; border: 0; border-radius: 14px; background: #20d6ce; color: #07111f; font-size: 16px; font-weight: 900; cursor: pointer; }
+      button:active { transform: scale(.99); }
+      label { display: grid; gap: 8px; color: #a9b8c9; font-size: 12px; font-weight: 800; }
+      input { width: 100%; accent-color: #20d6ce; }
+      #status { min-height: 20px; color: #6de3de; font-size: 13px; font-weight: 800; }
+      .note { color: #71839a; font-size: 12px; }
+      @media (max-width: 850px) { body { grid-template-columns: 1fr; } #avatar { height: 62vh; } }
+    </style>
+  </head>
+  <body>
+    <div id="avatar"></div>
+    <aside>
+      <div class="eyebrow">VOZUAL EDITOR · JSON V3</div>
+      <h1 id="title">SEÑA</h1>
+      <p>Esta vista reproduce el JSON con el mismo avatar y runtime que utiliza Vozual móvil.</p>
+      <label>VELOCIDAD <input id="speed" type="range" min="0.5" max="2" value="1" step="0.5" /></label>
+      <button id="play" type="button">REPRODUCIR SEÑA</button>
+      <div id="status">Cargando avatar…</div>
+      <p class="note">Vista local de desarrollo. No publica la seña ni modifica el celular.</p>
+    </aside>
+    <script>
+      const parameters = new URLSearchParams(window.location.search);
+      const gloss = (parameters.get('gloss') || 'SEÑA').trim().toUpperCase();
+      const title = document.getElementById('title');
+      const play = document.getElementById('play');
+      const speed = document.getElementById('speed');
+      const status = document.getElementById('status');
+      let playbackId = 1;
+      let ready = false;
+      title.textContent = gloss;
+
+      function replay() {
+        if (!ready || typeof window.playVozualClip !== 'function') return;
+        playbackId += 1;
+        window.setVozualRenderMode?.('rigged');
+        window.playVozualClip(gloss, playbackId, Number(speed.value), false);
+        status.textContent = `Reproduciendo ${gloss} · ${speed.value}×`;
+      }
+
+      play.addEventListener('click', replay);
+      window.ReactNativeWebView = {
+        postMessage(rawMessage) {
+          let message;
+          try { message = JSON.parse(rawMessage); } catch { return; }
+          if (message.type === 'ready') {
+            ready = true;
+            status.textContent = `${gloss} listo.`;
+            replay();
+          }
+          if (message.type === 'ended' && message.playbackId === playbackId) {
+            status.textContent = `${gloss} terminó. Pulsa REPRODUCIR SEÑA para verla otra vez.`;
+          }
+          if (message.type === 'error') status.textContent = message.message || 'No se pudo reproducir la seña.';
+        },
+      };
+    </script>
+    <script src="./runtime.js"></script>
+  </body>
+</html>

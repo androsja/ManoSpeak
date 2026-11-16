@@ -2,35 +2,32 @@
 
 Run with Blender:
 
-    blender --background --python tools/verify-rig-export.py -- avatar.glb
+    blender --background --python-exit-code 1 --python tools/verify-rig-export.py -- avatar.glb profile.json
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 from pathlib import Path
 
 import bpy
 
 
-def input_path() -> Path:
+def input_paths() -> tuple[Path, Path]:
     try:
         separator = sys.argv.index("--")
-        return Path(sys.argv[separator + 1]).expanduser().resolve()
+        source = Path(sys.argv[separator + 1]).expanduser().resolve()
+        profile = Path(sys.argv[separator + 2]).expanduser().resolve()
+        return source, profile
     except (ValueError, IndexError) as error:
-        raise RuntimeError("Pass an exported .glb path after --") from error
+        raise RuntimeError("Pass an exported .glb and profile path after --") from error
 
 
-def require_chain(armature: bpy.types.Object, side: str) -> None:
-    names = (
-        "DEF-spine.003",
-        f"DEF-shoulder.{side}",
-        f"DEF-upper_arm.{side}",
-        f"DEF-upper_arm.{side}.001",
-        f"DEF-forearm.{side}",
-        f"DEF-forearm.{side}.001",
-        f"DEF-hand.{side}",
-    )
+def require_chain(armature: bpy.types.Object, side: str, names: list[str]) -> None:
+    if len(names) < 2 or len(set(names)) != len(names):
+        raise RuntimeError(f"Invalid {side} profile chain")
     bones = armature.data.bones
     for parent_name, child_name in zip(names, names[1:]):
         child = bones.get(child_name)
@@ -39,16 +36,50 @@ def require_chain(armature: bpy.types.Object, side: str) -> None:
             raise RuntimeError(f"Invalid {side} deform chain: {child_name} parent is {actual}, expected {parent_name}")
 
 
+def require_facial_hierarchy(armature: bpy.types.Object) -> int:
+    prefixes = (
+        "DEF-brow.", "DEF-cheek.", "DEF-forehead.", "DEF-temple.", "DEF-ear.",
+        "DEF-jaw", "DEF-chin", "DEF-tongue", "DEF-eye.", "DEF-lid.",
+        "DEF-lip.", "DEF-nose", "DEF-teeth.",
+    )
+    head = armature.data.bones.get("DEF-spine.006")
+    if head is None:
+        raise RuntimeError("Missing DEF-spine.006 facial parent")
+    facial = [bone for bone in armature.data.bones if bone.name.startswith(prefixes)]
+    if not facial:
+        raise RuntimeError("Export contains no recognized facial deform bones")
+    detached = [bone.name for bone in facial if bone.parent is None]
+    if detached:
+        raise RuntimeError(f"Detached facial deform bones: {', '.join(detached[:8])}")
+    wrong_parent = [bone.name for bone in facial if bone.parent != head]
+    if wrong_parent:
+        raise RuntimeError(f"Facial bones do not use the declared head parent: {', '.join(wrong_parent[:8])}")
+    return len(facial)
+
+
 def main() -> None:
-    source = input_path()
+    source, profile_path = input_paths()
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    expected = profile.pop("sha256", None)
+    canonical = json.dumps(profile, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    if hashlib.sha256(canonical.encode("utf-8")).hexdigest() != expected:
+        raise RuntimeError("Rig profile checksum mismatch")
+    if profile.get("schema") != "vozual.rig-capability-profile" or profile.get("schemaVersion") != 2:
+        raise RuntimeError("A v2 rig capability profile is required")
+    if hashlib.sha256(source.read_bytes()).hexdigest() != profile.get("asset", {}).get("candidateSha256"):
+        raise RuntimeError("Candidate asset checksum mismatch")
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(source))
     armatures = [item for item in bpy.context.scene.objects if item.type == "ARMATURE"]
     if len(armatures) != 1:
         raise RuntimeError(f"Expected exactly one armature, found {len(armatures)}")
-    for side in ("L", "R"):
-        require_chain(armatures[0], side)
-    print(f"PASS: certified structural deform chains for {source.name}")
+    for side in ("left", "right"):
+        chain = profile.get("deformChains", {}).get(side)
+        if not isinstance(chain, list) or any(not isinstance(name, str) or not name for name in chain):
+            raise RuntimeError(f"Missing {side} profile chain")
+        require_chain(armatures[0], side, chain)
+    facial_count = require_facial_hierarchy(armatures[0])
+    print(f"PASS: candidate hash, bilateral deform chains, and {facial_count} facial parent links for {source.name}")
 
 
 if __name__ == "__main__":

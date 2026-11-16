@@ -163,8 +163,28 @@ describe('LscPhraseAssetCatalogService', () => {
 
     expect(result).toEqual({
       status: 'ambiguous',
-      candidateIds: ['greeting.hello', 'greeting.general'],
+      candidates: [
+        {id: 'greeting.hello', intendedMeaning: 'Greeting another person'},
+        {id: 'greeting.general', intendedMeaning: 'Greeting another person'},
+      ],
       message: 'Esta frase puede tener más de un significado en LSC. Elige una opción del catálogo.',
     });
+  });
+
+  it('resolves the explicitly selected approved meaning when a phrase is ambiguous', () => {
+    const reviewed = catalog([
+      approvedEntry(),
+      approvedEntry({id: 'greeting.general'}),
+    ]);
+
+    expect(resolvePlayableLscPhrase(
+      'buenas',
+      [installedAsset],
+      reviewed,
+      'greeting.general',
+    )).toEqual(expect.objectContaining({
+      status: 'matched',
+      entry: expect.objectContaining({id: 'greeting.general'}),
+    }));
   });
 });

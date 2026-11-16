@@ -1,36 +1,37 @@
 import {
-  resolveInstalledSignPlan,
-  type InstalledLinguisticSign,
-} from './LinguisticCatalogService';
-import {
   resolvePlayableLscPhrase,
   type InstalledLscAsset,
 } from './LscPhraseAssetCatalogService';
 
 export type RuntimeLscPlayback = {
-  status: 'reviewed' | 'draft' | 'unsupported';
+  status: 'reviewed';
   glosses: string[];
+  message: string;
+} | {
+  status: 'ambiguous';
+  glosses: [];
+  message: string;
+  candidates: Array<{id: string; intendedMeaning: string}>;
+} | {
+  status: 'unsupported';
+  glosses: [];
   message: string;
 };
 
-type RuntimeInstalledSign = InstalledLscAsset & InstalledLinguisticSign;
-
-const DRAFT_PREVIEW_MESSAGE =
-  'Vista previa de desarrollo: esta animación todavía no tiene validación lingüística LSC.';
-
 /**
- * Firebase-installed signs have already passed the editor's approved,
- * compiled and published gate. They are therefore playable in release builds
- * as individual signs and ordered sign sequences. The phrase catalog remains
- * the stronger path for reviewed fixed expressions; development-only draft
- * preview is retained for assets that have not passed publication.
+ * The phrase catalogue is the runtime trust boundary. Installed assets alone
+ * are never enough to animate the avatar: the exact confirmed Spanish phrase
+ * must resolve to an active, reviewed entry whose ordered clips pass checksum
+ * verification. This prevents a downloaded individual sign from becoming an
+ * unreviewed word-for-word or approximate LSC translation.
  */
 export function resolveRuntimeLscPlayback(
   text: string,
-  installedSigns: readonly RuntimeInstalledSign[],
-  allowDraftPreview: boolean,
+  installedSigns: readonly InstalledLscAsset[],
+  catalog?: unknown,
+  selectedEntryId?: string,
 ): RuntimeLscPlayback {
-  const reviewed = resolvePlayableLscPhrase(text, installedSigns);
+  const reviewed = resolvePlayableLscPhrase(text, installedSigns, catalog, selectedEntryId);
   if (reviewed.status === 'matched') {
     return {
       status: 'reviewed',
@@ -38,25 +39,13 @@ export function resolveRuntimeLscPlayback(
       message: '',
     };
   }
-
-  const publishedPlan = resolveInstalledSignPlan(text, installedSigns);
-  // A missing optional grammar marker (for example YO for "como") must not
-  // discard the sign that is installed and directly matched from speech.
-  if (publishedPlan.tokens.length > 0) {
+  if (reviewed.status === 'ambiguous') {
     return {
-      status: 'reviewed',
-      glosses: publishedPlan.tokens.map(token => token.gloss),
-      message: '',
+      status: 'ambiguous',
+      glosses: [],
+      message: reviewed.message,
+      candidates: reviewed.candidates,
     };
   }
-
-  if (allowDraftPreview) {
-    const draft = resolveInstalledSignPlan(text, installedSigns);
-    const glosses = draft.tokens.map(token => token.gloss);
-    if (glosses.length > 0) {
-      return {status: 'draft', glosses, message: DRAFT_PREVIEW_MESSAGE};
-    }
-  }
-
   return {status: 'unsupported', glosses: [], message: reviewed.message};
 }

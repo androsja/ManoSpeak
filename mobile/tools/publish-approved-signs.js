@@ -9,6 +9,7 @@ const {
   phraseReleaseSha256,
   signReleaseSha256,
 } = require('./build-published-signs');
+const {validateStorageAssetMetadata} = require('./storage-asset-contract');
 
 const MOBILE_ROOT = path.resolve(__dirname, '..');
 const REPOSITORY_ROOT = path.resolve(MOBILE_ROOT, '..');
@@ -202,6 +203,17 @@ function selectSignsForPublication(signs, glosses) {
 }
 
 async function publishApprovedSigns(options = {}) {
+  // Firestore rules now prohibit executable Base64 payloads. Keeping this
+  // legacy entry point callable would invite a split, non-atomic release path:
+  // sign metadata could become visible before the motion is safely stored.
+  // Task 19 replaces it with AtomicReleasePublisher plus privileged Storage
+  // and pointer-store adapters. This explicit failure is intentional until
+  // Task 22 migrates historical data into releases.
+  throw new Error(
+    'The legacy Firestore/Base64 publisher is retired. Publish immutable release artifacts through AtomicReleasePublisher.',
+  );
+
+  /* c8 ignore start -- retained only as migration reference; unreachable by design. */
   const build = buildPublishedSigns();
   const project = readFirebaseProject();
   if (!project) throw new Error('The Firebase project is not configured.');
@@ -264,6 +276,7 @@ async function publishApprovedSigns(options = {}) {
     if (contentBase64.length > 900_000) {
       throw new Error(`${sign.id} exceeds the safe Firestore document size.`);
     }
+    validateStorageAssetMetadata(sign.data, {allowLegacy: true});
     const existing = existingSigns.get(sign.id);
     const isCurrent = isCurrentPublishedSign(existing, sign.data);
     if (isCurrent) {
@@ -293,6 +306,10 @@ async function publishApprovedSigns(options = {}) {
       releaseSha256: sign.data.releaseSha256,
       avatarProfile: sign.data.avatarProfile,
       sizeBytes: sign.data.sizeBytes,
+      storagePath: sign.data.storagePath,
+      downloadUrl: sign.data.downloadUrl,
+      semanticPath: sign.data.semanticPath,
+      profilePath: sign.data.profilePath,
       approved: true,
       compiled: true,
       published: true,
@@ -412,6 +429,7 @@ async function publishApprovedSigns(options = {}) {
     unchangedPhrases,
     retiredPhrases,
   };
+  /* c8 ignore stop */
 }
 
 if (require.main === module) {

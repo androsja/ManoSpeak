@@ -1267,6 +1267,18 @@
     "rigFistHands": true,
     "rigHandFrontDepth": 0.38
   },
+  "HACER": {
+    "forceTwoHands": true,
+    "rigLeftHandShape": "pinched",
+    "rigRightHandShape": "pinched",
+    "rigCanonicalPinchedPalm": true,
+    "rigLeftHandTrackingRepair": "locked-palm",
+    "rigRightHandTrackingRepair": "locked-palm",
+    "rigLeftPalmScaleMin": 1.0,
+    "rigLeftPalmScaleMax": 1.0,
+    "rigRightPalmScaleMin": 1.0,
+    "rigRightPalmScaleMax": 1.0
+  },
   "TÚ": {
     "rigPointingHand": true
   },

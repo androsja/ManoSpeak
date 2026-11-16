@@ -21,6 +21,7 @@ import {
   type PublishedSign,
   type SignLanguageStatus,
 } from '../services/SignLanguageService';
+import {playableLscPhraseSuggestions} from '../services/LscPhraseAssetCatalogService';
 import {useI18n} from '../i18n/I18n';
 
 type Props = {
@@ -120,10 +121,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
   );
   const possiblePhrases = useMemo(() => {
     const language = languages.find(candidate => candidate.selected) ?? languages[0];
-    return recommendedPhrasesForInstalledLibrary(
-      language?.installedPhrases ?? [],
-      language?.installedSigns ?? [],
-    );
+    return playableLscPhraseSuggestions(language?.installedSigns ?? []);
   }, [languages]);
   const possiblePhrase = possiblePhrases.length > 0
     ? possiblePhrases[suggestionIndex % possiblePhrases.length]

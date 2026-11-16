@@ -1,0 +1,72 @@
+{
+  "signs": [
+    {
+      "id": "lsc-co-create",
+      "data": {
+        "languageId": "lsc-co",
+        "gloss": "CREAR",
+        "version": 1,
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "profileSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "releaseSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "storagePath": "lsc-co/signs/lsc-co-create/v1/create.motion.bin",
+        "semanticPath": "lsc-co/signs/lsc-co-create/v1/create.semantic.json",
+        "profilePath": "lsc-co/signs/lsc-co-create/v1/create.profile.json",
+        "downloadUrl": "https://storage.example.test/create.motion.bin",
+        "approved": true,
+        "compiled": true,
+        "published": false
+      }
+    },
+    {
+      "id": "lsc-co-unchanged",
+      "data": {
+        "languageId": "lsc-co",
+        "gloss": "IGUAL",
+        "version": 3,
+        "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "profileSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "releaseSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "storagePath": "lsc-co/signs/lsc-co-unchanged/v3/unchanged.motion.bin",
+        "semanticPath": "lsc-co/signs/lsc-co-unchanged/v3/unchanged.semantic.json",
+        "profilePath": "lsc-co/signs/lsc-co-unchanged/v3/unchanged.profile.json",
+        "approved": true,
+        "compiled": true,
+        "published": false
+      }
+    },
+    {
+      "id": "lsc-co-update",
+      "data": {
+        "languageId": "lsc-co",
+        "gloss": "ACTUALIZAR",
+        "version": 2,
+        "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "profileSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "releaseSha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "storagePath": "lsc-co/signs/lsc-co-update/v2/update.motion.bin",
+        "semanticPath": "lsc-co/signs/lsc-co-update/v2/update.semantic.json",
+        "profilePath": "lsc-co/signs/lsc-co-update/v2/update.profile.json",
+        "downloadUrl": "https://storage.example.test/update.motion.bin",
+        "approved": true,
+        "compiled": true,
+        "published": false
+      }
+    },
+    {
+      "id": "lsc-co-blocked",
+      "data": {
+        "languageId": "lsc-co",
+        "gloss": "BLOQUEADA",
+        "version": 1,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "profileSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "releaseSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "storagePath": "lsc-co/signs/lsc-co-blocked/v1/blocked.motion.bin",
+        "approved": false,
+        "compiled": true,
+        "published": false
+      }
+    }
+  ]
+}

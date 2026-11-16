@@ -42,6 +42,7 @@ import {
   shouldDriveStableOpenHandSegment,
   shouldUseSingleHandRig,
   softenFingerCurlLandmarks,
+  stableApparentHandScale,
   splitCapturedHeadOrientation,
   stabilizeFistHandLandmarkFrames,
   straightenOpenHandLandmarks,
@@ -299,6 +300,14 @@ describe('avatar motion presentation', () => {
     )).toBeCloseTo(1.6);
   });
 
+  it('keeps depth cues without making a hand visibly inflate or shrink', () => {
+    expect(stableApparentHandScale(Number.NaN)).toBe(1);
+    expect(stableApparentHandScale(0.4)).toBe(0.92);
+    expect(stableApparentHandScale(1)).toBe(1);
+    expect(stableApparentHandScale(1.08)).toBe(1.08);
+    expect(stableApparentHandScale(2.25)).toBe(1.15);
+  });
+
   it('smoothly reaches an edited hand keyframe without changing earlier frames', () => {
     const keyframes = [{
       frame: 12,
@@ -310,6 +319,7 @@ describe('avatar motion presentation', () => {
         verticalOffset: -0.4,
         depthOffset: 0.8,
         fist: 1,
+        pinch: 1,
         fingers: {index: 0.5},
         fingerJoints: {index: [0.2, 0.6, 0.9]},
       },
@@ -321,6 +331,7 @@ describe('avatar motion presentation', () => {
     expect(riggedHandsEditPoseAtFrame(keyframes, 10).left.horizontalOffset).toBeCloseTo(0.3);
     expect(riggedHandsEditPoseAtFrame(keyframes, 10).left.verticalOffset).toBeCloseTo(-0.2);
     expect(riggedHandsEditPoseAtFrame(keyframes, 10).left.depthOffset).toBeCloseTo(0.4);
+    expect(riggedHandsEditPoseAtFrame(keyframes, 10).left.pinch).toBeCloseTo(0.5);
     expect(riggedHandsEditPoseAtFrame(keyframes, 12).left).toEqual(expect.objectContaining({
       elbowRotation: 30,
       wristRoll: 40,
@@ -328,6 +339,7 @@ describe('avatar motion presentation', () => {
       verticalOffset: -0.4,
       depthOffset: 0.8,
       fist: 1,
+      pinch: 1,
       fingers: expect.objectContaining({index: 0.5}),
       fingerJoints: expect.objectContaining({index: [0.2, 0.6, 0.9]}),
     }));
@@ -1366,8 +1378,7 @@ describe('avatar motion presentation', () => {
     const samples = Array.from({length: 1000}, (_, index) => livelyIdleBodyPresentation(index * 25));
     expect(Math.max(...samples.map(sample => Math.abs(sample.verticalOffset)))).toBeLessThanOrEqual(0.006);
     expect(Math.max(...samples.map(sample => Math.abs(sample.rotationZ)))).toBeLessThanOrEqual(0.0065);
-    expect(Math.min(...samples.map(sample => sample.scale))).toBeGreaterThanOrEqual(0.9985);
-    expect(Math.max(...samples.map(sample => sample.scale))).toBeLessThanOrEqual(1.0015);
+    expect(samples.every(sample => sample.scale === 1)).toBe(true);
   });
 
   it('keeps idle gaze and head motion subtle', () => {

@@ -1,0 +1,50 @@
+{
+  "documents": [
+    {
+      "name": "projects/fixture/databases/(default)/documents/signs/lsc-co-unchanged",
+      "fields": {
+        "languageId": {"stringValue": "lsc-co"},
+        "gloss": {"stringValue": "IGUAL"},
+        "version": {"integerValue": "3"},
+        "sha256": {"stringValue": "4444444444444444444444444444444444444444444444444444444444444444"},
+        "profileSha256": {"stringValue": "5555555555555555555555555555555555555555555555555555555555555555"},
+        "releaseSha256": {"stringValue": "6666666666666666666666666666666666666666666666666666666666666666"},
+        "storagePath": {"stringValue": "lsc-co/signs/lsc-co-unchanged/v3/unchanged.motion.bin"},
+        "semanticPath": {"stringValue": "lsc-co/signs/lsc-co-unchanged/v3/unchanged.semantic.json"},
+        "profilePath": {"stringValue": "lsc-co/signs/lsc-co-unchanged/v3/unchanged.profile.json"},
+        "approved": {"booleanValue": true},
+        "compiled": {"booleanValue": true},
+        "published": {"booleanValue": true}
+      }
+    },
+    {
+      "name": "projects/fixture/databases/(default)/documents/signs/lsc-co-update",
+      "fields": {
+        "languageId": {"stringValue": "lsc-co"},
+        "gloss": {"stringValue": "ACTUALIZAR"},
+        "version": {"integerValue": "1"},
+        "sha256": {"stringValue": "0000000000000000000000000000000000000000000000000000000000000000"},
+        "profileSha256": {"stringValue": "0000000000000000000000000000000000000000000000000000000000000000"},
+        "releaseSha256": {"stringValue": "0000000000000000000000000000000000000000000000000000000000000000"},
+        "storagePath": {"stringValue": "lsc-co/signs/lsc-co-update/v1/update.motion.bin"},
+        "approved": {"booleanValue": true},
+        "compiled": {"booleanValue": true},
+        "published": {"booleanValue": true},
+        "contentBase64": {"stringValue": "bGVnYWN5"}
+      }
+    },
+    {
+      "name": "projects/fixture/databases/(default)/documents/signs/lsc-co-remote-only",
+      "fields": {
+        "languageId": {"stringValue": "lsc-co"},
+        "gloss": {"stringValue": "REMOTA"},
+        "version": {"integerValue": "1"},
+        "storagePath": {"stringValue": "lsc-co/signs/lsc-co-remote-only/v1/remote.motion.bin"},
+        "approved": {"booleanValue": true},
+        "compiled": {"booleanValue": true},
+        "published": {"booleanValue": true},
+        "downloadUrl": {"stringValue": "https://storage.example.test/remote.motion.bin"}
+      }
+    }
+  ]
+}

@@ -13,7 +13,6 @@ import sys
 from pathlib import Path
 
 import bpy
-from mathutils import Vector
 
 
 def canonical_json(value: object) -> str:
@@ -47,6 +46,9 @@ def load_profile(path: Path) -> dict[str, object]:
 def main() -> None:
     asset_path, profile_path = arguments()
     profile = load_profile(profile_path)
+    asset_hash = hashlib.sha256(asset_path.read_bytes()).hexdigest()
+    if asset_hash != profile["asset"]["candidateSha256"]:
+        raise RuntimeError(f"Candidate asset hash mismatch: {asset_hash}")
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(asset_path))
     armature = next((item for item in bpy.context.scene.objects if item.type == "ARMATURE"), None)
@@ -57,7 +59,13 @@ def main() -> None:
     middle = armature.pose.bones.get("DEF-f_middle.01.L")
     if not hand or not index or not middle:
         raise RuntimeError("Export lacks required manual conformance bones")
-    rest_hand_location = hand.matrix.translation.copy()
+    rest_hand_location = hand.bone.matrix_local.translation.copy()
+    rest_hand_rotation = hand.bone.matrix_local.to_quaternion()
+    bpy.context.view_layer.update()
+    initial_error = (hand.matrix.translation - rest_hand_location).length
+    initial_angle = hand.matrix.to_quaternion().rotation_difference(rest_hand_rotation).angle
+    if initial_error > 1e-6 or initial_angle > 1e-5:
+        raise RuntimeError(f"Hand is not in rest pose: {initial_error:.9f} m, {initial_angle:.9f} rad")
     index.rotation_mode = "XYZ"
     middle.rotation_mode = "XYZ"
     index.rotation_euler.x = 0.45
@@ -71,7 +79,8 @@ def main() -> None:
     middle.rotation_euler = (0.0, 0.0, 0.0)
     bpy.context.view_layer.update()
     replay_error = (hand.matrix.translation - rest_hand_location).length
-    if replay_error > 1e-6:
+    replay_angle = hand.matrix.to_quaternion().rotation_difference(rest_hand_rotation).angle
+    if replay_error > 1e-6 or replay_angle > 1e-5:
         raise RuntimeError(f"Neutral replay retained a prior pose offset of {replay_error:.9f} m")
     print(f"PASS: manual conformance pose and neutral replay; palm displacement={displacement:.6f} m")
 

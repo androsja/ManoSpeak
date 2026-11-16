@@ -63,7 +63,39 @@ def pose_index_only(
         bone.rotation_euler.z = math.radians(thumb_adduction if joint == 1 else 0.0)
 
 
-def configure_scene(output: Path, hand_center_x: float = 0.65) -> None:
+def pose_pinched(armature: bpy.types.Object, side: str = "L") -> None:
+    """Gather all fingertips into a soft cone without folding into a fist."""
+    finger_poses = (
+        ("f_index", (-21.5, 63.6, 49.1), -7.4, -30.2),
+        ("f_middle", (-19.8, 70.0, 55.0), -1.2, -5.6),
+        ("f_ring", (-21.3, 67.2, 48.9), 4.4, 17.5),
+        ("f_pinky", (-5.2, 37.6, 22.5), 2.5, 30.9),
+    )
+    mirrored = 1.0 if side == "L" else -1.0
+    for finger, curls, opposition, adduction in finger_poses:
+        for joint, angle in enumerate(curls, start=1):
+            bone = armature.pose.bones[f"DEF-{finger}.{joint:02d}.{side}"]
+            bone.rotation_mode = "XYZ"
+            bone.rotation_euler.x = math.radians(angle)
+            bone.rotation_euler.y = math.radians(
+                opposition * mirrored if joint == 1 else 0.0
+            )
+            bone.rotation_euler.z = math.radians(
+                adduction * mirrored if joint == 1 else 0.0
+            )
+    for joint, angle in enumerate((84.0, -25.5, -32.5), start=1):
+        bone = armature.pose.bones[f"DEF-thumb.{joint:02d}.{side}"]
+        bone.rotation_mode = "XYZ"
+        bone.rotation_euler.x = math.radians(angle)
+        bone.rotation_euler.y = math.radians(
+            -39.6 * mirrored if joint == 1 else 0.0
+        )
+        bone.rotation_euler.z = math.radians(
+            -40.1 * mirrored if joint == 1 else 0.0
+        )
+
+
+def configure_scene(output: Path, view: str = "hand", hand_center_x: float = 0.65) -> None:
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = 640
@@ -79,9 +111,15 @@ def configure_scene(output: Path, hand_center_x: float = 0.65) -> None:
     camera = bpy.data.objects.new("HandValidationCamera", camera_data)
     scene.collection.objects.link(camera)
     camera_data.type = "ORTHO"
-    camera_data.ortho_scale = 0.28
-    camera.location = (hand_center_x, -0.52, 1.14)
-    point_camera(camera, Vector((hand_center_x, 0.05, 1.14)))
+    if view == "hand":
+        camera_data.ortho_scale = 0.28
+        camera.location = (hand_center_x, -0.52, 1.14)
+        target = Vector((hand_center_x, 0.05, 1.14))
+    else:
+        camera_data.ortho_scale = 1.7
+        camera.location = (0.0, -3.0, 1.35)
+        target = Vector((0.0, 0.05, 1.25))
+    point_camera(camera, target)
     scene.camera = camera
 
     key_data = bpy.data.lights.new("HandValidationKey", "AREA")
@@ -90,16 +128,16 @@ def configure_scene(output: Path, hand_center_x: float = 0.65) -> None:
     key_data.size = 2.0
     key = bpy.data.objects.new("HandValidationKey", key_data)
     scene.collection.objects.link(key)
-    key.location = (hand_center_x, -1.0, 1.55)
-    point_camera(key, Vector((hand_center_x, 0.05, 1.14)))
+    key.location = (hand_center_x, -1.0, 1.55) if view == "hand" else (1.8, -2.0, 2.5)
+    point_camera(key, target)
 
     fill_data = bpy.data.lights.new("HandValidationFill", "AREA")
     fill_data.energy = 180
     fill_data.size = 1.5
     fill = bpy.data.objects.new("HandValidationFill", fill_data)
     scene.collection.objects.link(fill)
-    fill.location = (0.25, -0.45, 1.0)
-    point_camera(fill, Vector((hand_center_x, 0.05, 1.14)))
+    fill.location = (0.25, -0.45, 1.0) if view == "hand" else (-1.8, -1.8, 1.2)
+    point_camera(fill, target)
 
 
 def main() -> None:
@@ -134,10 +172,15 @@ def main() -> None:
             side="R",
         )
         hand_center_x = -0.65
-    elif pose != "open":
+    elif pose == "pinched":
+        pose_pinched(armature)
+    elif pose == "pinched-right":
+        pose_pinched(armature, side="R")
+        hand_center_x = -0.65
+    elif pose not in {"open", "upper-body"}:
         raise RuntimeError(f"Unsupported pose: {pose}")
     bpy.context.view_layer.update()
-    configure_scene(output, hand_center_x)
+    configure_scene(output, "upper-body" if pose == "upper-body" else "hand", hand_center_x)
     bpy.ops.render.render(write_still=True)
     print(f"VOZUAL hand validation render: {output}")
 

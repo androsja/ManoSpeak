@@ -31,7 +31,11 @@ export type PublishedSign = {
   version: number;
   assetName: string;
   sizeBytes: number;
-  assetDocumentPath: string;
+  assetDocumentPath?: string;
+  storagePath?: string;
+  downloadUrl?: string;
+  semanticPath?: string;
+  profilePath?: string;
   sha256: string;
   profileSha256: string;
   // This digest covers the complete independently published release,
@@ -74,6 +78,10 @@ export type InstalledSign = Pick<PublishedSign,
   | 'version'
   | 'assetName'
   | 'sizeBytes'
+  | 'storagePath'
+  | 'downloadUrl'
+  | 'semanticPath'
+  | 'profilePath'
   | 'sha256'
   | 'speechAliases'
   | 'categories'
@@ -197,6 +205,83 @@ function sha256Digest(value: unknown, field: string): string {
   return digest;
 }
 
+function optionalStoragePath(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const path = requiredString(value, field);
+  if (path.startsWith('/') || path.split('/').some(segment => !SAFE_PATH_SEGMENT.test(segment))) {
+    throw new Error(`Sign metadata has an invalid ${field}.`);
+  }
+  return path;
+}
+
+function optionalDownloadUrl(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const url = requiredString(value, 'downloadUrl');
+  try {
+    if (new URL(url).protocol !== 'https:') throw new Error();
+  } catch {
+    throw new Error('Sign metadata has an invalid downloadUrl.');
+  }
+  return url;
+}
+
+export type PublishedAssetReference = {
+  storagePath?: string;
+  downloadUrl?: string;
+  semanticPath?: string;
+  profilePath?: string;
+};
+
+/**
+ * Minimal boundary between the sign installer and Firebase Storage.
+ * Implementations must write the object bytes to `destinationPath`.
+ */
+export type FirebaseStorageAdapter = {
+  downloadToFile: (storagePath: string, destinationPath: string) => Promise<void>;
+};
+
+export type FirebaseStorageAdapterOptions = {
+  resolveDownloadUrl: (storagePath: string) => Promise<string>;
+  downloadToFile?: (downloadUrl: string, destinationPath: string) => Promise<void>;
+};
+
+/**
+ * Creates an adapter without importing or configuring the Firebase Storage SDK.
+ * The caller supplies the SDK-specific `storagePath` resolver, which keeps
+ * credentials and Firebase initialization outside this service and its tests.
+ */
+export function createFirebaseStorageAdapter(
+  options: FirebaseStorageAdapterOptions,
+): FirebaseStorageAdapter {
+  const downloadResolvedUrl = options.downloadToFile ?? (async (
+    downloadUrl: string,
+    destinationPath: string,
+  ) => {
+    await RNFS.downloadFile({fromUrl: downloadUrl, toFile: destinationPath}).promise;
+  });
+  return {
+    async downloadToFile(storagePath: string, destinationPath: string): Promise<void> {
+      const downloadUrl = await options.resolveDownloadUrl(storagePath);
+      optionalDownloadUrl(downloadUrl);
+      await downloadResolvedUrl(downloadUrl, destinationPath);
+    },
+  };
+}
+
+export function parsePublishedAssetReference(data: unknown): PublishedAssetReference {
+  if (!isRecord(data)) throw new Error('Sign metadata has an invalid asset reference.');
+  const reference = {
+    storagePath: optionalStoragePath(data.storagePath, 'storagePath'),
+    downloadUrl: optionalDownloadUrl(data.downloadUrl),
+    semanticPath: optionalStoragePath(data.semanticPath, 'semanticPath'),
+    profilePath: optionalStoragePath(data.profilePath, 'profilePath'),
+  };
+  if (!reference.storagePath && !reference.downloadUrl) {
+    throw new Error('Sign metadata requires storagePath or downloadUrl.');
+  }
+  return reference;
+}
+
 function stringArray(value: unknown, field: string): string[] {
   if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) {
     throw new Error(`Sign metadata has an invalid ${field}.`);
@@ -232,9 +317,17 @@ export function parseSignLanguage(id: string, data: unknown): SignLanguage {
 export function parsePublishedSign(id: string, data: unknown): PublishedSign {
   if (!isRecord(data)) throw new Error(`Sign ${id} is not an object.`);
   if (!SAFE_PATH_SEGMENT.test(id)) throw new Error(`Sign ${id} has an invalid ID.`);
-  const assetDocumentPath = requiredString(data.assetDocumentPath, 'assetDocumentPath');
-  if (!assetDocumentPath.startsWith(`signs/${id}/versions/`)) {
+  const assetDocumentPath = data.assetDocumentPath === undefined
+    ? undefined
+    : requiredString(data.assetDocumentPath, 'assetDocumentPath');
+  if (assetDocumentPath && !assetDocumentPath.startsWith(`signs/${id}/versions/`)) {
     throw new Error(`Sign ${id} has an invalid asset document path.`);
+  }
+  const assetReference = data.storagePath !== undefined || data.downloadUrl !== undefined
+    ? parsePublishedAssetReference(data)
+    : {};
+  if (!assetDocumentPath && !assetReference.storagePath && !assetReference.downloadUrl) {
+    throw new Error(`Sign ${id} has no asset source.`);
   }
   const sha256 = sha256Digest(data.sha256, 'sha256');
   const profileSha256 = sha256Digest(data.profileSha256, 'profileSha256');
@@ -253,6 +346,7 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
     assetName,
     sizeBytes: positiveInteger(data.sizeBytes, 'sizeBytes'),
     assetDocumentPath,
+    ...assetReference,
     sha256,
     profileSha256,
     releaseSha256: sha256Digest(data.releaseSha256, 'releaseSha256'),
@@ -488,6 +582,27 @@ export function hasUnpromptedSignChanges(statuses: readonly SignLanguageStatus[]
 }
 
 export async function listSignLanguages(): Promise<SignLanguageStatus[]> {
+  return listSignLanguagesWithMigration({enableLegacyCatalogMigration: false});
+}
+
+/**
+ * Legacy global catalogue reads are migration-only. The normal startup route
+ * uses ReleaseCatalogueSynchronizer (Task 20), which reads one release pointer
+ * and selected immutable fragments rather than all signs and phrases.
+ */
+export async function listSignLanguagesWithMigration(
+  {enableLegacyCatalogMigration}: Readonly<{enableLegacyCatalogMigration: boolean}>,
+): Promise<SignLanguageStatus[]> {
+  if (!enableLegacyCatalogMigration) {
+    const state = await readLibraryState();
+    const languageIds = [...new Set(Object.values(state.installedSigns).map(sign => sign.languageId))];
+    return mergeSignLanguageStatuses(
+      languageIds.map(id => ({id, code: id, name: id, region: '', published: true})),
+      [],
+      state,
+      [],
+    );
+  }
   const database = getFirestore();
   const [languageSnapshot, signSnapshot, phraseSnapshot, state] = await Promise.all([
     getDocsFromServer(query(
@@ -564,6 +679,10 @@ export async function readInstalledSignMotionBase64(gloss: string): Promise<stri
 export type InstalledSignPayload = {
   contentBase64: string;
   avatarProfile?: Record<string, unknown>;
+  storagePath?: string;
+  downloadUrl?: string;
+  semanticPath?: string;
+  profilePath?: string;
 };
 
 export async function readInstalledSignPayload(
@@ -585,6 +704,10 @@ export async function readInstalledSignPayload(
   return {
     contentBase64: await RNFS.readFile(sign.localPath, 'base64'),
     avatarProfile: sign.avatarProfile,
+    storagePath: sign.storagePath,
+    downloadUrl: sign.downloadUrl,
+    semanticPath: sign.semanticPath,
+    profilePath: sign.profilePath,
   };
 }
 
@@ -616,6 +739,7 @@ export async function dismissSignLanguageChanges(
 export async function installSignLanguageChanges(
   status: SignLanguageStatus,
   onProgress?: (fraction: number) => void,
+  storageAdapter?: FirebaseStorageAdapter,
 ): Promise<number> {
   if (
     status.pendingSigns.length === 0
@@ -650,9 +774,20 @@ export async function installSignLanguageChanges(
       const temporaryPath = `${finalPath}.download`;
       if (await RNFS.exists(temporaryPath)) await RNFS.unlink(temporaryPath);
       temporaryPaths.push(temporaryPath);
-      const assetSnapshot = await getDoc(doc(getFirestore(), sign.assetDocumentPath));
-      if (!assetSnapshot.exists()) throw new Error(`Sign ${sign.gloss} has no published asset.`);
-      const asset = assetSnapshot.data();
+      const assetSnapshot = sign.assetDocumentPath
+        ? await getDoc(doc(getFirestore(), sign.assetDocumentPath))
+        : undefined;
+      if (sign.assetDocumentPath && !assetSnapshot?.exists()) {
+        throw new Error(`Sign ${sign.gloss} has no published asset.`);
+      }
+      const asset = {...sign, ...(assetSnapshot?.data() ?? {})} as Record<string, unknown>;
+      const assetReference = asset.storagePath !== undefined || asset.downloadUrl !== undefined
+        ? parsePublishedAssetReference(asset)
+        : undefined;
+      const downloadUrl = assetReference?.downloadUrl;
+      const legacyContent = typeof asset.contentBase64 === 'string' && asset.contentBase64.length > 0
+        ? asset.contentBase64
+        : undefined;
       if (
         asset.approved !== true
         || asset.compiled !== true
@@ -665,14 +800,31 @@ export async function installSignLanguageChanges(
         // a present value that disagrees with the signed release metadata.
         || (asset.releaseSha256 !== undefined && asset.releaseSha256 !== sign.releaseSha256)
         || asset.sizeBytes !== sign.sizeBytes
-        || typeof asset.contentBase64 !== 'string'
+        || (!downloadUrl && !assetReference?.storagePath && !legacyContent)
         || !isRecord(asset.avatarProfile)
       ) throw new Error(`Sign ${sign.gloss} has invalid asset metadata.`);
-      await RNFS.writeFile(temporaryPath, asset.contentBase64, 'base64');
+      if (downloadUrl) {
+        await RNFS.downloadFile({fromUrl: downloadUrl, toFile: temporaryPath}).promise;
+      } else if (assetReference?.storagePath && storageAdapter) {
+        await storageAdapter.downloadToFile(assetReference.storagePath, temporaryPath);
+      } else if (legacyContent) {
+        await RNFS.writeFile(temporaryPath, legacyContent, 'base64');
+      } else {
+        throw new Error(`Sign ${sign.gloss} has storagePath metadata but no Firebase Storage adapter or legacy content.`);
+      }
       onProgress?.(Math.min(1, (completedBytes + sign.sizeBytes) / totalBytes));
+      const fileStat = await RNFS.stat(temporaryPath);
+      if (fileStat.size !== sign.sizeBytes) {
+        throw new Error(`Sign ${sign.gloss} has an invalid downloaded size.`);
+      }
       const digest = (await RNFS.hash(temporaryPath, 'sha256')).toLowerCase();
       if (digest !== sign.sha256) throw new Error(`Sign ${sign.gloss} failed its integrity check.`);
-      staged.push({sign, avatarProfile: asset.avatarProfile, temporaryPath, finalPath});
+      staged.push({
+        sign: {...sign, ...assetReference},
+        avatarProfile: asset.avatarProfile,
+        temporaryPath,
+        finalPath,
+      });
       completedBytes += sign.sizeBytes;
       onProgress?.(Math.min(1, completedBytes / totalBytes));
     }
@@ -711,6 +863,10 @@ export async function installSignLanguageChanges(
         sha256: item.sign.sha256,
         profileSha256: item.sign.profileSha256,
         releaseSha256: item.sign.releaseSha256,
+        storagePath: item.sign.storagePath,
+        downloadUrl: item.sign.downloadUrl,
+        semanticPath: item.sign.semanticPath,
+        profilePath: item.sign.profilePath,
         avatarProfile: item.avatarProfile,
         speechAliases: item.sign.speechAliases,
         categories: item.sign.categories,

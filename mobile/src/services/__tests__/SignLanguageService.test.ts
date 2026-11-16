@@ -22,6 +22,10 @@ jest.mock('react-native-fs', () => ({
     mockFiles.delete(source);
   }),
   hash: jest.fn(async () => 'a'.repeat(64)),
+  stat: jest.fn(async () => ({size: 1024})),
+  downloadFile: jest.fn(({toFile}: {toFile: string}) => ({
+    promise: (async () => { mockFiles.set(toFile, 'storage-content'); })(),
+  })),
 }));
 
 jest.mock('@react-native-firebase/firestore', () => ({
@@ -36,14 +40,17 @@ jest.mock('@react-native-firebase/firestore', () => ({
 
 import {
   filterPublishedSigns,
+  createFirebaseStorageAdapter,
   hasUnpromptedSignChanges,
   installedPhrasesForSelectedLanguage,
   installedSignsForSelectedLanguage,
   listSignLanguages,
+  listSignLanguagesWithMigration,
   mergeSignLanguageStatuses,
   installSignLanguageChanges,
   parsePublishedSign,
   parsePublishedPhrase,
+  parsePublishedAssetReference,
   parseSignLanguage,
   readInstalledSignPayload,
   type InstalledSign,
@@ -102,6 +109,39 @@ describe('SignLanguageService', () => {
     mockFiles.clear();
     jest.clearAllMocks();
   });
+
+  it('accepts Storage references while preserving legacy asset-document metadata', () => {
+    expect(parsePublishedAssetReference({
+      storagePath: 'lsc-co/signs/lsc-co-agua/v2/agua.motion.bin',
+      semanticPath: 'lsc-co/signs/lsc-co-agua/v2/agua.semantic.json',
+      profilePath: 'lsc-co/signs/lsc-co-agua/v2/agua.profile.json',
+    })).toEqual({
+      storagePath: 'lsc-co/signs/lsc-co-agua/v2/agua.motion.bin',
+      downloadUrl: undefined,
+      semanticPath: 'lsc-co/signs/lsc-co-agua/v2/agua.semantic.json',
+      profilePath: 'lsc-co/signs/lsc-co-agua/v2/agua.profile.json',
+    });
+    expect(parsePublishedAssetReference({
+      downloadUrl: 'https://firebasestorage.googleapis.com/v0/b/example/o/agua.motion.bin',
+    }).downloadUrl).toContain('https://');
+    expect(() => parsePublishedAssetReference({storagePath: '../unsafe.motion.bin'})).toThrow('invalid storagePath');
+  });
+
+  it('keeps Firebase URL resolution injectable and validates the resolved URL', async () => {
+    const resolveDownloadUrl = jest.fn(async (storagePath: string) => (
+      `https://firebasestorage.googleapis.com/v0/b/example/o/${storagePath}`
+    ));
+    const downloadToFile = jest.fn(async () => undefined);
+    const adapter = createFirebaseStorageAdapter({resolveDownloadUrl, downloadToFile});
+
+    await adapter.downloadToFile('lsc-co/agua.motion.bin', '/documents/agua.download');
+
+    expect(resolveDownloadUrl).toHaveBeenCalledWith('lsc-co/agua.motion.bin');
+    expect(downloadToFile).toHaveBeenCalledWith(
+      'https://firebasestorage.googleapis.com/v0/b/example/o/lsc-co/agua.motion.bin',
+      '/documents/agua.download',
+    );
+  });
   it('filters a large catalogue by gloss, aliases, and categories without accents', () => {
     const signs = [
       sign,
@@ -133,7 +173,7 @@ describe('SignLanguageService', () => {
         docs: [{id: phrase.id, data: () => phrase}],
       });
 
-    await expect(listSignLanguages()).resolves.toEqual([
+    await expect(listSignLanguagesWithMigration({enableLegacyCatalogMigration: true})).resolves.toEqual([
       expect.objectContaining({
         id: language.id,
         pendingSigns: [expect.objectContaining({gloss: 'AGUA'})],
@@ -141,6 +181,11 @@ describe('SignLanguageService', () => {
       }),
     ]);
     expect(getDocsFromServer).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not query every Firestore collection during the normal startup route', async () => {
+    await expect(listSignLanguages()).resolves.toEqual([]);
+    expect(getDocsFromServer).not.toHaveBeenCalled();
   });
 
   it('accepts only independently downloadable approved compiled signs', () => {
@@ -505,6 +550,146 @@ describe('SignLanguageService', () => {
     });
 
     await expect(installSignLanguageChanges(status)).resolves.toBe(1);
+  });
+
+  it('downloads a Storage URL, verifies it with the same hash, and persists sidecar paths', async () => {
+    const storageSign = parsePublishedSign('lsc-co-agua', {
+      ...sign,
+      storagePath: 'lsc-co/signs/lsc-co-agua/v2/agua.motion.bin',
+      downloadUrl: 'https://firebasestorage.googleapis.com/v0/b/example/o/agua.motion.bin',
+      semanticPath: 'lsc-co/signs/lsc-co-agua/v2/agua.semantic.json',
+      profilePath: 'lsc-co/signs/lsc-co-agua/v2/agua.profile.json',
+    });
+    const status = mergeSignLanguageStatuses([language], [storageSign], state())[0];
+    (getDoc as jest.Mock).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        approved: true,
+        compiled: true,
+        published: true,
+        sha256: storageSign.sha256,
+        profileSha256: storageSign.profileSha256,
+        releaseSha256: storageSign.releaseSha256,
+        sizeBytes: storageSign.sizeBytes,
+        storagePath: storageSign.storagePath,
+        downloadUrl: storageSign.downloadUrl,
+        semanticPath: storageSign.semanticPath,
+        profilePath: storageSign.profilePath,
+        avatarProfile: {version: 1},
+      }),
+    });
+
+    await expect(installSignLanguageChanges(status)).resolves.toBe(1);
+    expect(require('react-native-fs').downloadFile).toHaveBeenCalledWith(expect.objectContaining({
+      fromUrl: storageSign.downloadUrl,
+    }));
+    const committed = JSON.parse(
+      mockFiles.get('/documents/vozual-sign-languages/library.json') ?? '{}',
+    ) as SignLibraryState;
+    expect(committed.installedSigns[storageSign.id]).toEqual(expect.objectContaining({
+      storagePath: storageSign.storagePath,
+      downloadUrl: storageSign.downloadUrl,
+      semanticPath: storageSign.semanticPath,
+      profilePath: storageSign.profilePath,
+    }));
+  });
+
+  it('carries public HOLA metadata through mocked installation to the avatar payload boundary', async () => {
+    const holaProfile = {
+      activeHand: 'left',
+      contactAnchor: 'forehead',
+      contactStartFrame: 0,
+      contactEndFrame: 12,
+      palmAtContact: 'camera',
+    };
+    const hola = parsePublishedSign('lsc-co-00006800006f00006c000061', {
+      languageId: 'lsc-co',
+      gloss: 'HOLA',
+      version: 1,
+      assetName: 'm_00006800006f00006c000061.motion.bin',
+      sizeBytes: 117304,
+      assetDocumentPath: 'signs/lsc-co-00006800006f00006c000061/versions/v1',
+      storagePath: 'lsc-co/signs/lsc-co-00006800006f00006c000061/v1/m_00006800006f00006c000061.motion.bin',
+      downloadUrl: 'https://firebasestorage.googleapis.com/v0/b/vozual-lsc-prod/o/hola.motion.bin',
+      sha256: '7c649d28dc0b23a6fedb54324c9fa873472ac7ea2ddfaca2ee360c40f7fda08e',
+      profileSha256: '3fb7dff99748985ab308fdc699f3f20047b9696c0db5ce27f6f05fc54bc2769b',
+      releaseSha256: 'f8d3f28776a091ee14b362f58446889f8bfcfdd2b6a1103a10286ee7915029cc',
+      speechAliases: ['HOLA', 'hola'],
+      categories: ['saludos_cortesia'],
+      lexicalClass: 'fixed_expression',
+      verbType: 'none',
+      requiresSubjectMarker: false,
+      approved: true,
+      compiled: true,
+      published: true,
+    });
+    const status = mergeSignLanguageStatuses([language], [hola], state())[0];
+    (getDoc as jest.Mock).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        approved: true,
+        compiled: true,
+        published: true,
+        sha256: hola.sha256,
+        profileSha256: hola.profileSha256,
+        releaseSha256: hola.releaseSha256,
+        sizeBytes: hola.sizeBytes,
+        storagePath: hola.storagePath,
+        downloadUrl: hola.downloadUrl,
+        avatarProfile: holaProfile,
+      }),
+    });
+    const fs = require('react-native-fs');
+    (fs.stat as jest.Mock).mockResolvedValueOnce({size: hola.sizeBytes});
+    (fs.hash as jest.Mock).mockResolvedValueOnce(hola.sha256);
+
+    await expect(installSignLanguageChanges(status)).resolves.toBe(1);
+    await expect(readInstalledSignPayload('HOLA')).resolves.toEqual({
+      contentBase64: 'storage-content',
+      avatarProfile: holaProfile,
+      storagePath: hola.storagePath,
+      downloadUrl: hola.downloadUrl,
+      semanticPath: undefined,
+      profilePath: undefined,
+    });
+  });
+
+  it('downloads a storagePath through an injected adapter and verifies its bytes', async () => {
+    const storageSign = parsePublishedSign('lsc-co-agua', {
+      ...sign,
+      storagePath: 'lsc-co/signs/lsc-co-agua/v2/agua.motion.bin',
+      semanticPath: 'lsc-co/signs/lsc-co-agua/v2/agua.semantic.json',
+      profilePath: 'lsc-co/signs/lsc-co-agua/v2/agua.profile.json',
+    });
+    const status = mergeSignLanguageStatuses([language], [storageSign], state())[0];
+    (getDoc as jest.Mock).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        approved: true,
+        compiled: true,
+        published: true,
+        sha256: storageSign.sha256,
+        profileSha256: storageSign.profileSha256,
+        releaseSha256: storageSign.releaseSha256,
+        sizeBytes: storageSign.sizeBytes,
+        storagePath: storageSign.storagePath,
+        semanticPath: storageSign.semanticPath,
+        profilePath: storageSign.profilePath,
+        avatarProfile: {version: 1},
+      }),
+    });
+    const storageAdapter = {
+      downloadToFile: jest.fn(async (_storagePath: string, destinationPath: string) => {
+        mockFiles.set(destinationPath, 'storage-content');
+      }),
+    };
+
+    await expect(installSignLanguageChanges(status, undefined, storageAdapter)).resolves.toBe(1);
+    expect(storageAdapter.downloadToFile).toHaveBeenCalledWith(
+      storageSign.storagePath,
+      expect.stringContaining('.download'),
+    );
+    expect(require('react-native-fs').downloadFile).not.toHaveBeenCalled();
   });
 
   it('does not repeat a prompt after the current independent-sign revision is dismissed', () => {

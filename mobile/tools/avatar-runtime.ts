@@ -66,6 +66,7 @@ import {
   shouldDriveThumbUpHandSegment,
   shouldUseSingleHandRig,
   softenFingerCurlLandmarks,
+  stableApparentHandScale,
   splitCapturedHeadOrientation,
   straightenOpenHandLandmarks,
   type CapturedFaceCalibration,
@@ -90,6 +91,14 @@ import {
   repairStablePalmHandLandmarkFrames,
   RiggedHandTrackingRepair,
 } from '../src/services/CapturedHandTrackingQuality';
+import {
+  kinematicRigElbowCommand,
+  kinematicRigArmBoneNames,
+  kinematicRigJointCommands,
+  kinematicRigWristCommand,
+  KinematicHandPose,
+  RigWristCommand,
+} from '../src/services/KinematicRigBinding';
 
 type ClipName = string;
 type RenderMode = 'points' | 'hybrid' | 'cartoon' | 'rigged';
@@ -138,6 +147,8 @@ type AvatarProfile = {
   rigHeadVerticalOffset?: number;
   rigStableOpenHand?: boolean;
   rigSoftHandCurl?: boolean;
+  rigLeftSoftHandCurl?: boolean;
+  rigRightSoftHandCurl?: boolean;
   rigPointingHand?: boolean;
   rigSelfPointingHand?: boolean;
   forceTwoHands?: boolean;
@@ -145,6 +156,7 @@ type AvatarProfile = {
   rigHandFrontDepth?: number;
   rigLeftHandShape?: RiggedHandPresentation;
   rigRightHandShape?: RiggedHandPresentation;
+  rigCanonicalPinchedPalm?: boolean;
   rigLeftFingerStates?: RiggedHandFingerStates;
   rigRightFingerStates?: RiggedHandFingerStates;
   rigHandKeyframes?: RiggedHandEditKeyframe[];
@@ -190,9 +202,26 @@ type AvatarProfile = {
   rigInterHandContact?: RiggedInterHandContact;
 };
 
+type KinematicRuntimeFrame = {
+  timeMs: number;
+  hands: {left: KinematicHandPose; right: KinematicHandPose};
+  nonManual: {id: string; headRotationDeg: [number, number, number]; gazeDirection: [number, number, number]; browRaise: number; smile: number; mouthOpening: number; mouthPucker: number};
+};
+
+type KinematicRuntimePlan = {
+  schema: 'vozual.runtime-execution-plan';
+  formatVersion: 1;
+  source?: {id: string; revision: number; sha256: string};
+  rig?: {profileId: string; profileRevision: number; sha256: string};
+  durationMs: number;
+  sampleRateHz: number;
+  frames: KinematicRuntimeFrame[];
+};
+
 declare global {
   interface Window {
     playVozualClip: (clip: string, playbackId: number, playbackSpeed?: number, continuePhrase?: boolean) => void;
+    playVozualKinematicPlan: (plan: KinematicRuntimePlan, playbackId: number, playbackSpeed?: number) => boolean;
     installVozualMotionBase64: (
       clip: string,
       contentBase64: string,
@@ -214,15 +243,23 @@ declare global {
       smile: number;
       face: RiggedFacialEdit;
       pose: {left: RiggedHandEditPose; right: RiggedHandEditPose};
-      indexMiddleSpread: number;
-      forearmAxialRollDegrees: number;
+      indexMiddleSpread: Record<'left' | 'right', number>;
+      forearmAxialRollDegrees: Record<'left' | 'right', number>;
     } | undefined;
     setVozualRigHandKeyframes: (
       clip: string,
       keyframes: RiggedHandEditKeyframe[],
     ) => boolean;
-    setVozualRigFingerSpread: (clip: string, spread: number) => boolean;
-    setVozualForearmAxialRoll: (clip: string, degrees: number) => boolean;
+    setVozualRigFingerSpread: (
+      clip: string,
+      side: 'left' | 'right',
+      spread: number,
+    ) => boolean;
+    setVozualForearmAxialRoll: (
+      clip: string,
+      side: 'left' | 'right',
+      degrees: number,
+    ) => boolean;
     getVozualRigDiagnostics: () => Record<string, unknown>;
     ReactNativeWebView?: {postMessage: (message: string) => void};
   }
@@ -722,6 +759,7 @@ headFill.renderOrder = 0;
 
 const motions = new Map<ClipName, Motion>();
 const motionLoads = new Map<ClipName, Promise<Motion>>();
+const kinematicPlanLoads = new Map<ClipName, Promise<KinematicRuntimePlan>>();
 const installedMotionBytes = new Map<ClipName, Uint8Array>();
 const motionCacheOrder: ClipName[] = [];
 // A decoded motion contains thousands of nested JavaScript arrays. Keeping the
@@ -749,6 +787,16 @@ const anatomicalRiggedHandMotions = new WeakSet<Motion>();
 const stableRiggedFrames = new WeakMap<MotionFrame, MotionFrame>();
 const avatarProfiles = new Map<ClipName, AvatarProfile>();
 let activeMotion: Motion | undefined;
+let activeKinematicPlan: KinematicRuntimePlan | undefined;
+let activeKinematicReferenceHands: {
+  left: readonly [number, number, number];
+  right: readonly [number, number, number];
+} | undefined;
+let activeKinematicArmStartPose: Map<string, {
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+  scale: THREE.Vector3;
+}> | undefined;
 let activePalmApproachMotion: Motion | undefined;
 let activeProfile: AvatarProfile | undefined;
 let activeRiggedHand: 'L' | 'R' | undefined;
@@ -1274,6 +1322,13 @@ function averageRiggedPoints(points: THREE.Vector3[]) {
   ).multiplyScalar(1 / points.length);
 }
 
+function canonicalPinchedPalmBasis(side: 'L' | 'R') {
+  return palmBasis(
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(side === 'L' ? 1 : -1, 0, 0),
+  );
+}
+
 function placeRiggedPalm(
   side: 'L' | 'R',
   hand: Point[],
@@ -1307,10 +1362,17 @@ function placeRiggedPalm(
   const targetPalmCenter = averageRiggedPoints(targetMetacarpals);
   const targetIndexSide = averageRiggedPoints(targetMetacarpals.slice(0, 2));
   const targetPinkySide = averageRiggedPoints(targetMetacarpals.slice(2));
-  const targetBasis = palmBasis(
+  const capturedTargetBasis = palmBasis(
     targetPalmCenter.clone().sub(targetWrist),
     targetPinkySide.clone().sub(targetIndexSide),
   );
+  // In HACER, MediaPipe intermittently reverses the palm axis even though
+  // the signer keeps both fingertip cones upright. Use the intended
+  // linguistic orientation and retain only the captured wrist trajectory.
+  const targetBasis = activeProfile?.rigCanonicalPinchedPalm === true
+    && activeRiggedHandPresentations[side] === 'pinched'
+    ? canonicalPinchedPalmBasis(side)
+    : capturedTargetBasis;
   if (!targetBasis) return;
   const localBasis = palmBasis(palmRest.localLongitudinal, palmRest.localLateral);
   if (!localBasis) return;
@@ -1540,6 +1602,215 @@ function restoreRiggedHandPose(side: 'L' | 'R') {
     bone.updateMatrix();
   });
   riggedAvatar?.updateMatrixWorld(true);
+}
+
+function restoreKinematicRiggedArmPose(side: 'L' | 'R') {
+  const anatomicalSide = side === 'L' ? 'left' : 'right';
+  kinematicRigArmBoneNames(anatomicalSide).forEach(name => {
+    const bone = riggedBone(name);
+    const start = activeKinematicArmStartPose?.get(name);
+    if (!bone || !start) return;
+    bone.position.copy(start.position);
+    bone.quaternion.copy(start.quaternion);
+    bone.scale.copy(start.scale);
+    bone.updateMatrix();
+  });
+  riggedAvatar?.updateMatrixWorld(true);
+}
+
+/** Solves the arm chain so authored wrist positions move the complete limb. */
+function applyKinematicRiggedArmTrajectory(side: 'left' | 'right', wrist: RigWristCommand): boolean {
+  const rigSide = side === 'left' ? 'L' : 'R';
+  const reference = activeKinematicReferenceHands?.[side];
+  const lengths = riggedArmLengths.get(rigSide);
+  const upperBone = riggedBone(`DEF-upper_arm.${rigSide}`);
+  const forearmBone = riggedBone(`DEF-forearm.${rigSide}`);
+  const handBone = riggedBone(`DEF-hand.${rigSide}`);
+  if (!reference || !lengths || !upperBone || !forearmBone || !handBone || !riggedAvatar) return false;
+
+  const delta = new THREE.Vector3(
+    wrist.positionM[0] - reference[0],
+    wrist.positionM[1] - reference[1],
+    wrist.positionM[2] - reference[2],
+  );
+  if (delta.lengthSq() < 0.00000001) return true;
+  const avatarRotation = riggedAvatar.getWorldQuaternion(new THREE.Quaternion());
+  // Authored positionM is already in world meters. The avatar's display
+  // scale affects its bones, not the distance requested by the motion.
+  delta.applyQuaternion(avatarRotation);
+
+  const shoulder = upperBone.getWorldPosition(new THREE.Vector3());
+  const restElbow = forearmBone.getWorldPosition(new THREE.Vector3());
+  const targetWrist = handBone.getWorldPosition(new THREE.Vector3()).add(delta);
+  const wristDirection = targetWrist.clone().sub(shoulder);
+  const rawDistance = wristDirection.length();
+  if (rawDistance < 0.000001) return true;
+  wristDirection.multiplyScalar(1 / rawDistance);
+
+  const restWristDistance = handBone.getWorldPosition(new THREE.Vector3()).distanceTo(shoulder);
+  const authoredChainReach = lengths.upper + lengths.lower;
+  // Some exported rigs include a bind-pose offset between deform-bone origins.
+  // Calibrate the analytic chain to that observed resting reach before solving;
+  // otherwise every non-zero authored displacement is clamped to full extension.
+  const reachCalibration = Math.max(1, restWristDistance / Math.max(0.001, authoredChainReach));
+  const upperReach = lengths.upper * reachCalibration;
+  const lowerReach = lengths.lower * reachCalibration;
+  const minimumReach = Math.max(0.01, Math.abs(upperReach - lowerReach) + 0.001);
+  const maximumReach = Math.max(minimumReach, upperReach + lowerReach - 0.001);
+  const wristDistance = THREE.MathUtils.clamp(rawDistance, minimumReach, maximumReach);
+  targetWrist.copy(shoulder).addScaledVector(wristDirection, wristDistance);
+
+  const restElbowOffset = restElbow.clone().sub(shoulder);
+  const bendDirection = restElbowOffset.addScaledVector(
+    wristDirection,
+    -restElbowOffset.dot(wristDirection),
+  );
+  if (bendDirection.lengthSq() < 0.000001) {
+    bendDirection.set(side === 'left' ? -1 : 1, 0, 0)
+      .addScaledVector(wristDirection, side === 'left' ? 0.25 : -0.25);
+  }
+  bendDirection.normalize();
+  const along = (
+    upperReach * upperReach
+    - lowerReach * lowerReach
+    + wristDistance * wristDistance
+  ) / (2 * wristDistance);
+  const height = Math.sqrt(Math.max(0, upperReach * upperReach - along * along));
+  const elbowTarget = shoulder.clone()
+    .addScaledVector(wristDirection, along)
+    .addScaledVector(bendDirection, height);
+
+  placeRiggedBoneBetween(`DEF-upper_arm.${rigSide}`, shoulder, elbowTarget, upperReach);
+  riggedAvatar.updateMatrixWorld(true);
+  const solvedElbow = forearmBone.getWorldPosition(new THREE.Vector3());
+  placeRiggedForearmBetween(rigSide, solvedElbow, targetWrist, lowerReach);
+  riggedAvatar.updateMatrixWorld(true);
+  return true;
+}
+
+/** Applies the authored v3 joint coordinates directly to the exported rig. */
+function applyKinematicRiggedHand(side: 'left' | 'right', hand: KinematicHandPose) {
+  const rigSide = side === 'left' ? 'L' : 'R';
+  const wrist = kinematicRigWristCommand(side, hand);
+  restoreRiggedHandPose(rigSide);
+  restoreKinematicRiggedArmPose(rigSide);
+  const armTrajectoryApplied = applyKinematicRiggedArmTrajectory(side, wrist);
+  const applyArmRotation = (command: ReturnType<typeof kinematicRigElbowCommand>) => {
+    if (!command) return;
+    const bone = riggedBone(command.boneName);
+    if (bone?.parent) {
+      const [x, y, z] = command.rotationDeg.map(THREE.MathUtils.degToRad);
+      const authoredRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, 'XYZ'));
+      const avatarWorldOrientation = riggedAvatar
+        ? riggedAvatar.getWorldQuaternion(new THREE.Quaternion())
+        : new THREE.Quaternion();
+      const worldRotation = avatarWorldOrientation.clone()
+        .multiply(authoredRotation)
+        .multiply(avatarWorldOrientation.clone().invert());
+      const currentWorldOrientation = bone.getWorldQuaternion(new THREE.Quaternion());
+      const desiredWorldOrientation = worldRotation.multiply(currentWorldOrientation).normalize();
+      const parentWorldOrientation = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+      bone.quaternion.copy(parentWorldOrientation.invert().multiply(desiredWorldOrientation)).normalize();
+      bone.updateMatrix();
+      bone.updateWorldMatrix(false, true);
+    }
+  };
+  applyArmRotation(kinematicRigElbowCommand(side, hand));
+  kinematicRigJointCommands(side, hand).forEach(command => {
+    const bone = riggedBone(command.boneName);
+    const rest = bone ? riggedBoneRests.get(bone.name) : undefined;
+    if (!bone || !rest) return;
+    const [flexion, abduction, twist] = command.rotationDeg;
+    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      THREE.MathUtils.degToRad(flexion),
+      THREE.MathUtils.degToRad(abduction),
+      THREE.MathUtils.degToRad(twist),
+      'XYZ',
+    ));
+    bone.quaternion.copy(rest.localQuaternion).multiply(rotation).normalize();
+    bone.updateMatrix();
+    bone.updateWorldMatrix(false, true);
+  });
+  const handBone = riggedBone(wrist.boneName);
+  const handRest = handBone ? riggedBoneRests.get(handBone.name) : undefined;
+  if (handBone && handRest) {
+    const [x, y, z, w] = wrist.orientationQuat;
+    const authoredOrientation = new THREE.Quaternion(x, y, z, w).normalize();
+    const palmRest = riggedPalmRests.get(rigSide);
+    const localPalmBasis = palmRest
+      ? palmBasis(palmRest.localLongitudinal, palmRest.localLateral)
+      : undefined;
+    if (wrist.orientationSpace === 'body-local' && localPalmBasis && handBone.parent) {
+      const localPalmOrientation = new THREE.Quaternion()
+        .setFromRotationMatrix(localPalmBasis)
+        .invert();
+      const avatarWorldOrientation = riggedAvatar
+        ? riggedAvatar.getWorldQuaternion(new THREE.Quaternion())
+        : new THREE.Quaternion();
+      const desiredHandWorldOrientation = avatarWorldOrientation
+        .multiply(authoredOrientation)
+        .multiply(localPalmOrientation)
+        .normalize();
+      const parentWorldOrientation = handBone.parent.getWorldQuaternion(new THREE.Quaternion());
+      handBone.quaternion.copy(parentWorldOrientation.invert().multiply(desiredHandWorldOrientation)).normalize();
+    } else {
+      handBone.quaternion.copy(activeKinematicArmStartPose?.get(handBone.name)?.quaternion ?? handRest.localQuaternion).multiply(
+        authoredOrientation,
+      ).normalize();
+    }
+    handBone.updateMatrix();
+
+    // Fall back to a hand-only displacement only when the avatar lacks the
+    // arm chain required to solve the authored wrist trajectory.
+    const reference = activeKinematicReferenceHands?.[side];
+    if (!armTrajectoryApplied && handBone.parent && reference && riggedAvatar) {
+      const delta = new THREE.Vector3(
+        wrist.positionM[0] - reference[0],
+        wrist.positionM[1] - reference[1],
+        wrist.positionM[2] - reference[2],
+      );
+      const avatarRotation = riggedAvatar.getWorldQuaternion(new THREE.Quaternion());
+      delta.applyQuaternion(avatarRotation);
+      const targetWorld = handBone.getWorldPosition(new THREE.Vector3()).add(delta);
+      handBone.position.copy(handBone.parent.worldToLocal(targetWorld));
+      handBone.updateMatrix();
+    }
+  }
+  riggedAvatar?.updateMatrixWorld(true);
+}
+
+function applyKinematicNonManualFrame(nonManual: KinematicRuntimeFrame['nonManual']) {
+  restoreRiggedSyntheticFacePose();
+  const [yaw, pitch, roll] = nonManual.headRotationDeg.map(value => THREE.MathUtils.degToRad(value));
+  rotateRiggedHeadAndFace({yaw, pitch, roll});
+
+  const [gazeX, gazeY, gazeZ] = nonManual.gazeDirection;
+  const gazeHorizontal = Math.hypot(gazeX, gazeZ);
+  if (gazeHorizontal > 0.0001 || Math.abs(gazeY) > 0.0001) {
+    const eyeYaw = Math.atan2(gazeX, Math.max(0.0001, gazeZ));
+    const eyePitch = -Math.atan2(gazeY, Math.max(0.0001, gazeHorizontal));
+    (['L', 'R'] as const).forEach(side => {
+      rotateRiggedBoneInWorld('DEF-eye.' + side, new THREE.Vector3(0, 1, 0), eyeYaw);
+      rotateRiggedBoneInWorld('DEF-eye.' + side, new THREE.Vector3(1, 0, 0), eyePitch);
+    });
+  }
+
+  applyRiggedFacialEdit({
+    smile: THREE.MathUtils.clamp(nonManual.smile, 0, 1),
+    mouthPucker: THREE.MathUtils.clamp(nonManual.mouthPucker, 0, 1),
+    mouthOpening: THREE.MathUtils.clamp(nonManual.mouthOpening, 0, 1),
+    eyeWidening: 0,
+    browRaise: THREE.MathUtils.clamp(nonManual.browRaise, 0, 1),
+  });
+}
+
+function applyKinematicRiggedFrame(frame: KinematicRuntimeFrame) {
+  if (!riggedAvatar || !riggedAligned) return;
+  restoreRiggedIdleBodyPose();
+  applyKinematicRiggedHand('left', frame.hands.left);
+  applyKinematicRiggedHand('right', frame.hands.right);
+  applyKinematicNonManualFrame(frame.nonManual);
+  riggedAvatar.updateMatrixWorld(true);
 }
 
 function restoreRiggedSyntheticFacePose() {
@@ -2184,6 +2455,17 @@ const THUMB_UP_FINGER_CURLS: ReadonlyArray<readonly [string, readonly number[]]>
 ];
 
 const PINCHED_FINGER_POSE: ReadonlyArray<
+readonly [string, readonly number[], number, number]
+> = [
+  ['f_index', [-21.5, 63.6, 49.1], -7.4, -30.2],
+  ['f_middle', [-19.8, 70, 55], -1.2, -5.6],
+  ['f_ring', [-21.3, 67.2, 48.9], 4.4, 17.5],
+  ['f_pinky', [-5.2, 37.6, 22.5], 2.5, 30.9],
+];
+const PINCHED_THUMB_CURL = [84, -25.5, -32.5] as const;
+const PINCHED_THUMB_OPPOSITION = -39.6;
+const PINCHED_THUMB_ADDUCTION = -40.1;
+const QUESTION_Q_FINGER_POSE: ReadonlyArray<
 readonly [string, readonly number[], number]
 > = [
   ['f_index', [38, 62, 32], -13],
@@ -2191,11 +2473,11 @@ readonly [string, readonly number[], number]
   ['f_ring', [42, 66, 36], 5],
   ['f_pinky', [46, 70, 38], 14],
 ];
-const PINCHED_THUMB_CURL = [28, 48, 24] as const;
+const QUESTION_Q_THUMB_CURL = [28, 48, 24] as const;
 const MONEY_RUB_FINGER_POSE: ReadonlyArray<
 readonly [string, readonly number[], number]
 > = [
-  PINCHED_FINGER_POSE[0],
+  QUESTION_Q_FINGER_POSE[0],
   ['f_middle', [78, 98, 74], 2],
   ['f_ring', THUMB_UP_FINGER_CURLS[2][1], 0],
   ['f_pinky', THUMB_UP_FINGER_CURLS[3][1], 0],
@@ -2262,37 +2544,41 @@ function applyRiggedThumbUpFist(side: 'L' | 'R') {
   riggedAvatar?.updateMatrixWorld(true);
 }
 
-function applyRiggedPinchedHand(side: 'L' | 'R') {
+function applyRiggedPinchedHand(side: 'L' | 'R', amount = 1) {
   const mirrored = side === 'L' ? 1 : -1;
-  PINCHED_FINGER_POSE.forEach(([fingerName, curls, adduction]) => {
+  const blend = THREE.MathUtils.clamp(amount, 0, 1);
+  PINCHED_FINGER_POSE.forEach(([fingerName, curls, opposition, adduction]) => {
     curls.forEach((curl, jointIndex) => {
       const bone = riggedBone(`DEF-${fingerName}.0${jointIndex + 1}.${side}`);
       const rest = bone ? riggedBoneRests.get(bone.name) : undefined;
       if (!bone || !rest) return;
       const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
         THREE.MathUtils.degToRad(curl),
-        0,
+        THREE.MathUtils.degToRad(jointIndex === 0 ? opposition * mirrored : 0),
         THREE.MathUtils.degToRad(jointIndex === 0 ? adduction * mirrored : 0),
         'XYZ',
       ));
-      bone.quaternion.copy(rest.localQuaternion).multiply(rotation).normalize();
+      const target = rest.localQuaternion.clone().multiply(rotation).normalize();
+      bone.quaternion.slerp(target, blend).normalize();
       bone.scale.copy(rest.localScale);
       bone.updateMatrix();
       bone.updateWorldMatrix(false, true);
     });
   });
-  const thumbAdduction = side === 'L' ? 42 : -42;
+  const thumbOpposition = PINCHED_THUMB_OPPOSITION * mirrored;
+  const thumbAdduction = PINCHED_THUMB_ADDUCTION * mirrored;
   PINCHED_THUMB_CURL.forEach((curl, jointIndex) => {
     const bone = riggedBone(`DEF-thumb.0${jointIndex + 1}.${side}`);
     const rest = bone ? riggedBoneRests.get(bone.name) : undefined;
     if (!bone || !rest) return;
     const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
       THREE.MathUtils.degToRad(curl),
-      0,
+      THREE.MathUtils.degToRad(jointIndex === 0 ? thumbOpposition : 0),
       THREE.MathUtils.degToRad(jointIndex === 0 ? thumbAdduction : 0),
       'XYZ',
     ));
-    bone.quaternion.copy(rest.localQuaternion).multiply(rotation).normalize();
+    const target = rest.localQuaternion.clone().multiply(rotation).normalize();
+    bone.quaternion.slerp(target, blend).normalize();
     bone.scale.copy(rest.localScale);
     bone.updateMatrix();
     bone.updateWorldMatrix(false, true);
@@ -2358,7 +2644,7 @@ function applyRiggedMoneyRubHand(side: 'L' | 'R', rubPhase: number) {
 function applyRiggedQuestionQHand(side: 'L' | 'R', openingProgress: number) {
   const qAmount = 1 - THREE.MathUtils.clamp(openingProgress, 0, 1);
   const mirrored = side === 'L' ? 1 : -1;
-  PINCHED_FINGER_POSE.forEach(([fingerName, curls, adduction]) => {
+  QUESTION_Q_FINGER_POSE.forEach(([fingerName, curls, adduction]) => {
     curls.forEach((curl, jointIndex) => {
       const bone = riggedBone(`DEF-${fingerName}.0${jointIndex + 1}.${side}`);
       const rest = bone ? riggedBoneRests.get(bone.name) : undefined;
@@ -2378,7 +2664,7 @@ function applyRiggedQuestionQHand(side: 'L' | 'R', openingProgress: number) {
     });
   });
   const thumbAdduction = side === 'L' ? 42 : -42;
-  PINCHED_THUMB_CURL.forEach((curl, jointIndex) => {
+  QUESTION_Q_THUMB_CURL.forEach((curl, jointIndex) => {
     const bone = riggedBone(`DEF-thumb.0${jointIndex + 1}.${side}`);
     const rest = bone ? riggedBoneRests.get(bone.name) : undefined;
     if (!bone || !rest) return;
@@ -2557,6 +2843,10 @@ function applyRiggedHandEditPose(
       });
     });
 
+  if (pose.pinch > 0.0001) {
+    applyRiggedPinchedHand(side, pose.pinch);
+  }
+
   const handBone = riggedBone(`DEF-hand.${side}`);
   if (handBone && handBone.parent) {
     const wristRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
@@ -2623,7 +2913,9 @@ function driveRiggedPalmAndFingers(
   if (!configuredStates && activeRiggedHandPresentations[side] === 'thumb-up') {
     applyRiggedThumbUpFist(side);
   }
-  if (!configuredStates && activeRiggedHandPresentations[side] === 'pinched') {
+  const pinched = !configuredStates
+    && activeRiggedHandPresentations[side] === 'pinched';
+  if (pinched) {
     applyRiggedPinchedHand(side);
   }
   const moneyRub = !configuredStates
@@ -2652,7 +2944,6 @@ function driveRiggedPalmAndFingers(
       ),
     );
   }
-
   riggedFingerTargets.forEach(([boneName, fromIndex, toIndex]) => {
     const configuredFinger = configuredFingerForSegment(fromIndex);
     const configuredState = configuredFinger
@@ -2668,7 +2959,7 @@ function driveRiggedPalmAndFingers(
       // Explicit per-finger choices take precedence over a legacy whole-hand
       // preset. Captured fingers still follow all source landmarks.
     } else {
-    if (activeRiggedHandPresentations[side] === 'pinched') return;
+    if (pinched) return;
     if (questionQ) return;
     if (compactFist) return;
     if (moneyRub) return;
@@ -3132,7 +3423,7 @@ function profileSynchronizedPalmApproachScale(
   const approachHands = activePalmApproachMotion?.frames.map(frame => (
     frame.bodyHands.slice(handStart, handStart + 21)
   ));
-  return approachHands && activeFrameIndex >= 0
+  const authoredScale = approachHands && activeFrameIndex >= 0
     ? riggedApproachPalmScaleEnvelope(
       approachHands,
       activeFrameIndex,
@@ -3147,6 +3438,7 @@ function profileSynchronizedPalmApproachScale(
       maximumScale,
       activeProfile.rigPalmApproachGain,
     );
+  return stableApparentHandScale(authoredScale);
 }
 
 function applyProfileSynchronizedPalmApproach(
@@ -4203,12 +4495,21 @@ async function loadMotion(clip: string): Promise<Motion> {
   } else if (profile?.rigPointingHand) {
     pointingRiggedHandMotions.add(retargetedMotion);
     presentationArms.forEach(armIndex => cacheRiggedPresentationFrames(retargetedMotion, armIndex, 'pointing'));
-  } else if (normalizedClip === 'HOLA' || profile?.rigStableOpenHand) {
+  } else if (normalizedClip === 'ADIOS' || profile?.rigStableOpenHand) {
     stableRiggedHandMotions.add(retargetedMotion);
     presentationArms.forEach(armIndex => cacheRiggedPresentationFrames(retargetedMotion, armIndex, 'open'));
-  } else if (profile?.rigSoftHandCurl) {
+  } else if (profile?.rigSoftHandCurl || profile?.rigLeftSoftHandCurl || profile?.rigRightSoftHandCurl) {
     softCurlRiggedHandMotions.add(retargetedMotion);
-    presentationArms.forEach(armIndex => cacheRiggedPresentationFrames(retargetedMotion, armIndex, 'soft-curl'));
+    presentationArms.forEach(armIndex => {
+      const softCurlEnabled = armIndex === 0
+        ? profile.rigLeftSoftHandCurl ?? profile.rigSoftHandCurl
+        : profile.rigRightSoftHandCurl ?? profile.rigSoftHandCurl;
+      cacheRiggedPresentationFrames(
+        retargetedMotion,
+        armIndex,
+        softCurlEnabled ? 'soft-curl' : 'anatomical',
+      );
+    });
   } else {
     anatomicalRiggedHandMotions.add(retargetedMotion);
     presentationArms.forEach(armIndex => cacheRiggedPresentationFrames(retargetedMotion, armIndex, 'anatomical'));
@@ -4257,6 +4558,42 @@ function ensureMotion(clip: string): Promise<Motion> {
   return nextLoad;
 }
 
+async function loadKinematicPlan(clip: string): Promise<KinematicRuntimePlan> {
+  const normalizedClip = clip.trim().toUpperCase();
+  const response = await fetch(`./motions/${normalizedClip.toLowerCase()}.runtime-plan.json`);
+  if (!response.ok) throw new Error(`No se pudo cargar el plan cinemático ${normalizedClip}.`);
+  const plan = await response.json() as KinematicRuntimePlan;
+  if (
+    plan.schema !== 'vozual.runtime-execution-plan'
+    || plan.formatVersion !== 1
+    || !Number.isFinite(plan.durationMs)
+    || plan.durationMs <= 0
+    || !Array.isArray(plan.frames)
+    || plan.frames.length < 2
+  ) {
+    throw new Error(`El plan cinemático ${normalizedClip} no contiene una secuencia válida.`);
+  }
+  return plan;
+}
+
+function ensureKinematicPlan(clip: string): Promise<KinematicRuntimePlan> {
+  const normalizedClip = clip.trim().toUpperCase();
+  const cached = kinematicPlanLoads.get(normalizedClip);
+  if (cached) return cached;
+  const nextLoad = loadKinematicPlan(normalizedClip).then(
+    plan => {
+      kinematicPlanLoads.set(normalizedClip, Promise.resolve(plan));
+      return plan;
+    },
+    error => {
+      kinematicPlanLoads.delete(normalizedClip);
+      throw error;
+    },
+  );
+  kinematicPlanLoads.set(normalizedClip, nextLoad);
+  return nextLoad;
+}
+
 async function loadAvatarProfiles() {
   const response = await fetch('./motions/avatar_profiles.json');
   if (!response.ok) throw new Error('No se pudieron cargar los perfiles de animación.');
@@ -4270,6 +4607,8 @@ function playClip(
   playbackSpeed = 1,
   continuePhrase = false,
 ) {
+  activeKinematicPlan = undefined;
+  activeKinematicReferenceHands = undefined;
   if (clip === 'PHRASE_WAIT') {
     activeMotion = undefined;
     pendingMotion = undefined;
@@ -4367,30 +4706,35 @@ function playClip(
     && playbackMotion !== motion
   ) {
     const armIndexes = presentationArmIndexes(activeRiggedHand);
-    armIndexes.forEach(armIndex => cacheRiggedPresentationFrames(
-      playbackMotion,
-      armIndex,
-      (armIndex === 0
-        ? activeProfile?.rigLeftHandShape
-        : activeProfile?.rigRightHandShape)
-        ?? (activeStableRiggedHandShape
-        ? 'open'
-        : activeFistRiggedHandShape
-          ? 'fist'
-          : activePointingRiggedHandShape
-            ? activeProfile?.rigSelfPointingHand
-              ? 'self-pointing'
-              : 'pointing'
-            : activeSoftCurlRiggedHandShape
-              ? 'soft-curl'
-              : 'anatomical'),
-      armIndex === 0
-        ? activeProfile?.rigLeftHandTrackingRepair
-        : activeProfile?.rigRightHandTrackingRepair,
-      armIndex === 0
-        ? activeProfile?.rigLeftFingerStates
-        : activeProfile?.rigRightFingerStates,
-    ));
+    armIndexes.forEach(armIndex => {
+      const armSoftCurl = armIndex === 0
+        ? activeProfile?.rigLeftSoftHandCurl ?? activeProfile?.rigSoftHandCurl
+        : activeProfile?.rigRightSoftHandCurl ?? activeProfile?.rigSoftHandCurl;
+      cacheRiggedPresentationFrames(
+        playbackMotion,
+        armIndex,
+        (armIndex === 0
+          ? activeProfile?.rigLeftHandShape
+          : activeProfile?.rigRightHandShape)
+          ?? (activeStableRiggedHandShape
+          ? 'open'
+          : activeFistRiggedHandShape
+            ? 'fist'
+            : activePointingRiggedHandShape
+              ? activeProfile?.rigSelfPointingHand
+                ? 'self-pointing'
+                : 'pointing'
+              : activeSoftCurlRiggedHandShape && armSoftCurl
+                ? 'soft-curl'
+                : 'anatomical'),
+        armIndex === 0
+          ? activeProfile?.rigLeftHandTrackingRepair
+          : activeProfile?.rigRightHandTrackingRepair,
+        armIndex === 0
+          ? activeProfile?.rigLeftFingerStates
+          : activeProfile?.rigRightFingerStates,
+      );
+    });
   }
   activeRestReference = motion.frames[0];
   activePalmApproachMotion = playbackMotion;
@@ -4441,26 +4785,88 @@ function requestClip(
     return;
   }
   const normalizedClip = clip.trim().toUpperCase();
-  ensureMotion(normalizedClip).then(
-    () => {
-      // Loading is asynchronous. Do not let an older request replace a newer
-      // word that arrived while its asset was being decoded.
+  const startLegacyPlayback = () => ensureMotion(normalizedClip).then(() => {
+    // Loading is asynchronous. Do not let an older request replace a newer
+    // word that arrived while its asset was being decoded.
+    if (requestId !== latestPlaybackRequest) return;
+    playClip(normalizedClip, playbackId, playbackSpeed, continuePhrase);
+  });
+  // A runtime execution plan takes precedence whenever the sign provides one.
+  // Otherwise this falls back to the established compact-motion playback path.
+  const load = renderMode === 'rigged'
+    ? ensureKinematicPlan(normalizedClip).then(plan => {
       if (requestId !== latestPlaybackRequest) return;
-      playClip(normalizedClip, playbackId, playbackSpeed, continuePhrase);
-    },
-    error => {
-      if (requestId !== latestPlaybackRequest) return;
-      send('error', {
-        message: error instanceof Error ? error.message : String(error),
-        playbackId,
-      });
-      // Release the React Native queue even if one published asset is damaged.
-      send('ended', {playbackId});
-    },
-  );
+      const started = window.playVozualKinematicPlan(plan, playbackId, playbackSpeed);
+      if (!started) return startLegacyPlayback();
+    }).catch(() => startLegacyPlayback())
+    : startLegacyPlayback();
+  load.catch(error => {
+    if (requestId !== latestPlaybackRequest) return;
+    send('error', {
+      message: error instanceof Error ? error.message : String(error),
+      playbackId,
+    });
+    // Release the React Native queue even if one published asset is damaged.
+    send('ended', {playbackId});
+  });
 }
 
 window.playVozualClip = requestClip;
+
+window.playVozualKinematicPlan = (plan, playbackId, playbackSpeed = 1) => {
+  if (
+    plan?.schema !== 'vozual.runtime-execution-plan'
+    || plan.formatVersion !== 1
+    || !Array.isArray(plan.frames)
+    || plan.frames.length < 2
+    || !Number.isFinite(plan.durationMs)
+    || plan.durationMs <= 0
+  ) {
+    send('error', {message: 'El plan cinemático v3 no es válido.', playbackId});
+    return false;
+  }
+  activeMotion = undefined;
+  pendingMotion = undefined;
+  transitionStart = undefined;
+  transitionTarget = undefined;
+  returnStart = undefined;
+  returnTarget = undefined;
+  activeKinematicPlan = plan;
+  restoreRiggedIdleBodyPose();
+  activeKinematicArmStartPose = new Map();
+  for (const side of ['left', 'right'] as const) {
+    for (const name of kinematicRigArmBoneNames(side)) {
+      const bone = riggedBone(name);
+      const rest = bone ? riggedBoneRests.get(name) : undefined;
+      if (!bone || !rest) continue;
+
+      // A declarative plan must have identical output on every replay. Never
+      // make its reference arm pose depend on the last rendered frame.
+      bone.position.copy(rest.localPosition);
+      bone.quaternion.copy(rest.localQuaternion);
+      bone.scale.copy(rest.localScale);
+      bone.updateMatrix();
+      activeKinematicArmStartPose.set(name, {
+        position: rest.localPosition.clone(),
+        quaternion: rest.localQuaternion.clone(),
+        scale: rest.localScale.clone(),
+      });
+    }
+  }
+  riggedAvatar?.updateMatrixWorld(true);
+  activeKinematicReferenceHands = {
+    left: [...plan.frames[0].hands.left.wrist.positionM] as [number, number, number],
+    right: [...plan.frames[0].hands.right.wrist.positionM] as [number, number, number],
+  };
+  activePlaybackId = playbackId;
+  activePlaybackSpeed = Math.min(4, Math.max(0.25, playbackSpeed));
+  activeStartedAt = performance.now();
+  activeFrameIndex = -1;
+  ended = false;
+  riggedHandsAtRest = false;
+  applyKinematicRiggedFrame(plan.frames[0]);
+  return true;
+};
 
 function playbackBaseFps(motion: Motion, startFrame: number, endFrame: number) {
   return Math.min(
@@ -4578,8 +4984,14 @@ window.getVozualRigHandEditorState = (clip: string) => {
     smile: riggedSmileEditAtFrame(keyframes, currentFrame),
     face: riggedFacialEditAtFrame(keyframes, currentFrame),
     pose: riggedHandsEditPoseAtFrame(keyframes, currentFrame),
-    indexMiddleSpread: Number(avatarProfiles.get(normalizedClip)?.rigLeftIndexMiddleSpread ?? 0),
-    forearmAxialRollDegrees: Number(avatarProfiles.get(normalizedClip)?.rigLeftForearmAxialRollDegrees ?? 0),
+    indexMiddleSpread: {
+      left: Number(avatarProfiles.get(normalizedClip)?.rigLeftIndexMiddleSpread ?? 0),
+      right: Number(avatarProfiles.get(normalizedClip)?.rigRightIndexMiddleSpread ?? 0),
+    },
+    forearmAxialRollDegrees: {
+      left: Number(avatarProfiles.get(normalizedClip)?.rigLeftForearmAxialRollDegrees ?? 0),
+      right: Number(avatarProfiles.get(normalizedClip)?.rigRightForearmAxialRollDegrees ?? 0),
+    },
   };
 };
 
@@ -4605,14 +5017,21 @@ window.setVozualRigHandKeyframes = (
   return true;
 };
 
-window.setVozualRigFingerSpread = (clip: string, spread: number) => {
+window.setVozualRigFingerSpread = (
+  clip: string,
+  side: 'left' | 'right',
+  spread: number,
+) => {
   const normalizedClip = clip.trim().toUpperCase();
   const previousProfile = avatarProfiles.get(normalizedClip);
   if (!previousProfile) return false;
   const nextProfile: AvatarProfile = {
     ...previousProfile,
-    rigLeftIndexMiddleSpread: THREE.MathUtils.clamp(Number(spread) || 0, 0, 0.08),
   };
+  const profileKey = side === 'right'
+    ? 'rigRightIndexMiddleSpread'
+    : 'rigLeftIndexMiddleSpread';
+  nextProfile[profileKey] = THREE.MathUtils.clamp(Number(spread) || 0, 0, 0.08);
   avatarProfiles.set(normalizedClip, nextProfile);
   if (activeProfile === previousProfile) {
     activeProfile = nextProfile;
@@ -4621,11 +5040,19 @@ window.setVozualRigFingerSpread = (clip: string, spread: number) => {
   return true;
 };
 
-window.setVozualForearmAxialRoll = (clip: string, degrees: number) => {
+window.setVozualForearmAxialRoll = (
+  clip: string,
+  side: 'left' | 'right',
+  degrees: number,
+) => {
   const normalizedClip = clip.trim().toUpperCase();
   const previousProfile = avatarProfiles.get(normalizedClip);
   if (!previousProfile) return false;
-  const nextProfile: AvatarProfile = {...previousProfile, rigLeftForearmAxialRollDegrees: THREE.MathUtils.clamp(Number(degrees) || 0, -180, 180)};
+  const nextProfile: AvatarProfile = {...previousProfile};
+  const profileKey = side === 'right'
+    ? 'rigRightForearmAxialRollDegrees'
+    : 'rigLeftForearmAxialRollDegrees';
+  nextProfile[profileKey] = THREE.MathUtils.clamp(Number(degrees) || 0, -180, 180);
   avatarProfiles.set(normalizedClip, nextProfile);
   if (activeProfile === previousProfile) { activeProfile = nextProfile; if (displayedFrame) setFrame(displayedFrame); }
   return true;
@@ -4717,6 +5144,21 @@ function renderAnimationFrame(now = performance.now()) {
       returnTarget = undefined;
       setFrame(completedTarget);
     }
+  } else if (activeKinematicPlan) {
+    const elapsedMs = Math.max(0, (now - activeStartedAt) * activePlaybackSpeed);
+    const frameIndex = Math.min(
+      activeKinematicPlan.frames.length - 1,
+      Math.floor((elapsedMs / activeKinematicPlan.durationMs) * (activeKinematicPlan.frames.length - 1)),
+    );
+    if (frameIndex !== activeFrameIndex) {
+      activeFrameIndex = frameIndex;
+      applyKinematicRiggedFrame(activeKinematicPlan.frames[frameIndex]);
+    }
+    if (elapsedMs >= activeKinematicPlan.durationMs && !ended) {
+      ended = true;
+      activeKinematicPlan = undefined;
+      send('ended', {playbackId: activePlaybackId});
+    }
   } else if (activeMotion) {
     const elapsed = (now - activeStartedAt) / 1000;
     const playbackFps = playbackBaseFps(
@@ -4737,7 +5179,7 @@ function renderAnimationFrame(now = performance.now()) {
       setFrame(activeMotion.frames[frameIndex]);
       lastFrame = frameIndex;
     }
-    // HOLA has a derived, zero-phase stabilization profile for its rigged
+    // ADIOS has a derived, zero-phase stabilization profile for its rigged
     // hand. Interpolate that presentation on every display refresh so a 60 Hz
     // screen does not alternate between repeated and abruptly changed 30 Hz
     // poses. Source landmarks, frame count and timestamps remain untouched.
@@ -4757,7 +5199,7 @@ function renderAnimationFrame(now = performance.now()) {
       send('ended', {playbackId: activePlaybackId});
     }
   }
-  if (riggedHandsAtRest && !activeMotion && !pendingMotion && !transitionStart && !returnStart) {
+  if (riggedHandsAtRest && !activeKinematicPlan && !activeMotion && !pendingMotion && !transitionStart && !returnStart) {
     applyRiggedIdleBody(now);
     applyRiggedLivelyFace();
   }

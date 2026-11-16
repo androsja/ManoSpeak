@@ -38,6 +38,7 @@ class VoiceListeningService : Service() {
   private var scheduledRestart: Runnable? = null
   private var recognitionWatchdog: Runnable? = null
   private var lastPartialResults: ArrayList<String>? = null
+  private var lastPartialConfidenceScores: FloatArray? = null
   private var speechStarted = false
   private var hasReachedReadyState = false
   private var recognitionLanguageIndex = 0
@@ -170,9 +171,14 @@ class VoiceListeningService : Service() {
       if (!isCurrentSession(sessionId) || !recognitionInProgress) return@Runnable
       Log.w(TAG, "Recognition watchdog recovering session=$sessionId reason=$reason")
       if (!lastPartialResults.isNullOrEmpty()) {
-        sendSpeechEvent(EVENT_RESULTS, lastPartialResults)
+        sendSpeechEvent(
+          EVENT_RESULTS,
+          lastPartialResults,
+          confidenceScores = lastPartialConfidenceScores,
+        )
       }
       lastPartialResults = null
+      lastPartialConfidenceScores = null
       recognitionInProgress = false
       hasReachedReadyState = false
       sendSpeechEvent(EVENT_END)
@@ -279,6 +285,7 @@ class VoiceListeningService : Service() {
         if (!isCurrentSession(sessionId)) return
         hasReachedReadyState = true
         lastPartialResults = null
+        lastPartialConfidenceScores = null
         speechStarted = false
         Log.i(TAG, "Service-owned recognition is ready session=$sessionId")
         sendSpeechEvent(EVENT_START)
@@ -353,6 +360,7 @@ class VoiceListeningService : Service() {
           error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE
         ) {
           lastPartialResults = null
+          lastPartialConfidenceScores = null
           if (recognitionLanguageIndex < RECOGNITION_LANGUAGES.lastIndex) {
             val unsupportedLanguage = currentRecognitionLanguage()
             recognitionLanguageIndex += 1
@@ -380,9 +388,14 @@ class VoiceListeningService : Service() {
           !lastPartialResults.isNullOrEmpty()
         ) {
           Log.i(TAG, "Promoting partial result after terminal error session=$sessionId")
-          sendSpeechEvent(EVENT_RESULTS, lastPartialResults)
+          sendSpeechEvent(
+            EVENT_RESULTS,
+            lastPartialResults,
+            confidenceScores = lastPartialConfidenceScores,
+          )
         }
         lastPartialResults = null
+        lastPartialConfidenceScores = null
         sendSpeechEvent(EVENT_ERROR, error = error.toString())
 
         val requiresRecreation =
@@ -417,12 +430,15 @@ class VoiceListeningService : Service() {
         hasReachedReadyState = false
         consecutiveErrors = 0
         lastPartialResults = null
+        lastPartialConfidenceScores = null
         val recognizedValues =
           results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        val confidenceScores = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
         Log.i(TAG, "Service-owned recognition delivered results session=$sessionId")
         sendSpeechEvent(
           EVENT_RESULTS,
           recognizedValues,
+          confidenceScores = confidenceScores,
         )
         // Reuse the healthy recognizer. Recreating it after every phrase can
         // disconnect Google's speech service while the previous request closes.
@@ -433,10 +449,13 @@ class VoiceListeningService : Service() {
         if (!isCurrentSession(sessionId)) return
         lastPartialResults =
           partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        lastPartialConfidenceScores =
+          partialResults?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
         Log.d(TAG, "Service-owned recognition delivered partial results session=$sessionId")
         sendSpeechEvent(
           EVENT_PARTIAL_RESULTS,
           lastPartialResults,
+          confidenceScores = lastPartialConfidenceScores,
         )
         armRecognitionWatchdog(
           sessionId = sessionId,
@@ -478,8 +497,9 @@ class VoiceListeningService : Service() {
     event: String,
     values: ArrayList<String>? = null,
     error: String? = null,
+    confidenceScores: FloatArray? = null,
   ) {
-    PictureInPictureModule.emitSpeechEvent(event, values, error)
+    PictureInPictureModule.emitSpeechEvent(event, values, error, confidenceScores)
   }
 
   private fun createNotificationChannel() {

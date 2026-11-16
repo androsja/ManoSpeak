@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const {compileMotion, motionAssetName} = require('./compact-sign-motion');
+const {storagePaths} = require('./storage-asset-contract');
 
 const MOBILE_ROOT = path.resolve(__dirname, '..');
 const LANGUAGE_ID = 'lsc-co';
@@ -147,6 +148,12 @@ function buildPublishedSigns() {
     const version = previousReleaseSha256 === releaseSha256
       ? previous.version
       : Math.max(0, Number(previous?.version) || 0) + 1;
+    const storageMetadata = storagePaths({
+      languageId: LANGUAGE_ID,
+      signId,
+      version,
+      assetName,
+    });
     fs.writeFileSync(path.join(OUTPUT_DIR, assetName), content);
     return {
       id: signId,
@@ -158,6 +165,7 @@ function buildPublishedSigns() {
         sizeBytes: content.byteLength,
         ...releaseData,
         releaseSha256,
+        ...storageMetadata,
         avatarProfile,
         assetDocumentPath: `signs/${signId}/versions/v${version}`,
         approved: true,

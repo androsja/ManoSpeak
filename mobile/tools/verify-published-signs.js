@@ -8,6 +8,7 @@ const {
   requestedGlosses,
   selectSignsForPublication,
 } = require('./publish-approved-signs');
+const {validateStorageAssetMetadata} = require('./storage-asset-contract');
 
 const MOBILE_ROOT = path.resolve(__dirname, '..');
 const REPOSITORY_ROOT = path.resolve(MOBILE_ROOT, '..');
@@ -77,9 +78,32 @@ async function verifyPublishedSigns(options = {}) {
       || metadata.fields?.releaseSha256?.stringValue !== sign.data.releaseSha256
     ) throw new Error(`${sign.id} has stale public version metadata.`);
     const asset = await publicDocument(project, sign.data.assetDocumentPath);
-    const content = Buffer.from(asset.fields?.contentBase64?.stringValue ?? '', 'base64');
+    const plainAsset = plainFirestoreDocument(asset);
+    validateStorageAssetMetadata({...plainAsset, ...sign.data}, {allowLegacy: true});
+    const downloadUrl = plainAsset.downloadUrl ?? sign.data.downloadUrl;
+    let content;
+    if (downloadUrl) {
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error(`${sign.id} Storage download failed: ${response.status}.`);
+      }
+      content = Buffer.from(await response.arrayBuffer());
+    } else if (typeof plainAsset.contentBase64 === 'string' && plainAsset.contentBase64.length > 0) {
+      content = Buffer.from(plainAsset.contentBase64, 'base64');
+    } else {
+      throw new Error(`${sign.id} has storagePath metadata but no downloadUrl; Storage verification is not configured.`);
+    }
     const avatarProfile = plainFirestoreValue(asset.fields?.avatarProfile);
     if (
+      plainAsset.storagePath !== undefined
+      && plainAsset.storagePath !== sign.data.storagePath
+      || plainAsset.downloadUrl !== undefined
+      && plainAsset.downloadUrl !== sign.data.downloadUrl
+      || plainAsset.semanticPath !== undefined
+      && plainAsset.semanticPath !== sign.data.semanticPath
+      || plainAsset.profilePath !== undefined
+      && plainAsset.profilePath !== sign.data.profilePath
+      ||
       content.byteLength !== sign.data.sizeBytes
       || sha256(content) !== sign.data.sha256
       || asset.fields?.profileSha256?.stringValue !== sign.data.profileSha256

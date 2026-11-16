@@ -68,7 +68,11 @@ export type CatalogValidationResult =
 
 export type LscPhraseResolution =
   | {status: 'matched'; entry: LscPhraseAssetEntry}
-  | {status: 'ambiguous'; candidateIds: string[]; message: string}
+  | {
+    status: 'ambiguous';
+    candidates: Array<Pick<LscPhraseAssetEntry, 'id'> & {intendedMeaning: string}>;
+    message: string;
+  }
   | {
     status: 'unsupported';
     title: string;
@@ -292,6 +296,7 @@ function unsupported(catalog: unknown, message?: string): LscPhraseResolution {
 export function resolveReviewedLscPhrase(
   text: string,
   catalog: unknown = catalogJson,
+  selectedEntryId?: string,
 ): LscPhraseResolution {
   const validation = validateLscPhraseAssetCatalog(catalog);
   if (!validation.valid) return unsupported(catalog);
@@ -303,9 +308,16 @@ export function resolveReviewedLscPhrase(
   ));
   if (matches.length === 0) return unsupported(catalog);
   if (matches.length > 1) {
+    const selected = selectedEntryId
+      ? matches.find(entry => entry.id === selectedEntryId)
+      : undefined;
+    if (selected) return {status: 'matched', entry: selected};
     return {
       status: 'ambiguous',
-      candidateIds: matches.map(entry => entry.id),
+      candidates: matches.map(entry => ({
+        id: entry.id,
+        intendedMeaning: entry.spanish.intendedMeaning,
+      })),
       message: 'Esta frase puede tener más de un significado en LSC. Elige una opción del catálogo.',
     };
   }
@@ -332,8 +344,9 @@ export function resolvePlayableLscPhrase(
   text: string,
   installedAssets: readonly InstalledLscAsset[],
   catalog: unknown = catalogJson,
+  selectedEntryId?: string,
 ): LscPhraseResolution {
-  const resolution = resolveReviewedLscPhrase(text, catalog);
+  const resolution = resolveReviewedLscPhrase(text, catalog, selectedEntryId);
   if (resolution.status !== 'matched') return resolution;
   if (!hasEveryInstalledAsset(resolution.entry, installedAssetsById(installedAssets))) {
     return unsupported(

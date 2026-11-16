@@ -9,9 +9,29 @@ import {
   resolveInstalledSignPlan,
   resolvePublishedLscPlan,
   speechVocabularyForInstalledSigns,
+  selectPublishedLscEntries,
 } from '../LinguisticCatalogService';
 
 describe('LinguisticCatalogService', () => {
+  it('resolves an accent-free clip to the manifest identity without mutating the catalog', () => {
+    const source = {...PUBLISHED_LSC_ENTRIES[0], motion: {clip: 'ADIOS', published: true}};
+    expect(selectPublishedLscEntries([source], ['ADIÓS'])[0].motion.clip).toBe('ADIÓS');
+    expect(source.motion.clip).toBe('ADIOS');
+    expect(selectPublishedLscEntries([source], ['ADIÓS', 'ÁDIOS'])).toEqual([]);
+    expect(selectPublishedLscEntries([source], ['ADIOS', 'ADIÓS'])[0].motion.clip).toBe('ADIOS');
+  });
+
+  it('does not let accent matching bypass either approval or blocked status', () => {
+    const source = {...PUBLISHED_LSC_ENTRIES[0], motion: {clip: 'ADIOS', published: true}};
+    expect(selectPublishedLscEntries([source], [])).toEqual([]);
+    expect(selectPublishedLscEntries([
+      {...source, review: {...source.review, ownerApproval: undefined}},
+      {...source, review: {...source.review, status: 'blocked'}},
+      {...source, motion: {...source.motion, published: false}},
+    ], ['ADIÓS'])).toEqual([]);
+    expect(selectPublishedLscEntries([source, source], ['ADIÓS'])).toHaveLength(1);
+  });
+
   it('exposes exactly the signs explicitly approved by the project owner', () => {
     expect(PUBLISHED_LSC_ENTRIES.every(
       (entry) => entry.review.ownerApproval?.status === 'approved',

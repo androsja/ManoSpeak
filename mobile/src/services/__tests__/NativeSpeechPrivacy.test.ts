@@ -85,6 +85,23 @@ describe('native speech privacy contract', () => {
 
     expect(source).toContain('supportsOnDeviceRecognition');
     expect(source).toContain('requiresOnDeviceRecognition = YES');
+    expect(source).toContain('segment.confidence');
+  });
+
+  it('forwards native confidence and keeps a low-confidence final result pending review', () => {
+    const androidService = mobileSource(
+      'android/app/src/main/java/com/androsja/vozual/VoiceListeningService.kt',
+    );
+    const androidModule = mobileSource(
+      'android/app/src/main/java/com/androsja/vozual/PictureInPictureModule.kt',
+    );
+    const listenerSource = mobileSource('src/components/ListenerScreen.tsx');
+
+    expect(androidService).toContain('SpeechRecognizer.CONFIDENCE_SCORES');
+    expect(androidModule).toContain('putArray("confidence"');
+    expect(listenerSource).toContain('MIN_FINAL_SPEECH_CONFIDENCE = 0.55');
+    expect(listenerSource).toContain('lowConfidenceFinal');
+    expect(listenerSource).toContain('setTranscriptConfirmationVisible(true)');
   });
 
   it('does not fall back to the third-party iOS recognizer', () => {

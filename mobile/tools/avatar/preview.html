@@ -29,6 +29,13 @@
         gap: 14px;
       }
       .visual-comparison.has-source-video { grid-template-columns: repeat(2, minmax(280px, 430px)); }
+      .quick-avatar-refresh {
+        width: 100%;
+        min-height: 38px;
+        border: 1px solid #20d6ce;
+        background: #12383d;
+        color: #e7ffff;
+      }
       .phone {
         position: relative;
         width: 100%;
@@ -181,7 +188,7 @@
       #avatar-zoom { width: 100%; accent-color: #20d6ce; cursor: pointer; }
       .zoom-slider-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) 42px; align-items: center; gap: 10px; }
       .zoom-step { min-height: 38px; padding: 4px; font-size: 24px; line-height: 1; }
-      .zoom-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+      .zoom-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 8px; }
       .zoom-actions button { min-height: 38px; }
       .timeline {
         position: sticky;
@@ -247,6 +254,10 @@
       .rig-editor { margin: 0 0 18px; padding: 14px; border-radius: 12px; background: #111e2e; }
       .rig-editor h2 { margin: 0; font-size: 17px; }
       .rig-editor-help { margin: 7px 0 13px; color: #9fb0c4; font-size: 12px; line-height: 1.45; }
+      .rig-editor-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+      .rig-editor-actions button:active { transform: translateY(1px); filter: brightness(1.2); }
+      .rig-editor-actions button:disabled { cursor: default; opacity: 0.42; }
+      .rig-save-status { min-height: 18px; margin-top: 8px; color: #20d6ce; font-size: 11px; font-weight: 900; }
       .rig-editor-toolbar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
       .rig-editor-toolbar label, .rig-edit-row label { color: #c9d5e3; font-size: 11px; font-weight: 900; }
       .rig-editor-toolbar select, .rig-editor-toolbar input {
@@ -310,7 +321,7 @@
         #time-label { font-size: 15px; }
         .visual-comparison.has-source-video { grid-template-columns: minmax(300px, 430px); }
         .phone { height: 68vh; min-height: 500px; }
-        .rig-editor-toolbar, .rig-edit-grid { grid-template-columns: 1fr; }
+        .rig-editor-toolbar, .rig-edit-grid, .rig-editor-actions { grid-template-columns: 1fr; }
         .compilation-review-heading { display: block; }
         .approval-badge { display: inline-block; margin-top: 8px; }
         .approval-actions { grid-template-columns: 1fr; }
@@ -333,6 +344,7 @@
           </div>
           <div class="zoom-actions">
             <button id="show-full-avatar" type="button">VER PERSONAJE COMPLETO</button>
+            <button class="quick-avatar-refresh" id="quick-refresh-avatar" type="button">ACTUALIZAR AVATAR</button>
           </div>
         </section>
       </main>
@@ -408,6 +420,7 @@
         </select>
         <button class="wide" id="toggle-skeleton" type="button" aria-pressed="true">OCULTAR PUNTOS Y ESQUELETO</button>
         <button class="wide" id="idle" type="button">VOLVER A REPOSO</button>
+        <button class="wide" id="refresh-avatar" type="button">ACTUALIZAR AVATAR</button>
       </div>
       <section class="timeline" aria-label="Control de tiempo exacto">
         <div class="timeline-heading">
@@ -427,7 +440,8 @@
           antes del cuadro elegido para evitar saltos. En cada dedo, un valor negativo lo extiende y uno
           positivo lo cierra; así puedes abrir un dedo incluso sobre una empuñadura. El control PUÑO NATURAL
           cierra índice, medio, anular y meñique con una curvatura progresiva; no mueve el pulgar, para que
-          puedas orientarlo hacia abajo en señas como MAL. Agrega otro punto neutral
+          puedas orientarlo hacia abajo en señas como MAL. MANO EN PICO reúne las cinco yemas en un mismo
+          punto sin formar un puño y se aplica únicamente a la mano seleccionada. Agrega otro punto neutral
           cuando quieras regresar a la captura. GIRO DESDE EL CODO rota juntos el antebrazo y la mano.
           POSICIÓN HORIZONTAL y ALTURA permiten alinear las manos sin separar la muñeca del brazo.
           PROFUNDIDAD mueve la mano hacia adelante o hacia atrás. Los controles de ROSTRO se guardan
@@ -480,7 +494,29 @@
         </div>
         <div class="rig-editor-actions">
           <button id="rig-natural-fist" type="button">APLICAR PUÑO NATURAL</button>
+          <button id="rig-hacer-fingertips" type="button">APLICAR MANO EN PICO</button>
         </div>
+        <div class="rig-editor-actions" aria-label="Copiar postura de mano">
+          <button id="rig-copy-hand-pose" type="button">COPIAR POSTURA · IZQUIERDA</button>
+          <button id="rig-paste-hand-pose" type="button" disabled>PEGAR EN · IZQUIERDA</button>
+          <button id="rig-apply-hand-pose" type="button" disabled>APLICAR EN CUADRO · IZQUIERDA</button>
+        </div>
+        <div class="rig-editor-toolbar" aria-label="Opciones de copia de mano">
+          <label>QUÉ COPIAR
+            <select id="rig-hand-copy-mode">
+              <option value="shape">SOLO FORMA DE DEDOS</option>
+              <option value="shape-and-wrist">FORMA + ORIENTACIÓN DE MUÑECA</option>
+            </select>
+          </label>
+          <label>ORIENTACIÓN AL PEGAR
+            <select id="rig-hand-copy-orientation">
+              <option value="keep">CONSERVAR ORIENTACIÓN</option>
+              <option value="mirror">ESPEJAR ORIENTACIÓN</option>
+            </select>
+          </label>
+        </div>
+        <div id="rig-hand-clipboard-status" class="rig-save-status" role="status" aria-live="polite">Portapapeles de mano vacío.</div>
+        <p class="rig-editor-help">Puedes copiar solo la forma de los dedos o también la orientación de la muñeca. No se copian codo, antebrazo ni posición del brazo. “Espejar” invierte la orientación al pasarla a la otra mano.</p>
         <div class="rig-editor-toolbar">
           <label>DEDOS DENTRO DEL PUÑO
             <select id="rig-contact-finger-count">
@@ -600,6 +636,9 @@
       let rigEditorKeyframes = [];
       let rigSavedKeyframesSignature = '[]';
       let rigEditorPose = emptyRigEditorHands();
+      let rigEditorHandProfiles = emptyRigEditorHandProfiles();
+      let rigSavedHandProfilesSignature = JSON.stringify(rigEditorHandProfiles);
+      let rigHandClipboard = null;
       let rigEditorFace = emptyRigEditorFace();
       let rigPreviewDirty = false;
       let approvalSnapshot;
@@ -618,7 +657,6 @@
         {id: 'rig-middle', finger: 'middle', suffix: '%', scale: 100},
         {id: 'rig-ring', finger: 'ring', suffix: '%', scale: 100},
         {id: 'rig-pinky', finger: 'pinky', suffix: '%', scale: 100},
-        {id: 'rig-finger-spread', key: 'indexMiddleSpread', suffix: '%', scale: 100},
         {id: 'rig-joint-base', joint: 0, suffix: '%', scale: 100},
         {id: 'rig-joint-middle', joint: 1, suffix: '%', scale: 100},
         {id: 'rig-joint-tip', joint: 2, suffix: '%', scale: 100},
@@ -634,17 +672,44 @@
           verticalOffset: 0,
           depthOffset: 0,
           fist: 0,
+          pinch: 0,
           fingers: {thumb: 0, index: 0, middle: 0, ring: 0, pinky: 0},
           fingerJoints: {
             thumb: [0, 0, 0], index: [0, 0, 0], middle: [0, 0, 0],
             ring: [0, 0, 0], pinky: [0, 0, 0],
           },
-          indexMiddleSpread: 0.025,
         };
       }
 
       function emptyRigEditorHands() {
         return {left: emptyRigEditorHand(), right: emptyRigEditorHand()};
+      }
+
+      function emptyRigEditorHandProfiles() {
+        return {
+          left: {indexMiddleSpread: 0, forearmAxialRollDegrees: 0},
+          right: {indexMiddleSpread: 0, forearmAxialRollDegrees: 0},
+        };
+      }
+
+      function rigEditorHandProfilesFromState(state) {
+        const profiles = emptyRigEditorHandProfiles();
+        const spread = state?.indexMiddleSpread;
+        const roll = state?.forearmAxialRollDegrees;
+        if (spread && typeof spread === 'object') {
+          profiles.left.indexMiddleSpread = Number(spread.left || 0);
+          profiles.right.indexMiddleSpread = Number(spread.right || 0);
+        } else {
+          // Older runtime previews exposed the left-hand value as a scalar.
+          profiles.left.indexMiddleSpread = Number(spread || 0);
+        }
+        if (roll && typeof roll === 'object') {
+          profiles.left.forearmAxialRollDegrees = Number(roll.left || 0);
+          profiles.right.forearmAxialRollDegrees = Number(roll.right || 0);
+        } else {
+          profiles.left.forearmAxialRollDegrees = Number(roll || 0);
+        }
+        return profiles;
       }
 
       function emptyRigEditorFace() {
@@ -669,8 +734,61 @@
         return JSON.parse(JSON.stringify(value || emptyRigEditorHands()));
       }
 
+      function copyHandOnly(hand, handProfile) {
+        const source = hand || emptyRigEditorHand();
+        return {
+          wristPitch: Number(source.wristPitch || 0),
+          wristYaw: Number(source.wristYaw || 0),
+          wristRoll: Number(source.wristRoll || 0),
+          fist: Number(source.fist || 0),
+          pinch: Number(source.pinch || 0),
+          fingers: {...(source.fingers || {})},
+          fingerJoints: copyRigEditorPose(source.fingerJoints || emptyRigEditorHand().fingerJoints),
+          indexMiddleSpread: Number(
+            handProfile?.indexMiddleSpread ?? source.indexMiddleSpread ?? 0,
+          ),
+        };
+      }
+
+      function pasteHandOnly(target, targetProfile, source, includeWrist, mirrorWrist) {
+        const pose = copyHandOnly(source);
+        if (includeWrist) {
+          target.wristPitch = pose.wristPitch;
+          target.wristYaw = mirrorWrist ? -pose.wristYaw : pose.wristYaw;
+          target.wristRoll = mirrorWrist ? -pose.wristRoll : pose.wristRoll;
+        }
+        target.fist = pose.fist;
+        target.pinch = pose.pinch;
+        target.fingers = pose.fingers;
+        target.fingerJoints = pose.fingerJoints;
+        targetProfile.indexMiddleSpread = pose.indexMiddleSpread;
+      }
+
+      function selectedHandLabel() {
+        return rigEditorHand.value === 'left' ? 'IZQUIERDA' : 'DERECHA';
+      }
+
+      function updateHandClipboardControls() {
+        const hand = selectedHandLabel();
+        document.getElementById('rig-copy-hand-pose').textContent = `COPIAR POSTURA · ${hand}`;
+        document.getElementById('rig-paste-hand-pose').textContent = `PEGAR EN · ${hand}`;
+        document.getElementById('rig-apply-hand-pose').textContent = `APLICAR EN CUADRO · ${hand}`;
+        const hasClipboard = Boolean(rigHandClipboard);
+        document.getElementById('rig-paste-hand-pose').disabled = !hasClipboard;
+        document.getElementById('rig-apply-hand-pose').disabled = !hasClipboard;
+        document.getElementById('rig-hand-clipboard-status').textContent = hasClipboard
+          ? `Portapapeles: postura copiada desde ${rigHandClipboard.sourceHand}.`
+          : 'Portapapeles de mano vacío.';
+      }
+
+      function setHandClipboardStatus(message) {
+        document.getElementById('rig-hand-clipboard-status').textContent = message;
+      }
+
       function renderRigEditorControls() {
-        const hand = rigEditorPose[rigEditorHand.value] || emptyRigEditorHand();
+        const side = rigEditorHand.value;
+        const hand = rigEditorPose[side] || emptyRigEditorHand();
+        const handProfile = rigEditorHandProfiles[side];
         rigEditorFields.forEach(field => {
           const input = document.getElementById(field.id);
           const value = field.joint !== undefined
@@ -684,6 +802,12 @@
           input.value = String(Math.round(Number(rigEditorFace[field.key] || 0) * 100));
           document.getElementById(`${field.id}-value`).value = `${input.value}%`;
         });
+        const spreadInput = document.getElementById('rig-finger-spread');
+        const rollInput = document.getElementById('rig-forearm-roll');
+        spreadInput.value = String(Math.round(handProfile.indexMiddleSpread * 1000));
+        rollInput.value = String(Math.round(handProfile.forearmAxialRollDegrees));
+        document.getElementById('rig-finger-spread-value').value = `${spreadInput.value}%`;
+        document.getElementById('rig-forearm-roll-value').value = `${rollInput.value}°`;
       }
 
       function rigEditorFieldLabel(field, rawValue) {
@@ -719,6 +843,14 @@
           else hand[field.key] = value;
         });
         rigEditorPose[side] = hand;
+        rigEditorHandProfiles[side].indexMiddleSpread = Math.min(
+          0.08,
+          Math.max(0, Number(document.getElementById('rig-finger-spread').value) / 1000),
+        );
+        rigEditorHandProfiles[side].forearmAxialRollDegrees = Math.min(
+          180,
+          Math.max(-180, Number(document.getElementById('rig-forearm-roll').value)),
+        );
         rigFacialFields.forEach(field => {
           const input = document.getElementById(field.id);
           rigEditorFace[field.key] = Math.min(1, Math.max(0, Number(input.value) / 100));
@@ -729,25 +861,43 @@
       function applyNaturalFistPreset() {
         const side = rigEditorHand.value;
         const hand = rigEditorPose[side] || emptyRigEditorHand();
+        hand.pinch = 0;
         hand.fist = 1;
         ['index', 'middle', 'ring', 'pinky'].forEach(finger => {
           hand.fingers[finger] = 0;
           hand.fingerJoints[finger] = [0, 0, 0];
         });
-        hand.indexMiddleSpread = 0;
+        rigEditorHandProfiles[side].indexMiddleSpread = 0;
         rigEditorPose[side] = hand;
         renderRigEditorControls();
         previewRigEditorControls();
       }
 
-      function resetRigHandShape(hand) {
+      function applyHacerFingertipsPreset() {
+        // This is deliberately a hand-local preset: never alter the opposite
+        // hand while an author is adjusting a two-handed sign such as HACER.
+        const side = rigEditorHand.value;
+        const hand = rigEditorPose[side] || emptyRigEditorHand();
+        resetRigHandShape(hand, rigEditorHandProfiles[side]);
+        // The dedicated rig pose combines flexion, lateral convergence and
+        // thumb opposition so all five fingertips meet as one soft cone.
+        hand.pinch = 1;
+        rigEditorHandProfiles[side].indexMiddleSpread = 0;
+        rigEditorPose[side] = hand;
+        renderRigEditorControls();
+        previewRigEditorControls();
+        setRigSaveStatus(`Mano en pico aplicada en la mano ${selectedHandLabel()}. Agrega el cuadro y guarda para conservarla.`, 'success');
+      }
+
+      function resetRigHandShape(hand, handProfile) {
         hand.fist = 0;
+        hand.pinch = 0;
         hand.fingers = {thumb: 0, index: 0, middle: 0, ring: 0, pinky: 0};
         hand.fingerJoints = {
           thumb: [0, 0, 0], index: [0, 0, 0], middle: [0, 0, 0],
           ring: [0, 0, 0], pinky: [0, 0, 0],
         };
-        hand.indexMiddleSpread = 0;
+        handProfile.indexMiddleSpread = 0;
       }
 
       function applyFingerContactPreset() {
@@ -761,9 +911,9 @@
         );
         const longFingers = ['index', 'middle', 'ring', 'pinky'];
 
-        resetRigHandShape(receivingHand);
+        resetRigHandShape(receivingHand, rigEditorHandProfiles[receivingSide]);
         receivingHand.fist = 1;
-        resetRigHandShape(insertedHand);
+        resetRigHandShape(insertedHand, rigEditorHandProfiles[insertedSide]);
         longFingers.forEach((finger, index) => {
           insertedHand.fingers[finger] = index < fingerCount ? -1 : 1;
         });
@@ -781,8 +931,15 @@
         return JSON.stringify(sortedRigEditorKeyframes(keyframes));
       }
 
+      function rigHandProfilesSignature(profiles) {
+        return JSON.stringify(profiles);
+      }
+
       function hasUnsavedRigChanges() {
-        return rigKeyframesSignature(rigEditorKeyframes) !== rigSavedKeyframesSignature;
+        return (
+          rigKeyframesSignature(rigEditorKeyframes) !== rigSavedKeyframesSignature
+          || rigHandProfilesSignature(rigEditorHandProfiles) !== rigSavedHandProfilesSignature
+        );
       }
 
       function setRigSaveStatus(message, tone = '') {
@@ -844,10 +1001,24 @@
         return window.setVozualRigHandKeyframes?.(gloss, keyframes) ?? false;
       }
 
+      function applyRigEditorHandProfile(side) {
+        window.setVozualRigFingerSpread?.(
+          gloss,
+          side,
+          rigEditorHandProfiles[side].indexMiddleSpread,
+        );
+        window.setVozualForearmAxialRoll?.(
+          gloss,
+          side,
+          rigEditorHandProfiles[side].forearmAxialRollDegrees,
+        );
+      }
+
       function loadRigEditorForGloss(forceReload = false) {
         const state = window.getVozualRigHandEditorState?.(gloss);
         if (!state) return false;
-        if (forceReload || rigEditorGloss !== gloss) {
+        const loadingSavedState = forceReload || rigEditorGloss !== gloss;
+        if (loadingSavedState) {
           rigEditorGloss = gloss;
           rigEditorKeyframes = copyRigEditorPose(state.keyframes || []);
           rigSavedKeyframesSignature = rigKeyframesSignature(rigEditorKeyframes);
@@ -859,8 +1030,10 @@
         rigEditorFrame.max = String(rigEditorFrameCount - 1);
         rigEditorFrame.value = String(Math.max(0, Number(state.currentFrame) || 0));
         rigEditorPose = copyRigEditorPose(state.pose);
-        document.getElementById('rig-finger-spread').value = String(Math.round(Number(state.indexMiddleSpread || 0) * 1000));
-        document.getElementById('rig-forearm-roll').value = String(Math.round(Number(state.forearmAxialRollDegrees || 0)));
+        rigEditorHandProfiles = rigEditorHandProfilesFromState(state);
+        if (loadingSavedState) {
+          rigSavedHandProfilesSignature = rigHandProfilesSignature(rigEditorHandProfiles);
+        }
         rigEditorFace = normalizedRigEditorFace(state.face, state.smile);
         renderRigEditorControls();
         setRigSaveStatus(rigEditorKeyframes.length
@@ -877,8 +1050,7 @@
         if (!state) return;
         rigEditorFrame.value = String(Math.max(0, Math.round(Number(frame) || 0)));
         rigEditorPose = copyRigEditorPose(state.pose);
-        document.getElementById('rig-finger-spread').value = String(Math.round(Number(state.indexMiddleSpread || 0) * 1000));
-        document.getElementById('rig-forearm-roll').value = String(Math.round(Number(state.forearmAxialRollDegrees || 0)));
+        rigEditorHandProfiles = rigEditorHandProfilesFromState(state);
         rigEditorFace = normalizedRigEditorFace(state.face, state.smile);
         renderRigEditorControls();
       }
@@ -887,8 +1059,8 @@
         readRigEditorControls();
         const spreadInput = document.getElementById('rig-finger-spread');
         const rollInput = document.getElementById('rig-forearm-roll');
-        window.setVozualRigFingerSpread?.(gloss, Number(spreadInput.value) / 1000);
-        window.setVozualForearmAxialRoll?.(gloss, Number(rollInput.value));
+        const side = rigEditorHand.value;
+        applyRigEditorHandProfile(side);
         document.getElementById('rig-finger-spread-value').value = `${spreadInput.value}%`;
         document.getElementById('rig-forearm-roll-value').value = `${rollInput.value}°`;
         rigPreviewDirty = true;
@@ -924,12 +1096,24 @@
           const response = await fetch('./api/rig-hand-keyframes', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({gloss, keyframes: rigEditorKeyframes, indexMiddleSpread: Number(document.getElementById('rig-finger-spread').value) / 1000, forearmAxialRollDegrees: Number(document.getElementById('rig-forearm-roll').value)}),
+          body: JSON.stringify({
+            gloss,
+            keyframes: rigEditorKeyframes,
+            indexMiddleSpread: {
+              left: rigEditorHandProfiles.left.indexMiddleSpread,
+              right: rigEditorHandProfiles.right.indexMiddleSpread,
+            },
+            forearmAxialRollDegrees: {
+              left: rigEditorHandProfiles.left.forearmAxialRollDegrees,
+              right: rigEditorHandProfiles.right.forearmAxialRollDegrees,
+            },
+          }),
           });
           const result = await response.json().catch(() => ({}));
           if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
           rigEditorKeyframes = result.keyframes || [];
           rigSavedKeyframesSignature = rigKeyframesSignature(rigEditorKeyframes);
+          rigSavedHandProfilesSignature = rigHandProfilesSignature(rigEditorHandProfiles);
           rigPreviewDirty = false;
           applyRigEditorKeyframes(rigEditorKeyframes);
           renderRigKeyframeList();
@@ -1542,12 +1726,81 @@
       rigEditorFrame.addEventListener('keydown', event => {
         if (event.key === 'Enter') goToRigEditorFrame(rigEditorFrame.value);
       });
-      rigEditorHand.addEventListener('change', renderRigEditorControls);
+      rigEditorHand.addEventListener('change', () => {
+        renderRigEditorControls();
+        updateHandClipboardControls();
+      });
       rigPrecisionFinger.addEventListener('change', renderRigEditorControls);
       document.getElementById('rig-natural-fist').addEventListener('click', applyNaturalFistPreset);
+      document.getElementById('rig-hacer-fingertips').addEventListener('click', applyHacerFingertipsPreset);
+      document.getElementById('rig-copy-hand-pose').addEventListener('click', () => {
+        readRigEditorControls();
+        rigHandClipboard = copyHandOnly(
+          rigEditorPose[rigEditorHand.value],
+          rigEditorHandProfiles[rigEditorHand.value],
+        );
+        rigHandClipboard.sourceHand = selectedHandLabel();
+        updateHandClipboardControls();
+        setHandClipboardStatus(`✓ COPIADA: postura de ${selectedHandLabel()}. Ahora selecciona la mano destino y pulsa PEGAR.`);
+        const mode = document.getElementById('rig-hand-copy-mode').value;
+        setRigSaveStatus(`Postura de ${selectedHandLabel()} copiada (${mode === 'shape' ? 'solo forma' : 'forma y orientación'}).`, 'success');
+      });
+      document.getElementById('rig-paste-hand-pose').addEventListener('click', () => {
+        if (!rigHandClipboard) {
+          setHandClipboardStatus('Primero pulsa COPIAR POSTURA en una mano.');
+          setRigSaveStatus('Primero copia una postura de mano.', 'warning');
+          return;
+        }
+        const includeWrist = document.getElementById('rig-hand-copy-mode').value === 'shape-and-wrist';
+        const mirrorWrist = document.getElementById('rig-hand-copy-orientation').value === 'mirror';
+        pasteHandOnly(
+          rigEditorPose[rigEditorHand.value],
+          rigEditorHandProfiles[rigEditorHand.value],
+          rigHandClipboard,
+          includeWrist,
+          mirrorWrist,
+        );
+        renderRigEditorControls();
+        previewRigEditorControls();
+        setHandClipboardStatus(`✓ PEGADA: ${rigHandClipboard.sourceHand} → ${selectedHandLabel()}.`);
+        setRigSaveStatus(`Postura de ${rigHandClipboard.sourceHand} pegada en ${selectedHandLabel()} (${includeWrist ? 'con orientación' : 'solo forma'}).`, 'success');
+      });
+      document.getElementById('rig-apply-hand-pose').addEventListener('click', () => {
+        if (!rigHandClipboard) {
+          setHandClipboardStatus('Primero pulsa COPIAR POSTURA en una mano.');
+          setRigSaveStatus('Primero copia una postura de mano.', 'warning');
+          return;
+        }
+        const includeWrist = document.getElementById('rig-hand-copy-mode').value === 'shape-and-wrist';
+        const mirrorWrist = document.getElementById('rig-hand-copy-orientation').value === 'mirror';
+        pasteHandOnly(
+          rigEditorPose[rigEditorHand.value],
+          rigEditorHandProfiles[rigEditorHand.value],
+          rigHandClipboard,
+          includeWrist,
+          mirrorWrist,
+        );
+        renderRigEditorControls();
+        applyRigEditorHandProfile(rigEditorHand.value);
+        rigEditorKeyframes = upsertRigEditorKeyframe(rigEditorKeyframes);
+        rigPreviewDirty = false;
+        applyRigEditorKeyframes(rigEditorKeyframes);
+        renderRigKeyframeList();
+        setHandClipboardStatus(`✓ APLICADA en el cuadro ${rigEditorFrame.value}: ${rigHandClipboard.sourceHand} → ${selectedHandLabel()}.`);
+        setRigSaveStatus(`Postura aplicada en el cuadro ${rigEditorFrame.value}. Pulsa guardar para conservarla.`, 'success');
+      });
       document.getElementById('rig-finger-contact').addEventListener('click', applyFingerContactPreset);
       rigEditorFields.forEach(field => {
-        document.getElementById(field.id).addEventListener('input', previewRigEditorControls);
+        document.getElementById(field.id).addEventListener('input', () => {
+          if (
+            field.finger
+            || field.joint !== undefined
+            || field.key === 'fist'
+          ) {
+            rigEditorPose[rigEditorHand.value].pinch = 0;
+          }
+          previewRigEditorControls();
+        });
       });
       document.getElementById('rig-finger-spread').addEventListener('input', previewRigEditorControls);
       document.getElementById('rig-forearm-roll').addEventListener('input', previewRigEditorControls);
@@ -1573,7 +1826,9 @@
         renderRigAppState();
       });
       document.getElementById('rig-hand-neutral').addEventListener('click', () => {
-        rigEditorPose[rigEditorHand.value] = emptyRigEditorHand();
+        const side = rigEditorHand.value;
+        rigEditorPose[side] = emptyRigEditorHand();
+        rigEditorHandProfiles[side] = emptyRigEditorHandProfiles()[side];
         renderRigEditorControls();
         previewRigEditorControls();
       });
@@ -1588,6 +1843,7 @@
       document.getElementById('rig-clear-keyframes').addEventListener('click', () => {
         rigEditorKeyframes = [];
         rigEditorPose = emptyRigEditorHands();
+        rigEditorHandProfiles = emptyRigEditorHandProfiles();
         rigEditorFace = emptyRigEditorFace();
         rigPreviewDirty = false;
         applyRigEditorKeyframes([]);
@@ -1597,6 +1853,7 @@
         renderRigAppState();
       });
       rigSaveButton.addEventListener('click', () => persistRigEditorKeyframes());
+      updateHandClipboardControls();
       toggleSkeleton.addEventListener('click', () => {
         mode.value = mode.value === 'rigged' ? 'hybrid' : 'rigged';
         persistRenderMode();
@@ -1615,6 +1872,33 @@
         window.playVozualClip?.('IDLE', ++playbackId, 1, false);
         status.textContent = 'PERSONAJE EN REPOSO.';
       });
+      async function refreshAvatarPreview() {
+        // Copy the saved editor profiles into this running preview before
+        // reloading it. This keeps the desktop editor open.
+        const refreshButtons = [
+          document.getElementById('refresh-avatar'),
+          document.getElementById('quick-refresh-avatar'),
+        ];
+        refreshButtons.forEach((button) => { button.disabled = true; });
+        status.textContent = 'ACTUALIZANDO AVATAR…';
+        try {
+          const response = await fetch('./api/refresh-preview', {cache: 'no-store'});
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.ok) {
+            throw new Error(result.error || `HTTP ${response.status}`);
+          }
+        } catch (error) {
+          // Older previews do not have the synchronization endpoint. Reloading
+          // still preserves the selected sign and is safe in that case.
+          console.warn('Could not synchronize the running avatar preview.', error);
+        }
+        const refreshUrl = new URL(window.location.href);
+        if (gloss) refreshUrl.searchParams.set('gloss', gloss);
+        refreshUrl.searchParams.set('refresh', String(Date.now()));
+        window.location.replace(refreshUrl.toString());
+      }
+      document.getElementById('refresh-avatar').addEventListener('click', refreshAvatarPreview);
+      document.getElementById('quick-refresh-avatar').addEventListener('click', refreshAvatarPreview);
       mode.addEventListener('change', () => {
         persistRenderMode();
         updateSkeletonToggle();

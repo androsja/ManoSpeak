@@ -103,7 +103,7 @@
         "requiresSubjectMarker": false
       },
       "motion": {
-        "clip": "ADIÓS",
+        "clip": "ADIOS",
         "published": true
       },
       "review": {
@@ -303,8 +303,8 @@
           "status": "approved",
           "approvedBy": "project_owner",
           "approvedAt": "2026-09-03T02:30:50+00:00",
-          "reviewFingerprint": "c4e3e0ed882d6c38115bda47a0993a05a1d4fe12e5af3351b7405bbd7c712391",
-          "reviewedAt": "2026-10-22T00:12:59+00:00"
+          "reviewFingerprint": "01ded5c2d9361929c9b2bfb75554e81cd5558d2c91c0386de6c6dc1366b8a804",
+          "reviewedAt": "2026-11-14T04:47:02+00:00"
         }
       }
     },
@@ -944,9 +944,6 @@
         ],
         "forms": [
           {
-            "text": "hacer"
-          },
-          {
             "text": "realizar"
           },
           {
@@ -1033,7 +1030,8 @@
           {
             "text": "harían"
           }
-        ]
+        ],
+        "overrideDefaults": false
       },
       "lsc": {
         "verbType": "plain",
@@ -1045,7 +1043,12 @@
       },
       "review": {
         "status": "legacy_approved",
-        "regionalVariants": []
+        "regionalVariants": [],
+        "ownerApproval": {
+          "status": "pending",
+          "approvedBy": "project_owner",
+          "approvedAt": null
+        }
       }
     },
     {

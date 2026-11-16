@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const {parseLegacyMotionDocument} = require('./legacy-motion-loader.cjs');
 
 const HEADER_SIZE = 16;
 const FORMAT_VERSION = 2;
@@ -86,7 +87,10 @@ function buildAvatarProfiles(sourceDirectory) {
   return Object.fromEntries(glosses.flatMap(rawGloss => {
     const gloss = String(rawGloss).trim();
     const sourcePath = path.join(sourceDirectory, `${gloss.toLowerCase()}.motion.json`);
-    const sourceMotion = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+    const sourceMotion = parseLegacyMotionDocument(
+      JSON.parse(fs.readFileSync(sourcePath, 'utf8')),
+      sourcePath,
+    );
     const profileOverride = profileOverrides[gloss.toUpperCase()];
     const profile = (sourceMotion.avatarProfile || profileOverride)
       ? {...(sourceMotion.avatarProfile || {}), ...(profileOverride || {})}

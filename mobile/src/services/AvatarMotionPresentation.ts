@@ -119,6 +119,7 @@ export type RiggedHandEditPose = {
   verticalOffset: number;
   depthOffset: number;
   fist: number;
+  pinch: number;
   fingers: Record<RiggedFingerName, number>;
   fingerJoints: RiggedFingerJointEdits;
 };
@@ -185,6 +186,7 @@ function normalizedRiggedHandEditPose(
     verticalOffset: boundedEditValue(pose?.verticalOffset, -1, 1),
     depthOffset: boundedEditValue(pose?.depthOffset, -1, 1),
     fist: boundedEditValue(pose?.fist, 0, 1),
+    pinch: boundedEditValue(pose?.pinch, 0, 1),
     fingers: Object.fromEntries(RIGGED_EDIT_FINGERS.map(finger => [
       finger,
       boundedEditValue(pose?.fingers?.[finger], -1, 1),
@@ -286,6 +288,7 @@ function mixRiggedHandEditPose(
     verticalOffset: mix(start.verticalOffset, end.verticalOffset),
     depthOffset: mix(start.depthOffset, end.depthOffset),
     fist: mix(start.fist, end.fist),
+    pinch: mix(start.pinch, end.pinch),
     fingers: Object.fromEntries(RIGGED_EDIT_FINGERS.map(finger => [
       finger,
       mix(start.fingers[finger], end.fingers[finger]),
@@ -2441,8 +2444,27 @@ export function livelyIdleBodyPresentation(elapsedMs: number): LivelyIdleBodyPre
   return {
     verticalOffset: breathing * 0.006,
     rotationZ: weightShift * 0.0065,
-    scale: 1 + breathing * 0.0015,
+    // Keep the interpreter at a stable apparent distance. Breathing is
+    // conveyed through vertical and rotational micro-motion; scaling the
+    // whole rig makes the character appear to move toward/away from camera.
+    scale: 1,
   };
+}
+
+const MIN_STABLE_APPARENT_HAND_SCALE = 0.92;
+const MAX_STABLE_APPARENT_HAND_SCALE = 1.15;
+
+/**
+ * Prevents depth presentation from looking like a hand is inflating or
+ * shrinking. Occlusion and wrist depth retain the 3D cue while apparent
+ * size stays within a subtle, anatomically plausible range.
+ */
+export function stableApparentHandScale(scale: number): number {
+  if (!Number.isFinite(scale)) return 1;
+  return Math.min(
+    MAX_STABLE_APPARENT_HAND_SCALE,
+    Math.max(MIN_STABLE_APPARENT_HAND_SCALE, scale),
+  );
 }
 
 /**

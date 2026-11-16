@@ -13,6 +13,7 @@ import {
   Platform,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import RNFS from 'react-native-fs';
@@ -26,14 +27,15 @@ import {
 import type {InstalledPhrase, InstalledSign} from '../services/SignLanguageService';
 import {
   playableLscPhraseVocabulary,
+  playableLscPhraseSuggestions,
 } from '../services/LscPhraseAssetCatalogService';
 import {resolveRuntimeLscPlayback} from '../services/LscRuntimePlaybackService';
-import {speechVocabularyForInstalledSigns} from '../services/LinguisticCatalogService';
-import {PHRASE_CONTINUATION_GRACE_MS} from '../services/SignPhraseContinuity';
 import {
-  nextPhraseSuggestionIndex,
-  phraseSuggestionsForInstalledLibrary,
-} from '../services/PhraseSuggestionService';
+  deriveListenerFlowState,
+  listenerFlowAccessibilityLabel,
+} from '../services/ListenerFlowState';
+import {PHRASE_CONTINUATION_GRACE_MS} from '../services/SignPhraseContinuity';
+import {nextPhraseSuggestionIndex} from '../services/PhraseSuggestionService';
 import { AvatarClip, AvatarRenderMode, SkeletalAvatar } from './SkeletalAvatar';
 import {PipSkeletalAvatar} from './PipSkeletalAvatar';
 import type {ActivationAccount} from '../services/ActivationService';
@@ -62,7 +64,7 @@ import {
 import {SUPPORTED_APP_LOCALES, useI18n} from '../i18n/I18n';
 // The shared linguistic catalog controls what speech can activate a published
 // avatar clip. A clip may stay in VOZUAL without entering this vocabulary.
-const PLAYBACK_SPEEDS = [1, 2, 3, 4] as const;
+const PLAYBACK_SPEEDS = [0.5, 1, 2, 3, 4] as const;
 const PLAYBACK_SPEED_PREFERENCE_PATH = `${RNFS.DocumentDirectoryPath}/vozual-playback-speed.json`;
 const LISTENER_TUTORIAL_PATH = `${RNFS.DocumentDirectoryPath}/vozual-listener-tutorial-v1.json`;
 const AVATAR_ZOOM_MIN = 0.85;
@@ -70,12 +72,16 @@ const AVATAR_ZOOM_MAX = 1.3;
 const AVATAR_ZOOM_STEP = 0.05;
 const DEFAULT_AVATAR_ZOOM = 1;
 const CONTINUOUS_PREFIX_WAIT_MS = 1200;
+const MIN_FINAL_SPEECH_CONFIDENCE = 0.55;
 type ListeningMode = 'continuous' | 'phrase';
-const LISTENING_MODES: readonly ListeningMode[] = ['phrase', 'continuous'];
+// Reviewed LSC playback requires a person to confirm the transcript first.
+// Continuous mode remains unavailable until it can preserve that boundary.
+const LISTENING_MODES: readonly ListeningMode[] = ['phrase'];
 const AVATAR_RENDER_MODES: readonly AvatarRenderMode[] = ['points', 'rigged'];
 type KnownWord = string;
 type SpeechEvent = {
   value?: string[];
+  confidence?: number[];
   error?: string | {code?: string | number; message?: string};
 };
 type IosNativeSpeechEndEvent = {
@@ -137,6 +143,7 @@ const pictureInPicture = NativeModules.VozualPictureInPicture as {
   finishListeningPhrase: () => Promise<boolean>;
   enqueueSigns: (glosses: string[]) => void;
   resetPlayback: () => void;
+  setPlaybackPaused: (paused: boolean) => void;
   setListeningMode: (mode: ListeningMode, microphoneActive: boolean) => void;
   openSpeechSettings?: () => Promise<boolean>;
   setAvatarPresentation: (renderMode: AvatarRenderMode, avatarZoom: number, playbackSpeed: number) => void;
@@ -161,7 +168,7 @@ export function ListenerScreen({
   accessConfig,
   hasPlusEntitlement = false,
   installedSigns = [],
-  installedPhrases = [],
+  installedPhrases: _installedPhrases = [],
   availableSignChangeCount = 0,
   onManageAccount,
   onManageSignLanguages,
@@ -200,8 +207,16 @@ export function ListenerScreen({
   const [recognitionReady, setRecognitionReady] = useState(false);
   const [starting, setStarting] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [transcriptDraft, setTranscriptDraft] = useState('');
+  const [transcriptConfirmationVisible, setTranscriptConfirmationVisible] = useState(false);
+  const [ambiguousTranscript, setAmbiguousTranscript] = useState('');
+  const [ambiguousCandidates, setAmbiguousCandidates] = useState<Array<{
+    id: string;
+    intendedMeaning: string;
+  }>>([]);
   const [plannedLsc, setPlannedLsc] = useState('');
   const [playingSign, setPlayingSign] = useState(false);
+  const [playbackPaused, setPlaybackPaused] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<(typeof PLAYBACK_SPEEDS)[number]>(1);
   const [avatarZoom, setAvatarZoom] = useState(DEFAULT_AVATAR_ZOOM);
   const [avatarRenderMode, setAvatarRenderMode] = useState<AvatarRenderMode>('rigged');
@@ -211,7 +226,6 @@ export function ListenerScreen({
   const [errorMessage, setErrorMessage] = useState('');
   const [microphonePermissionBlocked, setMicrophonePermissionBlocked] = useState(false);
   const [notificationPermissionBlocked, setNotificationPermissionBlocked] = useState(false);
-  const [draftPreviewActive, setDraftPreviewActive] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [accountActionPending, setAccountActionPending] = useState(false);
   const [accountActionError, setAccountActionError] = useState('');
@@ -230,16 +244,44 @@ export function ListenerScreen({
   );
   const compactMode = pictureInPictureMode;
   const microphonePreparing = listening && !recognitionReady;
+  // Android may report a terminal recognition error while the asynchronous
+  // start request is still unwinding. A terminal session must never leave the
+  // primary action visually busy: only render its spinner while a session is
+  // still active.
+  const speechActionBusy = listening && (starting || phraseFinalizing);
+  const listenerFlowState = useMemo(() => deriveListenerFlowState({
+    listening,
+    starting,
+    phraseFinalizing,
+    transcriptConfirmationVisible,
+    ambiguousCandidateCount: ambiguousCandidates.length,
+    playingSign,
+    microphonePermissionBlocked,
+    notificationPermissionBlocked,
+    hasError: Boolean(errorMessage),
+  }), [
+    ambiguousCandidates.length,
+    errorMessage,
+    listening,
+    microphonePermissionBlocked,
+    notificationPermissionBlocked,
+    phraseFinalizing,
+    playingSign,
+    starting,
+    transcriptConfirmationVisible,
+  ]);
+  const reportPlaybackDiagnostic = useCallback((event: string, value: string) => {
+    pictureInPicture?.reportPlaybackEvent(event, value);
+  }, []);
   const phraseSuggestions = useMemo(
-    () => phraseSuggestionsForInstalledLibrary(installedPhrases, installedSigns),
-    [installedPhrases, installedSigns],
+    () => playableLscPhraseSuggestions(installedSigns),
+    [installedSigns],
   );
   const phraseSuggestion = phraseSuggestions.length > 0
     ? phraseSuggestions[phraseSuggestionIndex % phraseSuggestions.length]
     : '';
   const knownWords = useMemo(() => {
-    const reviewed = playableLscPhraseVocabulary(installedSigns);
-    return [...reviewed, ...speechVocabularyForInstalledSigns(installedSigns)];
+    return playableLscPhraseVocabulary(installedSigns);
   }, [installedSigns]);
   const installedSignCount = installedSigns.length;
   // Development builds exercise the complete Plus flow without contacting a
@@ -563,6 +605,7 @@ export function ListenerScreen({
     phraseInProgressRef.current = true;
     pictureInPicture?.reportPlaybackEvent('play-sign', word);
     setContinuePhrase(continuation);
+    setPlaybackPaused(false);
     setActiveClip(word.toUpperCase() as AvatarClip);
     setPlaybackId((value) => value + 1);
     setPlayingSign(true);
@@ -573,6 +616,7 @@ export function ListenerScreen({
     phraseInProgressRef.current = false;
     playingRef.current = false;
     setContinuePhrase(false);
+    setPlaybackPaused(false);
     setPlayingSign(false);
     setActiveClip('IDLE');
     setPlaybackId((value) => value + 1);
@@ -588,20 +632,25 @@ export function ListenerScreen({
     startSign(word, phraseInProgressRef.current);
   }, [startSign]);
 
-  const handleText = useCallback((text: string, isFinal = false) => {
+  const handleText = useCallback((text: string, isFinal = false, selectedEntryId?: string) => {
     setTranscript(text);
-    const resolution = resolveRuntimeLscPlayback(text, installedSigns, __DEV__);
+    const resolution = resolveRuntimeLscPlayback(text, installedSigns, undefined, selectedEntryId);
     const words = resolution.glosses as KnownWord[];
     speechDebug('speech-resolution', {
-      text,
       final: isFinal,
       status: resolution.status,
-      glosses: words,
-      message: resolution.message,
+      resolvedGlossCount: words.length,
+      hasRecoveryMessage: resolution.message.length > 0,
     });
-    setDraftPreviewActive(resolution.status === 'draft');
     setPlannedLsc(words.join(' · '));
     setErrorMessage(resolution.message);
+    if (resolution.status === 'ambiguous') {
+      setAmbiguousTranscript(text);
+      setAmbiguousCandidates(resolution.candidates);
+      return;
+    }
+    setAmbiguousTranscript('');
+    setAmbiguousCandidates([]);
     const {newWords, nextRecognizedWords} = advanceIncrementalSpeechMatches(
       recognizedWords.current,
       words,
@@ -618,6 +667,44 @@ export function ListenerScreen({
       }
     }
   }, [installedSigns, playNextSign]);
+
+  const requestTranscriptConfirmation = useCallback((text: string) => {
+    const draft = text.trim();
+    if (!draft) return;
+    recognizedWords.current = [];
+    signQueue.current = [];
+    setTranscript(draft);
+    setTranscriptDraft(draft);
+    setPlannedLsc('');
+    setErrorMessage('');
+    setAmbiguousTranscript('');
+    setAmbiguousCandidates([]);
+    setTranscriptConfirmationVisible(true);
+  }, []);
+
+  const confirmTranscript = useCallback(() => {
+    const confirmedText = transcriptDraft.trim();
+    if (!confirmedText) {
+      setErrorMessage(t('listener.confirmation.empty'));
+      return;
+    }
+    recognizedWords.current = [];
+    signQueue.current = [];
+    setTranscriptConfirmationVisible(false);
+    handleText(confirmedText, true);
+  }, [handleText, t, transcriptDraft]);
+
+  const cancelTranscriptConfirmation = useCallback(() => {
+    recognizedWords.current = [];
+    signQueue.current = [];
+    setTranscriptConfirmationVisible(false);
+    setTranscriptDraft('');
+    setTranscript('');
+    setPlannedLsc('');
+    setErrorMessage('');
+    setAmbiguousTranscript('');
+    setAmbiguousCandidates([]);
+  }, []);
 
   const playSuggestedPhrase = useCallback(() => {
     if (!phraseSuggestion || listening || playingSign) return;
@@ -646,19 +733,22 @@ export function ListenerScreen({
       combinedText === currentText ? [currentText] : [combinedText, currentText],
       knownWords,
     );
+    const confidence = event.confidence?.[0];
+    const hasMeasuredConfidence = typeof confidence === 'number' && Number.isFinite(confidence);
+    const lowConfidenceFinal = isFinal && hasMeasuredConfidence && confidence < MIN_FINAL_SPEECH_CONFIDENCE;
     speechDebug('speech-text-selected', {
-      alternatives: event.value ?? [],
-      currentText,
-      bestText,
       final: isFinal,
+      alternativeCount: event.value?.length ?? 0,
+      hasCandidate: bestText.length > 0,
+      hasMeasuredConfidence,
+      lowConfidenceFinal,
     });
     if (listeningModeRef.current === 'phrase' && !isFinal) {
       if (bestText) {
         phrasePartialTextRef.current = bestText;
         setTranscript(bestText);
-        const previewResolution = resolveRuntimeLscPlayback(bestText, installedSigns, __DEV__);
+        const previewResolution = resolveRuntimeLscPlayback(bestText, installedSigns);
         const preview = previewResolution.glosses;
-        setDraftPreviewActive(previewResolution.status === 'draft');
         setPlannedLsc(preview.length > 0 ? preview.join(' · ') : '');
       }
       return;
@@ -682,6 +772,18 @@ export function ListenerScreen({
       }
       return;
     }
+    if (lowConfidenceFinal) {
+      // Never resolve or queue a low-confidence final result. Preserve the
+      // draft so the person can correct it, then make confirmation explicit.
+      recognizedWords.current = [];
+      signQueue.current = [];
+      setTranscript(phraseText);
+      setTranscriptDraft(phraseText);
+      setPlannedLsc('');
+      setErrorMessage('El reconocimiento tuvo baja confianza. Revisa o corrige la frase antes de confirmarla.');
+      setTranscriptConfirmationVisible(true);
+      return;
+    }
     if (shouldDeferSpeechMatch(
       phraseText,
       knownWords,
@@ -697,22 +799,14 @@ export function ListenerScreen({
           deferredSpeechTimer.current = undefined;
           deferredSpeechPrefix.current = '';
           if (pendingText && listeningRef.current) {
-            handleText(pendingText, true);
+            requestTranscriptConfirmation(pendingText);
           }
         }, CONTINUOUS_PREFIX_WAIT_MS);
       }
       return;
     }
     if (listeningModeRef.current === 'continuous') clearDeferredSpeech();
-    const phraseResolution = resolveRuntimeLscPlayback(phraseText, installedSigns, __DEV__);
-    const matches = phraseResolution.glosses;
-    if (matches.length > 0) {
-      pictureInPicture?.reportPlaybackEvent(
-        'matched-speech',
-        matches.join(', '),
-      );
-    }
-    handleText(phraseText, isFinal);
+    if (isFinal) requestTranscriptConfirmation(phraseText);
     if (listeningModeRef.current === 'phrase' && isFinal) {
       if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
       phraseFinalizeTimer.current = undefined;
@@ -725,7 +819,7 @@ export function ListenerScreen({
       setPhraseFinalizing(false);
       void pictureInPicture?.stopListeningService();
     }
-  }, [clearDeferredSpeech, handleText, installedSigns, knownWords]);
+  }, [clearDeferredSpeech, handleText, installedSigns, knownWords, requestTranscriptConfirmation]);
 
   const markRecognitionUnavailable = useCallback(() => {
     recognitionReadyRef.current = false;
@@ -1563,12 +1657,14 @@ export function ListenerScreen({
             clip={activeClip}
             playbackId={playbackId}
             playbackSpeed={playbackSpeed}
+            paused={playbackPaused}
             continuePhrase={continuePhrase}
             avatarZoom={avatarZoom}
             renderMode={avatarRenderMode}
             onClipEnd={onSignEnd}
             onReady={() => setAvatarReady(true)}
             onUnavailable={() => setAvatarReady(false)}
+            onPlaybackDiagnostic={reportPlaybackDiagnostic}
           />
         )}
       </View>
@@ -1640,15 +1736,27 @@ export function ListenerScreen({
             <Text style={styles.tutorialPointer}>{t('listener.tutorial.pointer')}</Text>
           </View>
         )}
+        {__DEV__ && <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reproducir la seña de prueba ADIÓS"
+          disabled={!avatarReady || playingSign}
+          onPress={() => {
+            setPlannedLsc('ADIÓS · JSON LOCAL');
+            startSign('ADIOS', false);
+          }}
+          style={[styles.adiosPreviewButton, (!avatarReady || playingSign) && styles.adiosPreviewButtonDisabled]}
+        >
+          <Text style={styles.adiosPreviewButtonText}>VER SEÑA ADIÓS</Text>
+        </Pressable>}
         <Pressable
           accessibilityRole="button"
-          style={[styles.button, listening && styles.buttonActive, (phraseFinalizing || (!listening && playingSign)) && styles.buttonDisabled]}
+          style={[styles.button, listening && styles.buttonActive, (speechActionBusy || (!listening && playingSign)) && styles.buttonDisabled]}
           onPress={listeningMode === 'phrase'
             ? (listening ? finishPhraseListening : startPhraseListening)
             : (listening ? stopListening : startListening)}
-          disabled={starting || phraseFinalizing || (!listening && playingSign)}
+          disabled={speechActionBusy || (!listening && playingSign)}
         >
-          {starting || phraseFinalizing
+          {speechActionBusy
             ? <ActivityIndicator color="#07111F" />
             : <Text style={styles.buttonText}>
               {listeningMode === 'phrase'
@@ -1684,14 +1792,14 @@ export function ListenerScreen({
             <Text style={styles.microphoneProgressText}>{t('listener.preparingMicrophoneDetail')}</Text>
           </View>
         ) : (
-          (listening || playingSign) && <Text style={styles.status}>
+          listening && <Text style={styles.status}>
             {listeningMode === 'phrase'
-              ? listening ? t('listener.listeningFinish') : t('listener.replayingPhrase')
+              ? t('listener.listeningFinish')
               : t('listener.continuousActive')}
           </Text>
         )}
         {!!errorMessage && (
-          <Text style={draftPreviewActive ? styles.draftWarning : styles.error}>
+          <Text style={styles.error}>
             {errorMessage}
           </Text>
         )}
@@ -1736,15 +1844,68 @@ export function ListenerScreen({
           </View>
         )}
         {transcript ? (
-          <View style={styles.recognizedCard}>
-            <Text style={styles.transcript} numberOfLines={1} ellipsizeMode="tail">
-              {transcript}
+          <View
+            testID={`listener-flow-${listenerFlowState}`}
+            style={styles.recognizedCard}
+          >
+            <Text accessibilityLiveRegion="polite" style={styles.flowStatus}>
+              {listenerFlowAccessibilityLabel(listenerFlowState)}
             </Text>
-            <Text style={styles.lscPlan} numberOfLines={1} ellipsizeMode="tail">
-              {plannedLsc ? `LSC: ${plannedLsc}` : t('listener.lscEmpty')}
-            </Text>
+            {transcriptConfirmationVisible ? <>
+              <Text style={styles.confirmationTitle}>{t('listener.confirmation.title')}</Text>
+              <TextInput
+                accessibilityLabel={t('listener.confirmation.inputLabel')}
+                value={transcriptDraft}
+                onChangeText={setTranscriptDraft}
+                style={styles.transcriptInput}
+                autoCapitalize="sentences"
+                autoCorrect
+              />
+              <View style={styles.confirmationActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('listener.confirmation.cancelLabel')}
+                  onPress={cancelTranscriptConfirmation}
+                  style={styles.confirmationSecondary}
+                >
+                  <Text style={styles.confirmationSecondaryText}>{t('listener.confirmation.cancel')}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('listener.confirmation.confirmLabel')}
+                  onPress={confirmTranscript}
+                  style={styles.confirmationPrimary}
+                >
+                  <Text style={styles.confirmationPrimaryText}>{t('listener.confirmation.confirm')}</Text>
+                </Pressable>
+              </View>
+            </> : <>
+              <Text style={styles.transcript} numberOfLines={1} ellipsizeMode="tail">
+                {transcript}
+              </Text>
+              <Text style={styles.lscPlan} numberOfLines={1} ellipsizeMode="tail">
+                {plannedLsc ? `LSC: ${plannedLsc}` : t('listener.lscEmpty')}
+              </Text>
+            </>}
           </View>
         ) : null}
+        {ambiguousCandidates.length > 0 && (
+          <View style={styles.ambiguityCard}>
+            <Text style={styles.ambiguityTitle}>{t('listener.ambiguity.title')}</Text>
+            <Text style={styles.ambiguityDetail}>{t('listener.ambiguity.detail')}</Text>
+            {ambiguousCandidates.map(candidate => (
+              <Pressable
+                key={candidate.id}
+                accessibilityRole="button"
+                accessibilityLabel={t('listener.ambiguity.choiceLabel', {meaning: candidate.intendedMeaning})}
+                onPress={() => handleText(ambiguousTranscript, true, candidate.id)}
+                style={styles.ambiguityChoice}
+              >
+                <Text style={styles.ambiguityChoiceText}>{candidate.intendedMeaning}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         <View style={styles.suggestionCard}>
           {phraseSuggestions.length > 0 ? (
             <>
@@ -2080,6 +2241,9 @@ const styles = StyleSheet.create({
   buttonActive: { backgroundColor: '#FF5470' },
   buttonDisabled: { opacity: 0.62 },
   buttonText: { color: '#07111F', fontWeight: '800', letterSpacing: 0.4 },
+  adiosPreviewButton: { marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: '#69DDD9', backgroundColor: '#15394B', paddingVertical: 12, alignItems: 'center' },
+  adiosPreviewButtonDisabled: { opacity: 0.45 },
+  adiosPreviewButtonText: { color: '#69DDD9', fontWeight: '900', letterSpacing: 0.5 },
   floatingButton: { marginTop: 8, borderRadius: 12, borderWidth: 1, borderColor: '#16D9D1', paddingVertical: 11, alignItems: 'center' },
   floatingButtonDisabled: { borderColor: '#526174' },
   floatingButtonText: { color: '#16D9D1', fontWeight: '800', letterSpacing: 0.4 },
@@ -2087,9 +2251,22 @@ const styles = StyleSheet.create({
   status: { color: '#16D9D1', textAlign: 'center', fontSize: 11, fontWeight: '700', marginTop: 12 },
   microphoneProgress: { height: 32, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   microphoneProgressText: { color: '#16D9D1', fontSize: 11, fontWeight: '800', letterSpacing: 0.25 },
-  recognizedCard: { height: 58, marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#102337', justifyContent: 'center' },
+  recognizedCard: { minHeight: 58, marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#102337', justifyContent: 'center' },
+  flowStatus: { color: '#86A6BF', textAlign: 'center', fontSize: 11, lineHeight: 15, marginBottom: 3 },
   transcript: { color: '#D8E1EC', textAlign: 'center', fontSize: 14, lineHeight: 18 },
   lscPlan: { color: '#69DDD9', textAlign: 'center', marginTop: 3, fontSize: 12, fontWeight: '700', lineHeight: 16 },
+  confirmationTitle: { color: '#69DDD9', textAlign: 'center', fontSize: 10, fontWeight: '900', letterSpacing: 0.25, lineHeight: 14 },
+  transcriptInput: { color: '#F7F9FC', minHeight: 40, marginTop: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: '#31506A', borderRadius: 8, backgroundColor: '#07111F', fontSize: 14 },
+  confirmationActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  confirmationPrimary: { flex: 1, minHeight: 34, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#16D9D1', alignItems: 'center', justifyContent: 'center' },
+  confirmationPrimaryText: { color: '#07111F', fontSize: 10, fontWeight: '900', letterSpacing: 0.25 },
+  confirmationSecondary: { flex: 1, minHeight: 34, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#31506A', alignItems: 'center', justifyContent: 'center' },
+  confirmationSecondaryText: { color: '#D8E1EC', fontSize: 10, fontWeight: '900', letterSpacing: 0.25 },
+  ambiguityCard: { marginTop: 8, padding: 12, borderRadius: 10, backgroundColor: '#15394B', borderWidth: 1, borderColor: '#16D9D1' },
+  ambiguityTitle: { color: '#69DDD9', textAlign: 'center', fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
+  ambiguityDetail: { color: '#D8E1EC', marginTop: 5, textAlign: 'center', fontSize: 12, lineHeight: 16 },
+  ambiguityChoice: { minHeight: 36, marginTop: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#16D9D1', alignItems: 'center', justifyContent: 'center' },
+  ambiguityChoiceText: { color: '#07111F', fontSize: 11, fontWeight: '900', textAlign: 'center' },
   signUpdateCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, padding: 12, borderRadius: 12, backgroundColor: '#15394B', borderWidth: 1, borderColor: '#16D9D1' },
   signUpdateCopy: { flex: 1 },
   signUpdateTitle: { color: '#69DDD9', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },

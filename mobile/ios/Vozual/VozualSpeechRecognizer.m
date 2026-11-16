@@ -290,12 +290,24 @@ RCT_REMAP_METHOD(isListening,
         }
         if (result != nil) {
           NSString *text = result.bestTranscription.formattedString ?: @"";
+          NSNumber *confidence = nil;
+          NSArray<SFTranscriptionSegment *> *segments = result.bestTranscription.segments;
+          if (segments.count > 0) {
+            float total = 0;
+            for (SFTranscriptionSegment *segment in segments) {
+              total += segment.confidence;
+            }
+            confidence = @(total / segments.count);
+          }
+          NSDictionary *payload = confidence == nil
+            ? @{@"value": @[text]}
+            : @{@"value": @[text], @"confidence": @[confidence]};
           if (text.length > 0) {
-            [self emit:VozualSpeechPartialEvent body:@{@"value": @[text]}];
+            [self emit:VozualSpeechPartialEvent body:payload];
           }
           if (result.isFinal) {
             if (text.length > 0) {
-              [self emit:VozualSpeechResultsEvent body:@{@"value": @[text]}];
+              [self emit:VozualSpeechResultsEvent body:payload];
             }
             [self handleTerminalSession:sessionGeneration error:nil];
             return;

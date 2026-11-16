@@ -1,8 +1,9 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Platform, StyleSheet, Text, View} from 'react-native';
+import {Platform, Pressable, StyleSheet, Text, View} from 'react-native';
 import RNFS from 'react-native-fs';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
 import {readInstalledSignPayload} from '../services/SignLanguageService';
+import {KinematicExecutionPlan} from '../services/KinematicExecutionPlan';
 
 // WebView 14 currently publishes cross-platform props as an intersection that
 // TypeScript 6 reduces to `never`; the runtime component API remains unchanged.
@@ -19,12 +20,15 @@ type Props = {
   clip: AvatarClip;
   playbackId: number;
   playbackSpeed: number;
+  paused: boolean;
   continuePhrase: boolean;
   avatarZoom: number;
   renderMode: AvatarRenderMode;
+  kinematicPlan?: KinematicExecutionPlan;
   onClipEnd: () => void;
   onReady?: () => void;
   onUnavailable?: () => void;
+  onPlaybackDiagnostic?: (event: string, value: string) => void;
 };
 
 type RuntimeMessage = {
@@ -38,8 +42,9 @@ type RuntimeMessage = {
   riggedHasShoulders?: boolean;
 };
 
-export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase, avatarZoom, renderMode, onClipEnd, onReady, onUnavailable}: Props) {
+export function SkeletalAvatar({clip, playbackId, playbackSpeed, paused, continuePhrase, avatarZoom, renderMode, kinematicPlan, onClipEnd, onReady, onUnavailable, onPlaybackDiagnostic}: Props) {
   const webView = useRef<WebView>(null);
+  const runtimeLoadStartedAt = useRef<number | undefined>(undefined);
   const [ready, setReady] = useState(false);
   const [runtimeError, setRuntimeError] = useState('');
 
@@ -51,23 +56,33 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase,
     // itself.
     setReady(false);
     setRuntimeError('');
+    onPlaybackDiagnostic?.('avatar-web-content-terminated', 'reloading');
     onUnavailable?.();
     webView.current?.reload();
-  }, [onUnavailable]);
+  }, [onPlaybackDiagnostic, onUnavailable]);
 
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
     const send = async () => {
+      if (kinematicPlan) {
+        setRuntimeError('');
+        const script = `window.setVozualRenderMode(${JSON.stringify(renderMode)}); window.playVozualKinematicPlan(${JSON.stringify(kinematicPlan)}, ${playbackId}, ${playbackSpeed}); window.tickVozualAnimation?.(); true;`;
+        webView.current?.injectJavaScript(script);
+        return;
+      }
+      const usesBundledKinematicPlan = renderMode === 'rigged' && clip.toUpperCase() === 'ADIOS';
       let installScript = '';
-      if (clip !== 'IDLE' && clip !== 'PHRASE_WAIT') {
+      if (clip !== 'IDLE' && clip !== 'PHRASE_WAIT' && !usesBundledKinematicPlan) {
         const payload = await readInstalledSignPayload(clip);
         if (cancelled) return;
         if (!payload) {
           setRuntimeError(`La seña ${clip} no está descargada.`);
+          onPlaybackDiagnostic?.('avatar-motion-missing', clip);
           onClipEnd();
           return;
         }
+        onPlaybackDiagnostic?.('avatar-motion-base64-bytes', String(payload.contentBase64.length));
         installScript = `window.installVozualMotionBase64(${JSON.stringify(clip)}, ${JSON.stringify(payload.contentBase64)}, ${JSON.stringify(payload.avatarProfile)}); `;
       }
       setRuntimeError('');
@@ -79,7 +94,7 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase,
     };
     void send();
     return () => { cancelled = true; };
-  }, [clip, continuePhrase, onClipEnd, playbackId, playbackSpeed, ready, renderMode]);
+  }, [clip, continuePhrase, kinematicPlan, onClipEnd, onPlaybackDiagnostic, playbackId, playbackSpeed, ready, renderMode]);
 
   const sendZoom = useCallback(() => {
     if (!ready) return;
@@ -97,6 +112,11 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase,
 
   useEffect(sendRenderMode, [sendRenderMode]);
 
+  useEffect(() => {
+    if (!ready) return;
+    webView.current?.injectJavaScript(`window.setVozualPlaybackPaused?.(${paused}); true;`);
+  }, [paused, ready]);
+
   const onMessage = useCallback((event: WebViewMessageEvent) => {
     let message: RuntimeMessage;
     try {
@@ -113,6 +133,13 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase,
       if (riggedError) console.error(`[Rigged avatar] ${riggedError}`);
       setRuntimeError(riggedError);
       setReady(true);
+      if (runtimeLoadStartedAt.current !== undefined) {
+        onPlaybackDiagnostic?.(
+          'avatar-runtime-ready-ms',
+          String(Math.max(0, Date.now() - runtimeLoadStartedAt.current)),
+        );
+        runtimeLoadStartedAt.current = undefined;
+      }
       onReady?.();
     } else if (message.type === 'ended' && message.playbackId === playbackId) {
       onClipEnd();
@@ -120,8 +147,9 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase,
       const detail = message.message || 'Error desconocido del motor 3D.';
       console.error(`[Captured skeleton] ${detail}`);
       setRuntimeError(`No se pudo cargar el esqueleto: ${detail}`);
+      onPlaybackDiagnostic?.('avatar-runtime-error', 'reported');
     }
-  }, [onClipEnd, onReady, playbackId]);
+  }, [onClipEnd, onPlaybackDiagnostic, onReady, playbackId]);
 
   return (
     <View style={styles.container}>
@@ -137,7 +165,10 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase,
         domStorageEnabled={false}
         mixedContentMode="never"
         onMessage={onMessage}
-        onLoadStart={() => setReady(false)}
+        onLoadStart={() => {
+          runtimeLoadStartedAt.current = Date.now();
+          setReady(false);
+        }}
         onContentProcessDidTerminate={restartRuntime}
         style={styles.webView}
         containerStyle={styles.webView}
@@ -145,7 +176,17 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, continuePhrase,
         scrollEnabled={false}
       />
       {!ready && !runtimeError && <Text style={styles.status}>Cargando esqueleto capturado…</Text>}
-      {!!runtimeError && <Text style={styles.status}>{runtimeError}</Text>}
+      {!!runtimeError && <View style={styles.recovery}>
+        <Text accessibilityRole="alert" style={styles.recoveryText}>{runtimeError}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reintentar cargar el avatar"
+          onPress={restartRuntime}
+          style={styles.retryButton}
+        >
+          <Text style={styles.retryButtonText}>REINTENTAR AVATAR</Text>
+        </Pressable>
+      </View>}
     </View>
   );
 }
@@ -154,4 +195,8 @@ const styles = StyleSheet.create({
   container: {flex: 1, alignSelf: 'stretch', backgroundColor: '#343936'},
   webView: {flex: 1, backgroundColor: '#343936'},
   status: {position: 'absolute', alignSelf: 'center', top: '48%', color: '#D8E1EC'},
+  recovery: {position: 'absolute', alignSelf: 'center', top: '43%', alignItems: 'center', gap: 12},
+  recoveryText: {color: '#D8E1EC', textAlign: 'center', paddingHorizontal: 20},
+  retryButton: {borderWidth: 1, borderColor: '#6FE3DF', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9},
+  retryButtonText: {color: '#6FE3DF', fontWeight: '700', fontSize: 12},
 });

@@ -74,7 +74,6 @@ type LinguisticCatalog = {
 
 const CATALOG = catalogJson as LinguisticCatalog;
 const GRAMMAR = CATALOG.grammar ?? {};
-const OWNER_APPROVED_CLIPS = new Set<string>(publishedSignsJson.publishedGlosses);
 
 function uniquePhrases(entry: LinguisticEntry): string[] {
   return Array.from(new Set([
@@ -85,21 +84,30 @@ function uniquePhrases(entry: LinguisticEntry): string[] {
   ].map((phrase) => phrase.trim()).filter(Boolean)));
 }
 
-const publishedClips = new Set<string>();
-export const PUBLISHED_LSC_ENTRIES = CATALOG.entries.filter((entry) => {
-  if (
-    !entry.motion.published
-    || entry.review.status === 'blocked'
-    || entry.review.ownerApproval?.status !== 'approved'
-    || !OWNER_APPROVED_CLIPS.has(entry.motion.clip)
-  ) return false;
-  // One physical animation can have historical linguistic records with the
-  // same clip (for example ÉL and the non-sign article EL). The mobile
-  // library and its counter must represent playable animations, not rows.
-  if (publishedClips.has(entry.motion.clip)) return false;
-  publishedClips.add(entry.motion.clip);
-  return true;
-});
+export function selectPublishedLscEntries(
+  entries: readonly LinguisticEntry[],
+  approvedClips: readonly string[],
+): LinguisticEntry[] {
+  const approved = new Set(approvedClips);
+  const publishedClips = new Set<string>();
+  return entries.flatMap(entry => {
+    if (!entry.motion.published || entry.review.status === 'blocked'
+      || entry.review.ownerApproval?.status !== 'approved') return [];
+    const normalized = normalizeSpeech(entry.motion.clip);
+    const matches = approvedClips.filter(clip => normalizeSpeech(clip) === normalized);
+    // Preserve the manifest identity; accent-free editor spellings can only
+    // resolve to a unique published identifier, never to a guessed variant.
+    const clip = approved.has(entry.motion.clip)
+      ? entry.motion.clip : matches.length === 1 ? matches[0] : undefined;
+    if (!clip || publishedClips.has(clip)) return [];
+    publishedClips.add(clip);
+    return [{...entry, motion: {...entry.motion, clip}}];
+  });
+}
+
+export const PUBLISHED_LSC_ENTRIES = selectPublishedLscEntries(
+  CATALOG.entries, publishedSignsJson.publishedGlosses,
+);
 
 export const PUBLISHED_LSC_SPEECH_VOCABULARY: SpeechSign[] = PUBLISHED_LSC_ENTRIES.map(
   (entry) => ({

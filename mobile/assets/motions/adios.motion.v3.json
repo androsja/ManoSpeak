@@ -1,0 +1,264 @@
+{
+  "schema": "vozual.motion-schema",
+  "schemaVersion": 3,
+  "kind": "authored-kinematic-motion",
+  "id": "farewell.adios.kinematic.v1",
+  "revision": 9,
+  "rig": {
+    "profileId": "vozual-rig-1",
+    "profileRevision": 1,
+    "sha256": "c1b1eeeaa590549243d0d3aaafa60f8abeb92af7a6a872003862771332fe142f",
+    "jointMapRevision": 1,
+    "landmarkMapRevision": 1
+  },
+  "units": {"length": "m", "angle": "deg", "time": "ms"},
+  "linguisticIntent": {
+    "language": "lsc-CO",
+    "glossSequence": ["ADIÓS"],
+    "regionalVariant": "Colombia",
+    "phases": [
+      {"id": "stroke", "role": "stroke", "fromMs": 0, "toMs": 3700, "nonManualIds": ["friendly-farewell"]}
+    ]
+  },
+  "kinematicRealization": {
+    "durationMs": 3700,
+    "keyframes": [
+      {
+        "id": "start",
+        "timeMs": 0,
+        "hands": {
+          "left": {
+            "arm": {"elbow": {"rotationDeg": [0, 0, 0], "space": "body-local"}},
+            "wrist": {"positionM": [0, 0, 0], "orientationQuat": [0, 0, 0, 1], "orientationSpace": "body-local", "palmFacingDirection": [0, 0, 1], "relativeToForearmDeg": [0, 0, 0]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 10, "abductionDeg": 0, "twistDeg": 0}, "mcp": {"flexionDeg": 15, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 15}},
+              "index": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "middle": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "ring": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "pinky": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}}
+            }
+          },
+          "right": {
+            "wrist": {"positionM": [0, 0, 0], "orientationQuat": [0, 0, 0, 1]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 10, "abductionDeg": 0, "twistDeg": 0}, "mcp": {"flexionDeg": 15, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 15}},
+              "index": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "middle": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "ring": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "pinky": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}}
+            }
+          }
+        }
+      },
+      {
+        "id": "raised",
+        "timeMs": 900,
+        "hands": {
+          "left": {
+            "arm": {"elbow": {"rotationDeg": [0, 0, 0], "space": "body-local"}},
+            "wrist": {"positionM": [0.04, 0.18, 0.04], "orientationQuat": [0, 0, 0, 1], "orientationSpace": "body-local", "palmFacingDirection": [0, 0, 1], "relativeToForearmDeg": [0, 0, 0]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 12, "abductionDeg": 4, "twistDeg": 0}, "mcp": {"flexionDeg": 17, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 18}},
+              "index": {"mcp": {"flexionDeg": 8, "abductionDeg": 2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "middle": {"mcp": {"flexionDeg": 8, "abductionDeg": 1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "ring": {"mcp": {"flexionDeg": 8, "abductionDeg": -1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "pinky": {"mcp": {"flexionDeg": 8, "abductionDeg": -2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}}
+            }
+          },
+          "right": {
+            "wrist": {"positionM": [0, 0, 0], "orientationQuat": [0, 0, 0, 1]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 10, "abductionDeg": 0, "twistDeg": 0}, "mcp": {"flexionDeg": 15, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 15}},
+              "index": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "middle": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "ring": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "pinky": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}}
+            }
+          }
+        }
+      },
+      {
+        "id": "wave-right-1",
+        "timeMs": 1400,
+        "hands": {
+          "left": {
+            "arm": {"elbow": {"rotationDeg": [0, 0, 10], "space": "body-local"}},
+            "wrist": {"positionM": [0.04, 0.18, 0.04], "orientationQuat": [0, 0, 0.130526192, 0.991444861], "orientationSpace": "body-local", "palmFacingDirection": [0, 0, 1], "relativeToForearmDeg": [0, 0, 5]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 12, "abductionDeg": 4, "twistDeg": 0}, "mcp": {"flexionDeg": 17, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 18}},
+              "index": {"mcp": {"flexionDeg": 8, "abductionDeg": 2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "middle": {"mcp": {"flexionDeg": 8, "abductionDeg": 1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "ring": {"mcp": {"flexionDeg": 8, "abductionDeg": -1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "pinky": {"mcp": {"flexionDeg": 8, "abductionDeg": -2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}}
+            }
+          },
+          "right": {
+            "wrist": {"positionM": [0, 0, 0], "orientationQuat": [0, 0, 0, 1]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 10, "abductionDeg": 0, "twistDeg": 0}, "mcp": {"flexionDeg": 15, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 15}},
+              "index": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "middle": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "ring": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "pinky": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}}
+            }
+          }
+        }
+      },
+      {
+        "id": "wave-left-1",
+        "timeMs": 1900,
+        "hands": {
+          "left": {
+            "arm": {"elbow": {"rotationDeg": [0, 0, -10], "space": "body-local"}},
+            "wrist": {"positionM": [0.04, 0.18, 0.04], "orientationQuat": [0, 0, -0.130526192, 0.991444861], "orientationSpace": "body-local", "palmFacingDirection": [0, 0, 1], "relativeToForearmDeg": [0, 0, -5]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 12, "abductionDeg": 4, "twistDeg": 0}, "mcp": {"flexionDeg": 17, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 18}},
+              "index": {"mcp": {"flexionDeg": 8, "abductionDeg": 2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "middle": {"mcp": {"flexionDeg": 8, "abductionDeg": 1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "ring": {"mcp": {"flexionDeg": 8, "abductionDeg": -1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "pinky": {"mcp": {"flexionDeg": 8, "abductionDeg": -2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}}
+            }
+          },
+          "right": {
+            "wrist": {"positionM": [0, 0, 0], "orientationQuat": [0, 0, 0, 1]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 10, "abductionDeg": 0, "twistDeg": 0}, "mcp": {"flexionDeg": 15, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 15}},
+              "index": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "middle": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "ring": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "pinky": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}}
+            }
+          }
+        }
+      },
+      {
+        "id": "wave-right-2",
+        "timeMs": 2400,
+        "hands": {
+          "left": {
+            "arm": {"elbow": {"rotationDeg": [0, 0, 10], "space": "body-local"}},
+            "wrist": {"positionM": [0.04, 0.18, 0.04], "orientationQuat": [0, 0, 0.130526192, 0.991444861], "orientationSpace": "body-local", "palmFacingDirection": [0, 0, 1], "relativeToForearmDeg": [0, 0, 5]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 12, "abductionDeg": 4, "twistDeg": 0}, "mcp": {"flexionDeg": 17, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 18}},
+              "index": {"mcp": {"flexionDeg": 8, "abductionDeg": 2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "middle": {"mcp": {"flexionDeg": 8, "abductionDeg": 1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "ring": {"mcp": {"flexionDeg": 8, "abductionDeg": -1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "pinky": {"mcp": {"flexionDeg": 8, "abductionDeg": -2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}}
+            }
+          },
+          "right": {
+            "wrist": {"positionM": [0, 0, 0], "orientationQuat": [0, 0, 0, 1]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 10, "abductionDeg": 0, "twistDeg": 0}, "mcp": {"flexionDeg": 15, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 15}},
+              "index": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "middle": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "ring": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "pinky": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}}
+            }
+          }
+        }
+      },
+      {
+        "id": "wave-left-2",
+        "timeMs": 2900,
+        "hands": {
+          "left": {
+            "arm": {"elbow": {"rotationDeg": [0, 0, -10], "space": "body-local"}},
+            "wrist": {"positionM": [0.04, 0.18, 0.04], "orientationQuat": [0, 0, -0.130526192, 0.991444861], "orientationSpace": "body-local", "palmFacingDirection": [0, 0, 1], "relativeToForearmDeg": [0, 0, -5]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 12, "abductionDeg": 4, "twistDeg": 0}, "mcp": {"flexionDeg": 17, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 18}},
+              "index": {"mcp": {"flexionDeg": 8, "abductionDeg": 2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "middle": {"mcp": {"flexionDeg": 8, "abductionDeg": 1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "ring": {"mcp": {"flexionDeg": 8, "abductionDeg": -1, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}},
+              "pinky": {"mcp": {"flexionDeg": 8, "abductionDeg": -2, "twistDeg": 0}, "pip": {"flexionDeg": 8}, "dip": {"flexionDeg": 5}}
+            }
+          },
+          "right": {
+            "wrist": {"positionM": [0, 0, 0], "orientationQuat": [0, 0, 0, 1]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 10, "abductionDeg": 0, "twistDeg": 0}, "mcp": {"flexionDeg": 15, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 15}},
+              "index": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "middle": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "ring": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "pinky": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}}
+            }
+          }
+        }
+      },
+      {
+        "id": "end",
+        "timeMs": 3700,
+        "hands": {
+          "left": {
+            "arm": {"elbow": {"rotationDeg": [0, 0, 0], "space": "body-local"}},
+            "wrist": {"positionM": [0, 0, 0], "orientationQuat": [0, 0, 0, 1], "orientationSpace": "body-local", "palmFacingDirection": [0, 0, 1], "relativeToForearmDeg": [0, 0, 0]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 10, "abductionDeg": 0, "twistDeg": 0}, "mcp": {"flexionDeg": 15, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 15}},
+              "index": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "middle": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "ring": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "pinky": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}}
+            }
+          },
+          "right": {
+            "wrist": {"positionM": [0, 0, 0], "orientationQuat": [0, 0, 0, 1]},
+            "joints": {
+              "thumb": {"cmc": {"flexionDeg": 10, "abductionDeg": 0, "twistDeg": 0}, "mcp": {"flexionDeg": 15, "abductionDeg": 0, "twistDeg": 0}, "ip": {"flexionDeg": 15}},
+              "index": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "middle": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "ring": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}},
+              "pinky": {"mcp": {"flexionDeg": 5, "abductionDeg": 0, "twistDeg": 0}, "pip": {"flexionDeg": 5}, "dip": {"flexionDeg": 3}}
+            }
+          }
+        }
+      }
+    ],
+    "nonManuals": [
+      {"id": "friendly-farewell", "fromMs": 0, "toMs": 3700, "headRotationDeg": [0, 0, 0], "gazeDirection": [0, 0, 1], "browRaise": 0.25, "smile": 0.9, "mouthOpening": 0.08, "mouthPucker": 0}
+    ],
+    "contacts": [],
+    "proximities": [],
+    "relativePoses": [],
+    "jointRelations": [],
+    "trajectories": [
+      {
+        "id": "left-hand-farewell-raise",
+        "fromMs": 0,
+        "toMs": 900,
+        "strength": "required",
+        "target": "hand.left.palm.center",
+        "space": "body-local",
+        "path": [
+          {"timeMs": 0, "positionM": [0, 0, 0]},
+          {"timeMs": 450, "positionM": [0.28, 0.13, 0.05]},
+          {"timeMs": 900, "positionM": [0.04, 0.18, 0.04]}
+        ],
+        "positionToleranceM": 0.01,
+        "curve": "cubic",
+        "maxSpeedMps": 4.6,
+        "maxAccelerationMps2": 23,
+        "maxJerkMps3": 57
+      }
+    ],
+    "transitions": [
+      {"id": "start-raised", "fromKeyframeId": "start", "toKeyframeId": "raised", "curve": "cubic", "continuous": ["position", "orientation", "velocity"], "maxSpeedMps": 4.6, "maxAccelerationMps2": 23, "maxJerkMps3": 57},
+      {"id": "raised-right-1", "fromKeyframeId": "raised", "toKeyframeId": "wave-right-1", "curve": "cubic", "continuous": ["position", "orientation", "velocity"], "maxSpeedMps": 4.6, "maxAccelerationMps2": 23, "maxJerkMps3": 57},
+      {"id": "right-1-left-1", "fromKeyframeId": "wave-right-1", "toKeyframeId": "wave-left-1", "curve": "cubic", "continuous": ["position", "orientation", "velocity"], "maxSpeedMps": 4.6, "maxAccelerationMps2": 23, "maxJerkMps3": 57},
+      {"id": "left-1-right-2", "fromKeyframeId": "wave-left-1", "toKeyframeId": "wave-right-2", "curve": "cubic", "continuous": ["position", "orientation", "velocity"], "maxSpeedMps": 4.6, "maxAccelerationMps2": 23, "maxJerkMps3": 57},
+      {"id": "right-2-left-2", "fromKeyframeId": "wave-right-2", "toKeyframeId": "wave-left-2", "curve": "cubic", "continuous": ["position", "orientation", "velocity"], "maxSpeedMps": 4.6, "maxAccelerationMps2": 23, "maxJerkMps3": 57},
+      {"id": "left-2-end", "fromKeyframeId": "wave-left-2", "toKeyframeId": "end", "curve": "cubic", "continuous": ["position", "orientation", "velocity"], "maxSpeedMps": 4.6, "maxAccelerationMps2": 23, "maxJerkMps3": 57}
+    ]
+  },
+  "provenance": {
+    "authorId": "vozual-first-kinematic-milestone",
+    "createdAt": "2026-11-06T00:00:00Z",
+    "updatedAt": "2026-11-13T00:00:00Z",
+    "sourceSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "linguisticReview": {
+    "status": "draft",
+    "language": "lsc-CO",
+    "reviewerId": null,
+    "reviewedAt": null
+  }
+}

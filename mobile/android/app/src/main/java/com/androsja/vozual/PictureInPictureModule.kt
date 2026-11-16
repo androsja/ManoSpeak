@@ -159,6 +159,12 @@ class PictureInPictureModule(context: ReactApplicationContext) :
   }
 
   @ReactMethod
+  fun setPlaybackPaused(paused: Boolean) {
+    NativePipAvatarController.setPlaybackPaused(paused)
+    if (paused) stopAnimationClock() else startAnimationClock()
+  }
+
+  @ReactMethod
   fun reportPlaybackEvent(event: String, publishedGloss: String?) {
     val safeEvent = event.take(48).replace(Regex("[^A-Za-z0-9_-]"), "_")
     val safeGloss = publishedGloss
@@ -217,7 +223,12 @@ class PictureInPictureModule(context: ReactApplicationContext) :
     animationClock = null
   }
 
-  private fun forwardSpeechEvent(event: String, values: ArrayList<String>?, error: String?) {
+  private fun forwardSpeechEvent(
+    event: String,
+    values: ArrayList<String>?,
+    error: String?,
+    confidenceScores: FloatArray? = null,
+  ) {
     mainHandler.post {
       val payloadValues = Arguments.createArray().apply {
         values.orEmpty().forEach(::pushString)
@@ -226,6 +237,9 @@ class PictureInPictureModule(context: ReactApplicationContext) :
         putString("type", event)
         putArray("value", payloadValues)
         putString("error", error)
+        putArray("confidence", Arguments.createArray().apply {
+          confidenceScores?.forEach { score -> pushDouble(score.toDouble()) }
+        })
       }
       try {
         reactApplicationContext
@@ -254,13 +268,18 @@ class PictureInPictureModule(context: ReactApplicationContext) :
       activeModule?.get()?.startAnimationClock()
     }
 
-    fun emitSpeechEvent(event: String, values: ArrayList<String>?, error: String?) {
+    fun emitSpeechEvent(
+      event: String,
+      values: ArrayList<String>?,
+      error: String?,
+      confidenceScores: FloatArray? = null,
+    ) {
       val module = activeModule?.get()
       if (module == null) {
         Log.w(TAG, "No React module available for PiP speech event type=$event")
         return
       }
-      module.forwardSpeechEvent(event, values, error)
+      module.forwardSpeechEvent(event, values, error, confidenceScores)
     }
 
     fun emitPipAction() {

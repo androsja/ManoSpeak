@@ -1,11 +1,17 @@
 export type MotionPoint = [number, number, number];
 export type MotionHeadOrientation = {yaw: number; pitch: number; roll: number};
+export type MotionSemantic = Record<string, unknown>;
 export type MotionFrame = {
   bodyHands: MotionPoint[];
   face: MotionPoint[];
   headOrientation?: MotionHeadOrientation;
 };
-export type SignMotion = {fps: number; frames: MotionFrame[]};
+export type SignMotion = {
+  fps: number;
+  frames: MotionFrame[];
+  /** Optional source metadata; playback intentionally ignores it. */
+  semantic?: MotionSemantic;
+};
 
 const HEADER_SIZE = 16;
 const MAGIC = [0x56, 0x5a, 0x4d, 0x42]; // VZMB
