@@ -1,0 +1,1345 @@
+{
+  "blenderVersion": "5.2.3 LTS",
+  "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a",
+  "limitations": [
+    "Dominant-weight same-hand non-adjacent triangles only",
+    "No combined joints, continuous paths, mixed-weight, garment or inter-hand coverage",
+    "Passing samples do not establish anatomical or collision-free limits"
+  ],
+  "records": [
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.01.L",
+      "categories": [
+        "left-palm"
+      ],
+      "overlapCount": 22,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.01.L",
+      "categories": [
+        "left-middle"
+      ],
+      "overlapCount": 156,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.02.L",
+      "categories": [
+        "left-middle"
+      ],
+      "overlapCount": 115,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.03.L",
+      "categories": [
+        "left-middle"
+      ],
+      "overlapCount": 34,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.01.L",
+      "categories": [
+        "left-ring"
+      ],
+      "overlapCount": 6,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.01.L",
+      "categories": [
+        "left-ring"
+      ],
+      "overlapCount": 140,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.01.L",
+      "categories": [
+        "left-index"
+      ],
+      "overlapCount": 146,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.02.L",
+      "categories": [
+        "left-ring"
+      ],
+      "overlapCount": 111,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.02.L",
+      "categories": [
+        "left-index"
+      ],
+      "overlapCount": 109,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.01.L",
+      "categories": [
+        "left-middle",
+        "left-pinky"
+      ],
+      "overlapCount": 12,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.01.L",
+      "categories": [
+        "left-pinky"
+      ],
+      "overlapCount": 141,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.01.L",
+      "categories": [
+        "left-middle"
+      ],
+      "overlapCount": 143,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.02.L",
+      "categories": [
+        "left-pinky"
+      ],
+      "overlapCount": 69,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.02.L",
+      "categories": [
+        "left-middle"
+      ],
+      "overlapCount": 117,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.01.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.01.L",
+      "categories": [
+        "left-ring"
+      ],
+      "overlapCount": 135,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.02.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.02.L",
+      "categories": [
+        "left-ring"
+      ],
+      "overlapCount": 110,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.03.L",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.03.L",
+      "categories": [
+        "left-ring"
+      ],
+      "overlapCount": 50,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.01.R",
+      "categories": [
+        "right-palm"
+      ],
+      "overlapCount": 18,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-thumb.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-thumb.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-thumb.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.01.R",
+      "categories": [
+        "right-middle"
+      ],
+      "overlapCount": 153,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.02.R",
+      "categories": [
+        "right-middle"
+      ],
+      "overlapCount": 101,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_index.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_index.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_index.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.01.R",
+      "categories": [
+        "right-ring"
+      ],
+      "overlapCount": 14,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.01.R",
+      "categories": [
+        "right-index"
+      ],
+      "overlapCount": 164,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.01.R",
+      "categories": [
+        "right-ring"
+      ],
+      "overlapCount": 154,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.02.R",
+      "categories": [
+        "right-index"
+      ],
+      "overlapCount": 102,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.02.R",
+      "categories": [
+        "right-ring"
+      ],
+      "overlapCount": 82,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_middle.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_middle.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_middle.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.01.R",
+      "categories": [
+        "right-middle",
+        "right-pinky"
+      ],
+      "overlapCount": 12,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.01.R",
+      "categories": [
+        "right-middle"
+      ],
+      "overlapCount": 147,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.01.R",
+      "categories": [
+        "right-pinky"
+      ],
+      "overlapCount": 147,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.02.R",
+      "categories": [
+        "right-middle"
+      ],
+      "overlapCount": 101,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.02.R",
+      "categories": [
+        "right-pinky"
+      ],
+      "overlapCount": 37,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_ring.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_ring.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_ring.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.01.R",
+      "categories": [
+        "right-ring"
+      ],
+      "overlapCount": 6,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.01.R",
+      "categories": [
+        "right-ring"
+      ],
+      "overlapCount": 144,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.01.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.02.R",
+      "categories": [
+        "right-ring"
+      ],
+      "overlapCount": 92,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.02.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "x",
+      "bone": "DEF-f_pinky.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "y",
+      "bone": "DEF-f_pinky.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.03.R",
+      "categories": [
+        "right-ring"
+      ],
+      "overlapCount": 12,
+      "radians": -0.17453292519943295
+    },
+    {
+      "axis": "z",
+      "bone": "DEF-f_pinky.03.R",
+      "categories": [],
+      "overlapCount": 0,
+      "radians": 0.17453292519943295
+    }
+  ],
+  "sampling": "exact signed degree samples (-10.0, 10.0)",
+  "schema": "vozual.rig-per-bone-probes",
+  "schemaVersion": 1,
+  "scope": "one isolated local rotation, rest of armature reset"
+}

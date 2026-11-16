@@ -1,0 +1,38 @@
+{
+  "decisionId": "DEC-T3-14B-SCOPE-001",
+  "recordedAt": "2026-11-16T03:17:13+00:00",
+  "source": "Explicit user message in the current moderator conversation",
+  "userUtterance": "bueno apruebo",
+  "approvedScope": "Accept the existing measured mechanical observations and finite diagnostic catalog for subtask 3.14b; preserve the ability to extend support for future signs.",
+  "observations": {
+    "bones": 171,
+    "signedSamples": 1026
+  },
+  "diagnosticCatalog": {
+    "bones": 30,
+    "rows": 1710,
+    "acceptedNonzero": 1385,
+    "rejectedCollision": 235,
+    "neutralReferences": 90
+  },
+  "executionBoundary": "Diagnostic-only isolated single-bone/single-axis probes with the remainder reset. Current v4 compiler emits durationMs=0 and frames=[].",
+  "excludedApprovals": [
+    "Anatomical DOFs or safe joint ranges",
+    "General or coupled motion support",
+    "Linguistic realization of any sign, including AMIGOS",
+    "Visual fidelity or candidate adoption",
+    "Asset or derived-data distribution rights",
+    "Publication",
+    "Task 3 parent gate or Task 4 start"
+  ],
+  "profileCanonicalSha256": "c97937e3642cfae25dbbbb91fdd4ed62228ecc17d062a6c13443c556097ced54",
+  "profileRawSha256": "fb5ae6bc26cee45da42a4c3ab9769db8496e0ce996595b1174a053afafc3a0a1",
+  "mechanicalEvidenceProfileBasisSha256": "7651784cc5aa3b3f48fcbc0176e8ef50dd4728fabe73ef181c9662907f4324a0",
+  "measurementBasisSha256": "c8d77d81161fcc70a6340637c3eb3635e26ce231a16afcddf941f5e9317eec8d",
+  "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a",
+  "independentReview": "analysis_results/task3_14_diagnostics/standalone_verifier_basis_independent_review/TASK_3_14B_VERIFIER_README_INDEPENDENT_REVIEW.md",
+  "independentReviewSha256": "636835ab5bedbc43a463e4a5dc07202a21f8d9d84ae7418c8a370cf158199e6e",
+  "formalDisposition": "Scope approved; subtask remains partial pending documented durable evidence handling and reproducible handoff. No formal status or gate changed.",
+  "nextAction": "Document a permitted durable evidence location and handoff method; validate the restored real evidence there before considering formal closure. Record applicable rights evidence if distribution is proposed.",
+  "locality": "This approval record and DWP remain local and gitignored; no transfer was performed."
+}

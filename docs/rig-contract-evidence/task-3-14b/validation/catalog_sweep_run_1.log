@@ -1,0 +1,53 @@
+{
+  "passed": true,
+  "binding": {
+    "profileRawSha256": "fb5ae6bc26cee45da42a4c3ab9769db8496e0ce996595b1174a053afafc3a0a1",
+    "profileCanonicalSha256": "c97937e3642cfae25dbbbb91fdd4ed62228ecc17d062a6c13443c556097ced54",
+    "catalogRawSha256": "433d8bc45d9f7fb3dbd1ab0ff7e772f307593de057d43c5056c952a1a2a94aab",
+    "catalogDeclaredSha256": "f1f7c176ed26f2387e7a48c647880720b840c7adea3c14905349462e2f6ef70a",
+    "catalogCanonicalSha256": "f1f7c176ed26f2387e7a48c647880720b840c7adea3c14905349462e2f6ef70a",
+    "catalogProfileBasisSha256": "7651784cc5aa3b3f48fcbc0176e8ef50dd4728fabe73ef181c9662907f4324a0",
+    "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a",
+    "catalogCandidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a",
+    "profileInventorySha256": "e576d44fb13360d2fbff89ba455d2d89b6141c4c3f8f297b24e592818097abbf",
+    "catalogInventorySha256": "e576d44fb13360d2fbff89ba455d2d89b6141c4c3f8f297b24e592818097abbf",
+    "validatorSha256": "48374f3c1d7593bc3cfbb33cbbf43ee0bce044232c2c301017e1d90e58dfe8e3",
+    "canonicalizerSha256": "86f77569f0b60257c84dd61fbb9d5709154679fca4e1e51b1e1c3e4b535c9541",
+    "sourceReports": [
+      {
+        "path": ".dwp/plans/PLAN_lsc_motion_dsl_v4/analysis_results/TASK_3_PER_BONE_DENSE.json",
+        "sha256": "db03a8bb7c39e08241e81ea538819a563f90a01f51936d9d9e6fe614a1b9ce00"
+      },
+      {
+        "path": ".dwp/plans/PLAN_lsc_motion_dsl_v4/analysis_results/TASK_3_PER_BONE_COLLISION_PM10_BUILD4.json",
+        "sha256": "ade73a809d1f30e45110bc03a280416e8fc01651e646332a8281541d9a919500"
+      }
+    ]
+  },
+  "coverage": {
+    "rows": 1710,
+    "uniquePoints": 1710,
+    "bones": 30,
+    "rowsPerBone": [
+      57
+    ],
+    "sourceRows": 1710,
+    "sourceUniquePoints": 1710,
+    "sourceMismatches": 0,
+    "missingSourceKeys": 0,
+    "perAxisRows": {
+      "x": 570,
+      "y": 570,
+      "z": 570
+    },
+    "distinctAngles": 19
+  },
+  "outcomes": {
+    "neutralRows": 90,
+    "acceptedNonzero": 1385,
+    "collisionRejectedNonzero": 235,
+    "otherRejected": 0,
+    "countMismatches": 0
+  },
+  "unexpectedErrors": []
+}

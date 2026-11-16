@@ -1,0 +1,14 @@
+
+> vozual-mobile@0.1.0 test
+> jest --runInBand tools/__tests__/rig-capability-profile.test.ts tools/__tests__/rig-mechanical-evidence.test.ts tools/__tests__/compile-motion-v4.test.ts tools/__tests__/v4-rig-compile-binding.test.ts
+
+PASS tools/__tests__/compile-motion-v4.test.ts
+PASS tools/__tests__/rig-mechanical-evidence.test.ts
+PASS tools/__tests__/rig-capability-profile.test.ts
+PASS tools/__tests__/v4-rig-compile-binding.test.ts
+
+Test Suites: 4 passed, 4 total
+Tests:       44 passed, 44 total
+Snapshots:   0 total
+Time:        0.935 s, estimated 1 s
+Ran all test suites matching /tools\/__tests__\/rig-capability-profile.test.ts|tools\/__tests__\/rig-mechanical-evidence.test.ts|tools\/__tests__\/compile-motion-v4.test.ts|tools\/__tests__\/v4-rig-compile-binding.test.ts/i.

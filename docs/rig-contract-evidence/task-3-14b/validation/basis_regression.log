@@ -1,0 +1,27 @@
+{
+  "schema": "vozual.task3-14b-standalone-verifier-basis-regression.v1",
+  "verifierSha256": "37b5e2f33a6fa195bf16bd9e4d9c10f34b1fc55724ce81bb35aa46b3887e26a9",
+  "manifestSha256": "842f62a30e0dd6aff8b19c510a9d57856718ee9ccc9e631f2c5a3891965562bb",
+  "profileRawSha256": "fb5ae6bc26cee45da42a4c3ab9769db8496e0ce996595b1174a053afafc3a0a1",
+  "cases": [
+    {
+      "name": "current-profile-positive",
+      "exitCode": 0,
+      "expected": "MANIFEST.VERIFIED",
+      "observed": "MANIFEST.VERIFIED",
+      "passed": true
+    },
+    {
+      "name": "rehash-non-evidence-profile-field-negative",
+      "exitCode": 1,
+      "expected": "response report profile digest does not match the derived measurement basis",
+      "observed": "MANIFEST.INVALID: response report profile digest does not match the derived measurement basis",
+      "passed": true,
+      "fixtureProfileRawSha256": "8d33dc528b2b4acdaca1c0dfc180f64d7eda2a919151b253383f1a1b56872d89"
+    }
+  ],
+  "fixturesRemoved": true,
+  "passed": true,
+  "nodeVersion": "v25.2.1",
+  "pythonVersion": "Python 3.14.6"
+}
