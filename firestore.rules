@@ -52,8 +52,8 @@ service cloud.firestore {
       allow delete: if owns(uid);
     }
 
-    // Public metadata only. Each compiled motion lives in its own version
-    // document and all catalogue writes are restricted to trusted tools.
+    // Public metadata only. Motion bytes and source material always live in
+    // Storage; trusted publisher tooling bypasses these client rules.
     match /signLanguages/{languageId} {
       allow read: if resource.data.published == true;
       allow write: if false;
@@ -75,9 +75,11 @@ service cloud.firestore {
         && resource.data.published == true
         && resource.data.approved == true
         && resource.data.compiled == true
-        && resource.data.contentBase64 is string
         && resource.data.sha256 is string
-        && resource.data.sizeBytes is int;
+        && resource.data.sizeBytes is int
+        && resource.data.sizeBytes > 0
+        && resource.data.storagePath is string
+        && !resource.data.keys().hasAny(['contentBase64']);
       allow write: if false;
     }
 

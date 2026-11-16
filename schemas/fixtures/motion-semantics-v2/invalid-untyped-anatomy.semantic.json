@@ -1,0 +1,15 @@
+{
+  "schema": "vozual.motion-semantics",
+  "schemaVersion": 2,
+  "gloss": "INVALID",
+  "language": "lsc",
+  "regionalVariant": "lsc-CO",
+  "durationMs": 100,
+  "manualTracks": {"left": {"participation": "inactive", "role": "none"}, "right": {"participation": "inactive", "role": "none"}},
+  "trajectories": [],
+  "anatomicalRelations": [{"id": "bad-bone", "type": "contact", "span": {"fromMs": 0, "toMs": 10}, "strength": "required", "a": "bone.Unknown", "b": "body.chin", "maxSeparationM": 0.001}],
+  "bilateralCoordination": [],
+  "handshapeEvents": [],
+  "nonManualEvents": [],
+  "validation": {"status": "needs_review", "source": "unknown"}
+}

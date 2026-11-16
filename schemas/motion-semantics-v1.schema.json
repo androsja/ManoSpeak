@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/motion-semantics-v1.schema.json",
+  "title": "Vozual universal motion semantics v1",
+  "description": "Additive semantic description for legacy landmark motions and authored motion v2 recipes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "gloss", "language", "regionalVariant", "handMode", "hands", "trajectory", "contact", "spatial", "symmetry", "nonManual", "phases", "validation"],
+  "properties": {
+    "schema": {"const": "vozual.motion-semantics"},
+    "schemaVersion": {"const": 1},
+    "gloss": {"type": "string", "minLength": 1},
+    "language": {"const": "lsc"},
+    "regionalVariant": {"const": "lsc-CO"},
+    "handMode": {"enum": ["left", "right", "bilateral", "alternating"]},
+    "hands": {
+      "type": "object", "additionalProperties": false, "required": ["left", "right"],
+      "properties": {"left": {"$ref": "#/$defs/hand"}, "right": {"$ref": "#/$defs/hand"}}
+    },
+    "trajectory": {"$ref": "#/$defs/trajectory"},
+    "contact": {"$ref": "#/$defs/contact"},
+    "spatial": {"$ref": "#/$defs/spatial"},
+    "symmetry": {"$ref": "#/$defs/symmetry"},
+    "nonManual": {"$ref": "#/$defs/nonManual"},
+    "phases": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/phase"}},
+    "validation": {"$ref": "#/$defs/validation"}
+  },
+  "$defs": {
+    "number": {"type": "number"},
+    "vec3": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}, {"type": "number"}], "items": false, "minItems": 3, "maxItems": 3},
+    "range01": {"type": "number", "minimum": 0, "maximum": 1},
+    "frameSpan": {"type": "object", "additionalProperties": false, "required": ["from", "to"], "properties": {"from": {"type": "integer", "minimum": 0}, "to": {"type": "integer", "minimum": 0}}},
+    "joints": {
+      "type": "object", "additionalProperties": false, "required": ["shoulder", "elbow", "wrist"],
+      "properties": {
+        "shoulder": {"$ref": "#/$defs/joint"},
+        "elbow": {"$ref": "#/$defs/joint"},
+        "wrist": {"$ref": "#/$defs/joint"}
+      }
+    },
+    "joint": {
+      "type": "object", "additionalProperties": false, "required": ["start", "end"],
+      "properties": {
+        "start": {"$ref": "#/$defs/vec3"}, "end": {"$ref": "#/$defs/vec3"},
+        "angleDeg": {"type": "number"}, "rangeDeg": {"type": "number", "minimum": 0}
+      }
+    },
+    "finger": {"enum": ["extended", "flexed", "curled", "pointing", "hooked", "spread", "closed", "unknown"]},
+    "hand": {
+      "type": "object", "additionalProperties": false, "required": ["participates", "role", "joints", "handshape", "palm", "fingers"],
+      "properties": {
+        "participates": {"type": "boolean"},
+        "role": {"enum": ["active", "support", "contact", "inactive", "alternating"]},
+        "joints": {"$ref": "#/$defs/joints"},
+        "handshape": {"enum": ["open", "flat", "fist", "point", "pinch", "hook", "thumbs_up", "custom", "unknown"]},
+        "handshapeConfidence": {"$ref": "#/$defs/range01"},
+        "palm": {"$ref": "#/$defs/palm"},
+        "fingers": {
+          "type": "object", "additionalProperties": false,
+          "required": ["thumb", "index", "middle", "ring", "pinky"],
+          "properties": {"thumb": {"$ref": "#/$defs/finger"}, "index": {"$ref": "#/$defs/finger"}, "middle": {"$ref": "#/$defs/finger"}, "ring": {"$ref": "#/$defs/finger"}, "pinky": {"$ref": "#/$defs/finger"}}
+        },
+        "fingerArticulation": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["finger", "action"], "properties": {"finger": {"enum": ["thumb", "index", "middle", "ring", "pinky"]}, "action": {"enum": ["open", "close", "flex", "extend", "spread", "touch", "circle", "wave"]}, "span": {"$ref": "#/$defs/frameSpan"}}}}
+      }
+    },
+    "palm": {
+      "type": "object", "additionalProperties": false, "required": ["facing", "normalStart", "normalEnd"],
+      "properties": {
+        "facing": {"enum": ["camera", "away", "up", "down", "left", "right", "in", "out", "unknown"]},
+        "normalStart": {"$ref": "#/$defs/vec3"}, "normalEnd": {"$ref": "#/$defs/vec3"},
+        "rollDeg": {"type": "number"}, "pitchDeg": {"type": "number"}, "yawDeg": {"type": "number"}
+      }
+    },
+    "trajectory": {
+      "type": "object", "additionalProperties": false, "required": ["path", "direction", "velocity", "holds", "repetitions"],
+      "properties": {
+        "path": {"enum": ["stationary", "line", "arc", "circle", "zigzag", "wave", "oscillation", "alternating", "compound", "unknown"]},
+        "direction": {"type": "array", "items": {"enum": ["up", "down", "left", "right", "forward", "backward", "inward", "outward", "toward_body", "away_body", "circular", "none"]}, "minItems": 1, "uniqueItems": true},
+        "displacement": {"$ref": "#/$defs/vec3"}, "pathLength": {"type": "number", "minimum": 0},
+        "velocity": {"type": "object", "additionalProperties": false, "required": ["profile", "peak", "average"], "properties": {"profile": {"enum": ["constant", "accelerating", "decelerating", "pulse", "mixed", "unknown"]}, "peak": {"type": "number", "minimum": 0}, "average": {"type": "number", "minimum": 0}}},
+        "acceleration": {"type": "number"},
+        "holds": {"type": "array", "items": {"$ref": "#/$defs/frameSpan"}},
+        "repetitions": {"type": "integer", "minimum": 0}
+      }
+    },
+    "contact": {
+      "type": "object", "additionalProperties": false, "required": ["status", "anchor"],
+      "properties": {"status": {"enum": ["none", "touch", "hold", "brush", "tap"]}, "anchor": {"enum": ["none", "chin", "mouth", "forehead", "cheek", "chest", "shoulder", "hand", "other"]}, "span": {"$ref": "#/$defs/frameSpan"}, "pressure": {"enum": ["none", "light", "firm", "unknown"]}}
+    },
+    "spatial": {
+      "type": "object", "additionalProperties": false, "required": ["zoneStart", "zoneEnd"],
+      "properties": {"zoneStart": {"enum": ["neutral", "head", "face", "upper_body", "chest", "waist", "side_left", "side_right", "front", "overhead", "unknown"]}, "zoneEnd": {"enum": ["neutral", "head", "face", "upper_body", "chest", "waist", "side_left", "side_right", "front", "overhead", "unknown"]}, "start": {"$ref": "#/$defs/vec3"}, "end": {"$ref": "#/$defs/vec3"}}
+    },
+    "symmetry": {
+      "type": "object", "additionalProperties": false, "required": ["mode", "leftRole", "rightRole"],
+      "properties": {"mode": {"enum": ["symmetric", "asymmetric", "mirrored", "sequential", "independent", "not_applicable"]}, "leftRole": {"enum": ["active", "support", "contact", "inactive", "alternating"]}, "rightRole": {"enum": ["active", "support", "contact", "inactive", "alternating"]}}
+    },
+    "nonManual": {
+      "type": "object", "additionalProperties": false, "required": ["head", "torso", "gaze", "eyes", "brows", "mouth"],
+      "properties": {
+        "head": {"type": "object", "additionalProperties": false, "required": ["rotationStart", "rotationEnd"], "properties": {"rotationStart": {"$ref": "#/$defs/vec3"}, "rotationEnd": {"$ref": "#/$defs/vec3"}}},
+        "torso": {"type": "object", "additionalProperties": false, "required": ["rotationStart", "rotationEnd"], "properties": {"rotationStart": {"$ref": "#/$defs/vec3"}, "rotationEnd": {"$ref": "#/$defs/vec3"}}},
+        "gaze": {"type": "object", "additionalProperties": false, "required": ["direction", "vergenceDeg"], "properties": {"direction": {"$ref": "#/$defs/vec3"}, "vergenceDeg": {"type": "number"}}},
+        "eyes": {"type": "object", "additionalProperties": false, "required": ["leftClosure", "rightClosure", "leftWidening", "rightWidening"], "properties": {"leftClosure": {"$ref": "#/$defs/range01"}, "rightClosure": {"$ref": "#/$defs/range01"}, "leftWidening": {"$ref": "#/$defs/range01"}, "rightWidening": {"$ref": "#/$defs/range01"}}},
+        "brows": {"type": "object", "additionalProperties": false, "required": ["leftLift", "rightLift", "leftLower", "rightLower"], "properties": {"leftLift": {"$ref": "#/$defs/range01"}, "rightLift": {"$ref": "#/$defs/range01"}, "leftLower": {"$ref": "#/$defs/range01"}, "rightLower": {"$ref": "#/$defs/range01"}}},
+        "mouth": {"type": "object", "additionalProperties": false, "required": ["opening", "pucker", "width", "leftCorner", "rightCorner"], "properties": {"opening": {"$ref": "#/$defs/range01"}, "pucker": {"$ref": "#/$defs/range01"}, "width": {"$ref": "#/$defs/range01"}, "leftCorner": {"type": "number", "minimum": -1, "maximum": 1}, "rightCorner": {"type": "number", "minimum": -1, "maximum": 1}}}
+      }
+    },
+    "phase": {"type": "object", "additionalProperties": false, "required": ["id", "kind", "span"], "properties": {"id": {"type": "string", "minLength": 1}, "kind": {"enum": ["preparation", "stroke", "hold", "release", "repetition", "transition", "rest"]}, "span": {"$ref": "#/$defs/frameSpan"}, "notes": {"type": "string"}}},
+    "validation": {"type": "object", "additionalProperties": false, "required": ["status", "sourceLayout", "landmarkCounts"], "properties": {"status": {"enum": ["derived", "authored", "reviewed", "needs_review"]}, "sourceLayout": {"enum": ["pose33_left21_right21_face468", "motion-schema-v2", "unknown"]}, "landmarkCounts": {"type": "object", "additionalProperties": false, "required": ["pose", "leftHand", "rightHand", "face"], "properties": {"pose": {"type": "integer", "minimum": 0}, "leftHand": {"type": "integer", "minimum": 0}, "rightHand": {"type": "integer", "minimum": 0}, "face": {"type": "integer", "minimum": 0}}}, "warnings": {"type": "array", "items": {"type": "string"}}}}
+  }
+}

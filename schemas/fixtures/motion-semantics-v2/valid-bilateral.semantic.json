@@ -1,0 +1,15 @@
+{
+  "schema": "vozual.motion-semantics",
+  "schemaVersion": 2,
+  "gloss": "EJEMPLO_BILATERAL",
+  "language": "lsc",
+  "regionalVariant": "lsc-CO",
+  "durationMs": 800,
+  "manualTracks": {"left": {"participation": "active", "role": "symmetric"}, "right": {"participation": "active", "role": "symmetric"}},
+  "trajectories": [{"id": "left-wrist-arc", "effector": "hand.left.wrist", "space": "body-local", "span": {"fromMs": 100, "toMs": 600}, "path": "arc", "waypoints": [{"timeMs": 100, "position": [-0.2, 1.1, 0.3]}, {"timeMs": 600, "position": [-0.4, 1.3, 0.4]}], "toleranceM": 0.008}],
+  "anatomicalRelations": [{"id": "tips-near", "type": "proximity", "span": {"fromMs": 260, "toMs": 500}, "strength": "required", "a": "hand.left.index.tip", "b": "hand.right.index.tip", "minDistanceM": 0.002, "maxDistanceM": 0.02}, {"id": "index-curl", "type": "joint_coupling", "span": {"fromMs": 100, "toMs": 600}, "strength": "preferred", "lhs": "hand.left.index.pip.flexionDeg", "rhs": "hand.right.index.pip.flexionDeg", "relation": "equal", "toleranceDeg": 8}],
+  "bilateralCoordination": [{"id": "hands-mirrored", "span": {"fromMs": 100, "toMs": 600}, "mode": "mirrored", "leftEffector": "hand.left.palm.center", "rightEffector": "hand.right.palm.center", "phaseOffsetMs": 0}],
+  "handshapeEvents": [{"id": "left-open-close", "hand": "left", "span": {"fromMs": 100, "toMs": 300}, "from": "B_OPEN", "to": "S_FIST", "articulation": [{"joint": "hand.left.index.pip.flexionDeg", "fromDeg": 0, "toDeg": 80}]}],
+  "nonManualEvents": [{"id": "brows-raised", "channels": ["brows.leftInnerLift", "brows.rightInnerLift"], "span": {"fromMs": 180, "toMs": 500}, "curve": "smoothstep", "target": 0.65}],
+  "validation": {"status": "authored", "source": "motion-schema-v3", "warnings": []}
+}

@@ -1,0 +1,84 @@
+rules_version = '2';
+
+// Storage is the data plane for released LSC assets. Firestore stores only
+// small, queryable metadata; it never stores motion bytes or source recipes.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function author() {
+      return signedIn() && request.auth.token.lscAuthor == true;
+    }
+
+    function reviewer() {
+      return signedIn() && request.auth.token.lscReviewer == true;
+    }
+
+    function publisher() {
+      return signedIn() && request.auth.token.lscPublisher == true;
+    }
+
+    function hash(value) {
+      return value.matches('^[a-f0-9]{64}$');
+    }
+
+    function immutableMetadata(releaseId, digest) {
+      return request.resource.size > 0
+        && request.resource.metadata.sha256 == digest
+        && hash(request.resource.metadata.sha256)
+        && request.resource.metadata.releaseId == releaseId
+        && request.resource.metadata.compilerVersion is string
+        && request.resource.metadata.rigProfileId is string
+        && request.resource.metadata.rigProfileRevision is string
+        && request.resource.metadata.formatVersion is string;
+    }
+
+    // Originals, consent records, and diagnostics are private. A mobile
+    // client has no rule path that can read any object under authoring/.
+    match /authoring/{authorId}/{allPaths=**} {
+      allow read, create, update, delete: if author() && request.auth.uid == authorId;
+    }
+
+    // A reviewer can inspect reports only. They cannot read source recipes,
+    // recordings, or consent material, and cannot mutate authoring content.
+    match /review/{releaseId}/reports/{digest}/report.json {
+      allow read: if reviewer() || publisher();
+      allow create: if author() && hash(digest) && immutableMetadata(releaseId, digest);
+      allow update, delete: if false;
+    }
+
+    // Released public data is created once by a publisher. Its path includes
+    // the content hash and every object repeats that hash in immutable custom
+    // metadata. Update/delete are denied so a published release is never
+    // changed in place.
+    match /distribution/releases/{releaseId}/root/{digest}/manifest.json {
+      allow read: if true;
+      allow create: if publisher() && hash(digest) && immutableMetadata(releaseId, digest);
+      allow update, delete: if false;
+    }
+
+    match /distribution/releases/{releaseId}/fragments/{fragmentId}/{digest}/fragment.json {
+      allow read: if true;
+      allow create: if publisher() && hash(digest) && immutableMetadata(releaseId, digest);
+      allow update, delete: if false;
+    }
+
+    match /distribution/releases/{releaseId}/signs/{signId}/motion-binary/{digest}/artifact.bin {
+      allow read: if true;
+      allow create: if publisher() && hash(digest) && immutableMetadata(releaseId, digest);
+      allow update, delete: if false;
+    }
+
+    match /distribution/releases/{releaseId}/signs/{signId}/execution-plan/{digest}/artifact.json {
+      allow read: if true;
+      allow create: if publisher() && hash(digest) && immutableMetadata(releaseId, digest);
+      allow update, delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

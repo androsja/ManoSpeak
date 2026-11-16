@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/release-root-v1.schema.json",
+  "title": "Vozual release root v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "formatVersion", "releaseId", "languageId", "locale", "status", "createdAt", "publishedAt", "minimumAppVersion", "compilerVersion", "rig", "manifestSha256", "manifestSignature", "fragmentStrategy", "fragments"],
+  "properties": {
+    "schema": {"const": "vozual.release-root"}, "formatVersion": {"const": 1}, "releaseId": {"$ref": "release-catalog-v1.schema.json#/$defs/id"}, "languageId": {"$ref": "release-catalog-v1.schema.json#/$defs/id"}, "locale": {"type": "string", "minLength": 1}, "status": {"const": "published"}, "createdAt": {"type": "string", "format": "date-time"}, "publishedAt": {"type": "string", "format": "date-time"}, "minimumAppVersion": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$"}, "compilerVersion": {"type": "string", "minLength": 1}, "rig": {"$ref": "release-catalog-v1.schema.json#/$defs/rig"}, "manifestSha256": {"$ref": "release-catalog-v1.schema.json#/$defs/sha256"}, "manifestSignature": {"type": "string", "minLength": 1}, "fragmentStrategy": {"type": "object", "additionalProperties": false, "required": ["kind", "prefixLength"], "properties": {"kind": {"const": "gloss-prefix-v1"}, "prefixLength": {"type": "integer", "minimum": 1}}}, "fragments": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["id", "storagePath", "sha256", "sizeBytes", "entryCount"], "properties": {"id": {"$ref": "release-catalog-v1.schema.json#/$defs/id"}, "storagePath": {"$ref": "release-catalog-v1.schema.json#/$defs/storagePath"}, "sha256": {"$ref": "release-catalog-v1.schema.json#/$defs/sha256"}, "sizeBytes": {"type": "integer", "minimum": 1}, "entryCount": {"type": "integer", "minimum": 0}}}}
+  }
+}

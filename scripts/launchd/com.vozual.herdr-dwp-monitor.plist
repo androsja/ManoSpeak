@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.vozual.herdr-dwp-monitor</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/sh</string>
+		<string>/Users/jflorezgaleano/Library/Application Support/VozualAgentMonitor/monitor_vozual_agents.sh</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/Users/jflorezgaleano/Library/Application Support/VozualAgentMonitor</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HERDR_ENV</key>
+		<string>1</string>
+		<key>HERDR_SOCKET_PATH</key>
+		<string>/Users/jflorezgaleano/.config/herdr/herdr.sock</string>
+		<key>PATH</key>
+		<string>/Users/jflorezgaleano/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StartInterval</key>
+	<integer>30</integer>
+	<key>StandardOutPath</key>
+	<string>/Users/jflorezgaleano/Library/Logs/Vozual/herdr-dwp-monitor.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/jflorezgaleano/Library/Logs/Vozual/herdr-dwp-monitor.err.log</string>
+</dict>
+</plist>

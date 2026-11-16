@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/active-release-pointer-v1.schema.json",
+  "title": "Vozual active release pointer v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "formatVersion", "languageId", "locale", "releaseId", "status", "rootManifestPath", "rootManifestSha256", "updatedAt"],
+  "properties": {"schema": {"const": "vozual.active-release-pointer"}, "formatVersion": {"const": 1}, "languageId": {"$ref": "release-catalog-v1.schema.json#/$defs/id"}, "locale": {"type": "string", "minLength": 1}, "releaseId": {"$ref": "release-catalog-v1.schema.json#/$defs/id"}, "status": {"const": "published"}, "rootManifestPath": {"$ref": "release-catalog-v1.schema.json#/$defs/storagePath"}, "rootManifestSha256": {"$ref": "release-catalog-v1.schema.json#/$defs/sha256"}, "updatedAt": {"type": "string", "format": "date-time"}}
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/release-fragment-v1.schema.json",
+  "title": "Vozual release fragment v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "formatVersion", "releaseId", "fragmentId", "entries"],
+  "properties": {"schema": {"const": "vozual.release-fragment"}, "formatVersion": {"const": 1}, "releaseId": {"$ref": "release-catalog-v1.schema.json#/$defs/id"}, "fragmentId": {"$ref": "release-catalog-v1.schema.json#/$defs/id"}, "entries": {"type": "array", "minItems": 1, "items": {"$ref": "release-sign-entry-v1.schema.json"}}}
+}

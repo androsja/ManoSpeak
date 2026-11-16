@@ -1,0 +1,694 @@
+{
+  "schema": "vozual.motion-schema",
+  "schemaVersion": 2,
+  "kind": "authored-motion",
+  "id": "fixture.synthetic.neutral-reach",
+  "revision": 1,
+  "units": {
+    "length": "m",
+    "angle": "deg",
+    "time": "ms"
+  },
+  "coordinateSystem": {
+    "name": "vozual-avatar-local",
+    "handedness": "right",
+    "up": "+Y",
+    "forward": "+Z",
+    "right": "+X",
+    "origin": "pelvis_center"
+  },
+  "dominantHand": "right",
+  "capture": {
+    "present": false
+  },
+  "recipe": {
+    "status": "draft",
+    "intent": {
+      "id": "fixture-only",
+      "meaning": "Mechanical validation fixture; not an LSC sign",
+      "glossSequence": [
+        "SYNTHETIC_TEST"
+      ],
+      "regionalVariant": "not-applicable"
+    },
+    "timeline": {
+      "durationMs": 1000,
+      "nominalFps": 30,
+      "keyframes": [
+        {
+          "id": "neutral",
+          "timeMs": 0,
+          "body": {
+            "torsoRotationDeg": [
+              0,
+              0,
+              0
+            ],
+            "left": {
+              "shoulderPositionM": [
+                -0.2,
+                1.3,
+                0
+              ],
+              "elbowPositionM": [
+                -0.35,
+                1.0,
+                0
+              ]
+            },
+            "right": {
+              "shoulderPositionM": [
+                0.2,
+                1.3,
+                0
+              ],
+              "elbowPositionM": [
+                0.35,
+                1.0,
+                0
+              ]
+            }
+          },
+          "hands": {
+            "left": {
+              "wristPositionM": [
+                -0.45,
+                0.75,
+                0
+              ],
+              "palmOrientationQuat": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "bones": {
+                "thumb.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "thumb.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "thumb.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            },
+            "right": {
+              "wristPositionM": [
+                0.45,
+                0.75,
+                0
+              ],
+              "palmOrientationQuat": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "bones": {
+                "thumb.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "thumb.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "thumb.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            }
+          },
+          "nonManual": {
+            "head": {
+              "rotationDeg": [
+                0,
+                0,
+                0
+              ]
+            },
+            "gaze": {
+              "direction": [
+                0,
+                0,
+                1
+              ],
+              "vergenceDeg": 0
+            },
+            "eyelids": {
+              "leftClosure": 0,
+              "rightClosure": 0,
+              "leftWidening": 0,
+              "rightWidening": 0
+            },
+            "brows": {
+              "leftInnerLift": 0,
+              "rightInnerLift": 0,
+              "leftInnerLower": 0,
+              "rightInnerLower": 0
+            },
+            "mouth": {
+              "opening": 0,
+              "pucker": 0,
+              "width": 0,
+              "leftCorner": 0,
+              "rightCorner": 0
+            }
+          },
+          "curve": "hold"
+        },
+        {
+          "id": "reach",
+          "timeMs": 1000,
+          "body": {
+            "torsoRotationDeg": [
+              0,
+              0,
+              0
+            ],
+            "left": {
+              "shoulderPositionM": [
+                -0.2,
+                1.3,
+                0
+              ],
+              "elbowPositionM": [
+                -0.35,
+                1.0,
+                0
+              ]
+            },
+            "right": {
+              "shoulderPositionM": [
+                0.2,
+                1.3,
+                0
+              ],
+              "elbowPositionM": [
+                0.35,
+                1.0,
+                0
+              ]
+            }
+          },
+          "hands": {
+            "left": {
+              "wristPositionM": [
+                -0.45,
+                0.75,
+                0
+              ],
+              "palmOrientationQuat": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "bones": {
+                "thumb.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "thumb.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "thumb.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            },
+            "right": {
+              "wristPositionM": [
+                0.5,
+                0.8,
+                0.01
+              ],
+              "palmOrientationQuat": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "bones": {
+                "thumb.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "thumb.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "thumb.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_index.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_middle.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_ring.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.01": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.02": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "f_pinky.03": {
+                  "rotationDeg": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              }
+            }
+          },
+          "nonManual": {
+            "head": {
+              "rotationDeg": [
+                0,
+                0,
+                0
+              ]
+            },
+            "eyelids": {
+              "leftClosure": 0,
+              "rightClosure": 0,
+              "leftWidening": 0,
+              "rightWidening": 0
+            },
+            "brows": {
+              "leftInnerLift": 0,
+              "rightInnerLift": 0,
+              "leftInnerLower": 0,
+              "rightInnerLower": 0
+            },
+            "mouth": {
+              "opening": 0,
+              "pucker": 0,
+              "width": 0,
+              "leftCorner": 0,
+              "rightCorner": 0
+            }
+          },
+          "curve": "smoothstep"
+        }
+      ]
+    },
+    "contacts": [],
+    "trajectories": [],
+    "transitions": [
+      {
+        "from": "neutral",
+        "to": "reach",
+        "durationMs": 1000,
+        "curve": "smoothstep"
+      }
+    ]
+  },
+  "presentation": {
+    "profileId": "fixture-profile",
+    "baseRecipeSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "corrections": []
+  },
+  "compiled": {
+    "status": "not_compiled"
+  },
+  "provenance": {
+    "authorId": "fixture",
+    "createdAt": "2026-11-01T00:00:00Z",
+    "updatedAt": "2026-11-01T00:00:00Z",
+    "recipeSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "linguisticReview": {
+    "status": "not_applicable",
+    "language": "lsc-CO",
+    "reviewerId": null,
+    "reviewedAt": null
+  },
+  "compatibility": {
+    "legacyV1PlaybackAllowed": false
+  }
+}

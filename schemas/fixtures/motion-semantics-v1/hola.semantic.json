@@ -1,0 +1,64 @@
+{
+  "schema": "vozual.motion-semantics",
+  "schemaVersion": 1,
+  "gloss": "HOLA",
+  "language": "lsc",
+  "regionalVariant": "lsc-CO",
+  "handMode": "left",
+  "hands": {
+    "left": {
+      "participates": true,
+      "role": "active",
+      "joints": {
+        "shoulder": {"start": [0.49, 0.70, -0.10], "end": [0.50, 0.70, -0.10]},
+        "elbow": {"start": [0.87, 0.88, -0.48], "end": [0.75, 0.63, -0.40], "rangeDeg": 42},
+        "wrist": {"start": [0.67, 0.49, -0.78], "end": [0.75, 0.27, -0.01]}
+      },
+      "handshape": "open",
+      "handshapeConfidence": 0.86,
+      "palm": {"facing": "camera", "normalStart": [0.01, 0.04, 0.99], "normalEnd": [0.02, 0.03, 0.99], "rollDeg": 0, "pitchDeg": 0, "yawDeg": 0},
+      "fingers": {"thumb": "extended", "index": "extended", "middle": "extended", "ring": "extended", "pinky": "extended"},
+      "fingerArticulation": []
+    },
+    "right": {
+      "participates": false,
+      "role": "inactive",
+      "joints": {
+        "shoulder": {"start": [0.16, 0.70, -0.10], "end": [0.16, 0.70, -0.10]},
+        "elbow": {"start": [0.16, 1.07, -0.12], "end": [0.16, 1.07, -0.12]},
+        "wrist": {"start": [0.16, 1.50, -0.32], "end": [0.16, 1.50, -0.32]}
+      },
+      "handshape": "unknown",
+      "handshapeConfidence": 0,
+      "palm": {"facing": "unknown", "normalStart": [0, 0, 0], "normalEnd": [0, 0, 0]},
+      "fingers": {"thumb": "unknown", "index": "unknown", "middle": "unknown", "ring": "unknown", "pinky": "unknown"},
+      "fingerArticulation": []
+    }
+  },
+  "trajectory": {
+    "path": "line",
+    "direction": ["up", "outward"],
+    "displacement": [0.08, -0.22, 0.77],
+    "pathLength": 0.98,
+    "velocity": {"profile": "mixed", "peak": 1.0, "average": 0.5},
+    "acceleration": 0,
+    "holds": [{"from": 0, "to": 12}],
+    "repetitions": 0
+  },
+  "contact": {"status": "hold", "anchor": "forehead", "span": {"from": 0, "to": 12}, "pressure": "light"},
+  "spatial": {"zoneStart": "face", "zoneEnd": "overhead", "start": [0.67, 0.49, -0.78], "end": [0.75, 0.27, -0.01]},
+  "symmetry": {"mode": "asymmetric", "leftRole": "active", "rightRole": "inactive"},
+  "nonManual": {
+    "head": {"rotationStart": [0, 0, 0], "rotationEnd": [0, 0, 0]},
+    "torso": {"rotationStart": [0, 0, 0], "rotationEnd": [0, 0, 0]},
+    "gaze": {"direction": [0, 0, 1], "vergenceDeg": 0},
+    "eyes": {"leftClosure": 0, "rightClosure": 0, "leftWidening": 0, "rightWidening": 0},
+    "brows": {"leftLift": 0, "rightLift": 0, "leftLower": 0, "rightLower": 0},
+    "mouth": {"opening": 0, "pucker": 0, "width": 0, "leftCorner": 0, "rightCorner": 0}
+  },
+  "phases": [
+    {"id": "contact", "kind": "hold", "span": {"from": 0, "to": 12}, "notes": "Open left palm at forehead, then upward release."},
+    {"id": "release", "kind": "release", "span": {"from": 13, "to": 35}}
+  ],
+  "validation": {"status": "derived", "sourceLayout": "pose33_left21_right21_face468", "landmarkCounts": {"pose": 33, "leftHand": 21, "rightHand": 21, "face": 468}, "warnings": []}
+}

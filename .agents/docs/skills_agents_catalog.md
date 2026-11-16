@@ -3,6 +3,7 @@
 This catalog records all configured agent personas and DWP-related skills available in this repository.
 
 ## Active Personas
+- [ticket-moderator.md](../agents/ticket-moderator.md): Reports every open DWP ticket with its formal state, queue owner, verified evidence, blocker, and next action; runs separately from the primary moderator.
 - [architect.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/.agents/agents/architect.md): Oversees design structures and performance budgets.
 - [ml-researcher.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/.agents/agents/ml-researcher.md): Coordinate normalizers and training pipelines.
 - [mobile-developer.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/.agents/agents/mobile-developer.md): UI creation, Camera interfaces, and Local TTS.

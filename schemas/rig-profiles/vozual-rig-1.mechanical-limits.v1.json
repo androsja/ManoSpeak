@@ -1,0 +1,57 @@
+{
+  "schema": "vozual.rig-mechanical-limits",
+  "schemaVersion": 1,
+  "id": "vozual-rig-1-authoring-envelope",
+  "profileId": "vozual-rig-1",
+  "profileRevision": 1,
+  "profileSha256": "c1b1eeeaa590549243d0d3aaafa60f8abeb92af7a6a872003862771332fe142f",
+  "sourceProfilePath": "schemas/rig-profiles/vozual-rig-1.v1.json",
+  "sourceProfileSha256": "213258754b05d79d1000ca9bcadf4687c82221d4d800c75c2d1f3eacfcaf3129",
+  "scope": "v3-authored-json-only",
+  "angleUnit": "deg",
+  "status": "declared-mechanical-authoring-envelope",
+  "anatomicalStatus": "unsupported",
+  "continuousRangeSemantics": "accepted-by-v3-validator; not a measured anatomical envelope",
+  "jointLimitsDeg": {
+    "thumb.cmc.flexionDeg": [-35, 70],
+    "thumb.cmc.abductionDeg": [-55, 55],
+    "thumb.cmc.twistDeg": [-45, 45],
+    "thumb.mcp.flexionDeg": [-20, 90],
+    "thumb.mcp.abductionDeg": [-35, 35],
+    "thumb.mcp.twistDeg": [-35, 35],
+    "thumb.ip.flexionDeg": [-15, 95],
+    "finger.mcp.flexionDeg": [-25, 100],
+    "finger.mcp.abductionDeg": [-28, 28],
+    "finger.mcp.twistDeg": [-20, 20],
+    "finger.pip.flexionDeg": [-10, 115],
+    "finger.dip.flexionDeg": [-10, 90]
+  },
+  "additionalDomains": {
+    "elbowRotationDeg": {
+      "components": ["x", "y", "z"],
+      "range": [-180, 180],
+      "enforcedBy": "validateKinematicMotionV3"
+    },
+    "wristRelativeToForearmDeg": {
+      "components": ["x", "y", "z"],
+      "range": [-90, 90],
+      "enforcedBy": "validateKinematicMotionV3"
+    },
+    "editorWristRotationDeg": {
+      "components": ["pitch", "yaw", "roll"],
+      "range": [-180, 180],
+      "enforcedBy": "sign_authoring_editor only; not v3 rig proof"
+    }
+  },
+  "review": {
+    "technical": "implementing-agent audit",
+    "independent": "pending",
+    "anatomical": "unsupported"
+  },
+  "futureWork": [
+    "map limits to v2 profile descriptor",
+    "validate coupled multi-joint configurations against the profile-bound candidate",
+    "obtain independent rig/anatomical review before calling them safe joint limits"
+  ],
+  "sha256": "abf385b6766042d784889715ebfd22043b943de23d6f5614194ce06ccf9f0a30"
+}

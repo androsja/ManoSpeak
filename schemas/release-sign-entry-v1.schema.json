@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/release-sign-entry-v1.schema.json",
+  "title": "Vozual public release sign entry v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "formatVersion", "id", "languageId", "gloss", "aliases", "categories", "status", "approved", "compatibility", "artifacts"],
+  "properties": {"schema": {"const": "vozual.release-sign-entry"}, "formatVersion": {"const": 1}, "id": {"$ref": "release-catalog-v1.schema.json#/$defs/id"}, "languageId": {"$ref": "release-catalog-v1.schema.json#/$defs/id"}, "gloss": {"type": "string", "minLength": 1}, "aliases": {"type": "array", "items": {"type": "string", "minLength": 1}}, "categories": {"type": "array", "items": {"type": "string", "minLength": 1}}, "status": {"const": "published"}, "approved": {"const": true}, "compatibility": {"type": "object", "additionalProperties": false, "required": ["sourceMotionSchemaVersion", "minimumAppVersion", "compilerVersion", "rig"], "properties": {"sourceMotionSchemaVersion": {"enum": [2, 3]}, "minimumAppVersion": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$"}, "compilerVersion": {"type": "string", "minLength": 1}, "rig": {"$ref": "release-catalog-v1.schema.json#/$defs/rig"}}}, "artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "release-catalog-v1.schema.json#/$defs/artifact"}}},
+  "allOf": [{"if": {"properties": {"compatibility": {"properties": {"sourceMotionSchemaVersion": {"const": 3}}, "required": ["sourceMotionSchemaVersion"]}}}, "then": {"properties": {"artifacts": {"contains": {"properties": {"kind": {"const": "execution-plan"}}, "required": ["kind"]}}}}}, {"properties": {"artifacts": {"contains": {"properties": {"kind": {"const": "motion-binary"}}, "required": ["kind"]}}}}]
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "vozual.rig-profile",
+  "schemaVersion": 1,
+  "id": "vozual-rig-1",
+  "revision": 1,
+  "sha256": "c1b1eeeaa590549243d0d3aaafa60f8abeb92af7a6a872003862771332fe142f",
+  "jointLimitsDeg": {
+    "thumb.cmc.flexionDeg": [-35, 70],
+    "thumb.cmc.abductionDeg": [-55, 55],
+    "thumb.cmc.twistDeg": [-45, 45],
+    "thumb.mcp.flexionDeg": [-20, 90],
+    "thumb.mcp.abductionDeg": [-35, 35],
+    "thumb.mcp.twistDeg": [-35, 35],
+    "thumb.ip.flexionDeg": [-15, 95],
+    "finger.mcp.flexionDeg": [-25, 100],
+    "finger.mcp.abductionDeg": [-28, 28],
+    "finger.mcp.twistDeg": [-20, 20],
+    "finger.pip.flexionDeg": [-10, 115],
+    "finger.dip.flexionDeg": [-10, 90]
+  },
+  "landmarks": ["mcp", "pip", "dip", "tip", "palm.center", "palm.thenar", "palm.hypothenar", "palm.radial", "palm.ulnar"],
+  "bodyAnchors": ["chin", "mouth", "forehead", "chest", "shoulder.left", "shoulder.right"]
+}

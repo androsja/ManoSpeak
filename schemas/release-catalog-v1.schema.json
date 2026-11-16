@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/release-catalog-v1.schema.json",
+  "title": "Vozual release catalogue common contract v1",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"},
+    "storagePath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)[A-Za-z0-9][A-Za-z0-9._/-]*$"},
+    "status": {"enum": ["draft", "review", "approved", "published", "withdrawn"]},
+    "rig": {"type": "object", "additionalProperties": false, "required": ["profileId", "profileRevision", "sha256"], "properties": {"profileId": {"$ref": "#/$defs/id"}, "profileRevision": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/sha256"}}},
+    "artifact": {"type": "object", "additionalProperties": false, "required": ["kind", "storagePath", "sha256", "sizeBytes", "formatVersion"], "properties": {"kind": {"enum": ["motion-binary", "execution-plan"]}, "storagePath": {"$ref": "#/$defs/storagePath"}, "sha256": {"$ref": "#/$defs/sha256"}, "sizeBytes": {"type": "integer", "minimum": 1}, "formatVersion": {"type": "integer", "minimum": 1}}}
+  }
+}

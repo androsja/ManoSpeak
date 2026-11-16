@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/motion-schema-v2.schema.json",
+  "title": "Vozual motion schema v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "kind", "id", "revision", "units", "coordinateSystem", "dominantHand", "capture", "recipe", "presentation", "compiled", "provenance", "linguisticReview", "compatibility"],
+  "properties": {
+    "schema": {"const": "vozual.motion-schema"},
+    "schemaVersion": {"const": 2},
+    "kind": {"const": "authored-motion"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "units": {"$ref": "#/$defs/units"},
+    "coordinateSystem": {"$ref": "#/$defs/coordinateSystem"},
+    "dominantHand": {"enum": ["left", "right", "ambidextrous"]},
+    "capture": {"type": "object"},
+    "recipe": {"$ref": "#/$defs/recipe"},
+    "presentation": {"type": "object"},
+    "compiled": {"$ref": "#/$defs/compiled"},
+    "provenance": {"type": "object"},
+    "linguisticReview": {"$ref": "#/$defs/review"},
+    "compatibility": {"type": "object"}
+  },
+  "allOf": [{
+    "if": {"properties": {"recipe": {"properties": {"status": {"const": "published"}}}}},
+    "then": {"properties": {"linguisticReview": {"properties": {"status": {"const": "approved"}}}, "compiled": {"properties": {"status": {"const": "compiled"}}}}}
+  }],
+  "$defs": {
+    "vec3": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}, {"type": "number"}], "items": false, "minItems": 3, "maxItems": 3},
+    "quat": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}, {"type": "number"}, {"type": "number"}], "items": false, "minItems": 4, "maxItems": 4},
+    "units": {"type": "object", "additionalProperties": false, "required": ["length", "angle", "time"], "properties": {"length": {"const": "m"}, "angle": {"const": "deg"}, "time": {"const": "ms"}}},
+    "coordinateSystem": {"type": "object", "additionalProperties": false, "required": ["name", "handedness", "up", "forward", "right", "origin"], "properties": {"name": {"const": "vozual-avatar-local"}, "handedness": {"const": "right"}, "up": {"const": "+Y"}, "forward": {"const": "+Z"}, "right": {"const": "+X"}, "origin": {"const": "pelvis_center"}}},
+    "bone": {"type": "object", "additionalProperties": false, "required": ["rotationDeg"], "properties": {"rotationDeg": {"$ref": "#/$defs/vec3"}}},
+    "bones": {"type": "object", "additionalProperties": false, "required": ["thumb.01", "thumb.02", "thumb.03", "f_index.01", "f_index.02", "f_index.03", "f_middle.01", "f_middle.02", "f_middle.03", "f_ring.01", "f_ring.02", "f_ring.03", "f_pinky.01", "f_pinky.02", "f_pinky.03"], "properties": {
+      "thumb.01": {"$ref": "#/$defs/bone"}, "thumb.02": {"$ref": "#/$defs/bone"}, "thumb.03": {"$ref": "#/$defs/bone"},
+      "f_index.01": {"$ref": "#/$defs/bone"}, "f_index.02": {"$ref": "#/$defs/bone"}, "f_index.03": {"$ref": "#/$defs/bone"},
+      "f_middle.01": {"$ref": "#/$defs/bone"}, "f_middle.02": {"$ref": "#/$defs/bone"}, "f_middle.03": {"$ref": "#/$defs/bone"},
+      "f_ring.01": {"$ref": "#/$defs/bone"}, "f_ring.02": {"$ref": "#/$defs/bone"}, "f_ring.03": {"$ref": "#/$defs/bone"},
+      "f_pinky.01": {"$ref": "#/$defs/bone"}, "f_pinky.02": {"$ref": "#/$defs/bone"}, "f_pinky.03": {"$ref": "#/$defs/bone"}
+    }},
+    "hand": {"type": "object", "additionalProperties": false, "required": ["wristPositionM", "palmOrientationQuat", "bones"], "properties": {"wristPositionM": {"$ref": "#/$defs/vec3"}, "palmOrientationQuat": {"$ref": "#/$defs/quat"}, "bones": {"$ref": "#/$defs/bones"}}},
+    "bodySide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shoulderPositionM", "elbowPositionM"],
+      "properties": {
+        "shoulderPositionM": {"$ref": "#/$defs/vec3"},
+        "elbowPositionM": {"$ref": "#/$defs/vec3"}
+      }
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["torsoRotationDeg", "left", "right"],
+      "properties": {
+        "torsoRotationDeg": {"$ref": "#/$defs/vec3"},
+        "left": {"$ref": "#/$defs/bodySide"},
+        "right": {"$ref": "#/$defs/bodySide"}
+      }
+    },
+    "head": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rotationDeg"],
+      "properties": {"rotationDeg": {"$ref": "#/$defs/vec3"}}
+    },
+    "gaze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["direction", "vergenceDeg"],
+      "properties": {
+        "direction": {"allOf": [{"$ref": "#/$defs/vec3"}, {"not": {"const": [0, 0, 0]}}]},
+        "vergenceDeg": {"type": "number", "minimum": -30, "maximum": 30}
+      }
+    },
+    "eyelids": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["leftClosure", "rightClosure", "leftWidening", "rightWidening"],
+      "properties": {
+        "leftClosure": {"type": "number", "minimum": 0, "maximum": 1},
+        "rightClosure": {"type": "number", "minimum": 0, "maximum": 1},
+        "leftWidening": {"type": "number", "minimum": 0, "maximum": 1},
+        "rightWidening": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "brows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["leftInnerLift", "rightInnerLift", "leftInnerLower", "rightInnerLower"],
+      "properties": {
+        "leftInnerLift": {"type": "number", "minimum": 0, "maximum": 1},
+        "rightInnerLift": {"type": "number", "minimum": 0, "maximum": 1},
+        "leftInnerLower": {"type": "number", "minimum": 0, "maximum": 1},
+        "rightInnerLower": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "mouth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opening", "pucker", "width", "leftCorner", "rightCorner"],
+      "properties": {
+        "opening": {"type": "number", "minimum": 0, "maximum": 1},
+        "pucker": {"type": "number", "minimum": 0, "maximum": 1},
+        "width": {"type": "number", "minimum": 0, "maximum": 1},
+        "leftCorner": {"type": "number", "minimum": -1, "maximum": 1},
+        "rightCorner": {"type": "number", "minimum": -1, "maximum": 1}
+      }
+    },
+    "nonManual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["head", "gaze", "eyelids", "brows", "mouth"],
+      "properties": {
+        "head": {"$ref": "#/$defs/head"},
+        "gaze": {"$ref": "#/$defs/gaze"},
+        "eyelids": {"$ref": "#/$defs/eyelids"},
+        "brows": {"$ref": "#/$defs/brows"},
+        "mouth": {"$ref": "#/$defs/mouth"}
+      }
+    },
+    "keyframe": {"type": "object", "additionalProperties": false, "required": ["id", "timeMs", "body", "hands", "nonManual", "curve"], "properties": {
+      "id": {"type": "string", "minLength": 1}, "timeMs": {"type": "integer", "minimum": 0},
+      "body": {"$ref": "#/$defs/body"},
+      "hands": {"type": "object", "additionalProperties": false, "required": ["left", "right"], "properties": {"left": {"$ref": "#/$defs/hand"}, "right": {"$ref": "#/$defs/hand"}}},
+      "nonManual": {"$ref": "#/$defs/nonManual"}, "curve": {"enum": ["hold", "linear", "smoothstep"]}
+    }},
+    "recipe": {"type": "object", "additionalProperties": false, "required": ["status", "intent", "timeline", "contacts", "trajectories", "transitions"], "properties": {
+      "status": {"enum": ["draft", "approved", "published"]}, "intent": {"type": "object", "required": ["id", "meaning", "glossSequence", "regionalVariant"]},
+      "timeline": {"type": "object", "additionalProperties": false, "required": ["durationMs", "nominalFps", "keyframes"], "properties": {"durationMs": {"type": "integer", "minimum": 1}, "nominalFps": {"type": "number", "exclusiveMinimum": 0}, "keyframes": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/keyframe"}}}},
+      "contacts": {"type": "array"}, "trajectories": {"type": "array"}, "transitions": {"type": "array"}
+    }},
+    "compiled": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"enum": ["not_compiled", "compiled"]}, "format": {"const": "VZMV"}, "formatVersion": {"const": 2}}},
+    "review": {"type": "object", "additionalProperties": false, "required": ["status", "language", "reviewerId", "reviewedAt"], "properties": {"status": {"enum": ["not_applicable", "pending", "approved", "rejected"]}, "language": {"const": "lsc-CO"}, "reviewerId": {"type": ["string", "null"]}, "reviewedAt": {"type": ["string", "null"], "format": "date-time"}}}
+  }
+}
