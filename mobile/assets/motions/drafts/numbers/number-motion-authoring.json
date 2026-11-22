@@ -1,0 +1,75 @@
+{
+  "schema": "vozual.number-motion-authoring",
+  "status": "owner-approved-prototype",
+  "languageId": "lsc-co",
+  "source": {
+    "title": "Diccionario Básico de la Lengua de Señas Colombiana",
+    "publisher": "Ministerio de Educación Nacional e INSOR",
+    "url": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf"
+  },
+  "entries": [
+    {
+      "number": 1,
+      "gloss": "UNO",
+      "speechAliases": ["uno", "1"],
+      "fingers": {"thumb": "closed", "index": "extended", "middle": "closed", "ring": "closed", "pinky": "closed"}
+    },
+    {
+      "number": 2,
+      "gloss": "DOS",
+      "speechAliases": ["dos", "2"],
+      "lateralFingerSpread": 1.8,
+      "rigFingerSplayDegrees": 28,
+      "fingers": {"thumb": "closed", "index": "extended", "middle": "extended", "ring": "closed", "pinky": "closed"}
+    },
+    {
+      "number": 3,
+      "gloss": "TRES",
+      "speechAliases": ["tres", "3"],
+      "lateralFingerSpread": 1.8,
+      "rigFingerSplayDegrees": 22,
+      "fingers": {"thumb": "closed", "index": "extended", "middle": "extended", "ring": "extended", "pinky": "closed"}
+    },
+    {
+      "number": 4,
+      "gloss": "CUATRO",
+      "speechAliases": ["cuatro", "4"],
+      "lateralFingerSpread": 1.8,
+      "rigFingerSplayDegrees": 16,
+      "fingers": {"thumb": "closed", "index": "extended", "middle": "extended", "ring": "extended", "pinky": "extended"}
+    },
+    {
+      "number": 5,
+      "gloss": "CINCO",
+      "speechAliases": ["cinco", "5"],
+      "lateralFingerSpread": 1.8,
+      "rigFingerSplayDegrees": 20,
+      "fingers": {"thumb": "extended", "index": "extended", "middle": "extended", "ring": "extended", "pinky": "extended"}
+    },
+    {
+      "number": 6,
+      "gloss": "SEIS",
+      "speechAliases": ["seis", "6"],
+      "fingers": {"thumb": "closed", "index": "captured", "middle": "closed", "ring": "closed", "pinky": "closed"},
+      "movement": {
+        "type": "finger-flexion-repetitions",
+        "finger": "index",
+        "repetitions": 2,
+        "startFrame": 12,
+        "flexionFrames": 10,
+        "returnFrames": 10,
+        "pauseFrames": 4,
+        "holdFrames": 12,
+        "flexAmount": 0.9
+      },
+      "source": {
+        "title": "Elementos para una didáctica del lenguaje y las matemáticas en estudiantes sordos de niveles iniciales",
+        "publisher": "Editorial Universidad Distrital Francisco José de Caldas",
+        "authors": ["Dora Inés Calderón", "Olga Lucía León Corredor"],
+        "year": 2016,
+        "pages": "94-96",
+        "url": "https://repository.udistrital.edu.co/server/api/core/bitstreams/d0377a58-82c3-4c9a-a050-66670890541f/content"
+      }
+    }
+  ]
+}

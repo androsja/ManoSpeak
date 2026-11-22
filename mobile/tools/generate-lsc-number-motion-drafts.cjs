@@ -5,65 +5,14 @@ const path = require('path');
 
 const MOBILE_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(MOBILE_ROOT, 'assets/motions/drafts/numbers');
-const DICTIONARY_URL = 'https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf';
-const NUMERAL_REFERENCE = {
-  title: 'Elementos para una didáctica del lenguaje y las matemáticas en estudiantes sordos de niveles iniciales',
-  publisher: 'Editorial Universidad Distrital Francisco José de Caldas',
-  authors: ['Dora Inés Calderón', 'Olga Lucía León Corredor'],
-  year: 2016,
-  pages: '94-96',
-  url: 'https://repository.udistrital.edu.co/server/api/core/bitstreams/d0377a58-82c3-4c9a-a050-66670890541f/content',
+const AUTHORING_CATALOG_PATH = path.join(OUTPUT_DIR, 'number-motion-authoring.json');
+const FINGER_LANDMARK_CHAINS = {
+  thumb: [1, 2, 3, 4],
+  index: [5, 6, 7, 8],
+  middle: [9, 10, 11, 12],
+  ring: [13, 14, 15, 16],
+  pinky: [17, 18, 19, 20],
 };
-
-const NUMBER_SIGNS = [
-  {
-    number: 1,
-    gloss: 'UNO',
-    speechAliases: ['uno', '1'],
-    fingers: {thumb: 'closed', index: 'extended', middle: 'closed', ring: 'closed', pinky: 'closed'},
-  },
-  {
-    number: 2,
-    gloss: 'DOS',
-    speechAliases: ['dos', '2'],
-    lateralFingerSpread: 1.8,
-    rigFingerSplayDegrees: 28,
-    fingers: {thumb: 'closed', index: 'extended', middle: 'extended', ring: 'closed', pinky: 'closed'},
-  },
-  {
-    number: 3,
-    gloss: 'TRES',
-    speechAliases: ['tres', '3'],
-    lateralFingerSpread: 1.8,
-    rigFingerSplayDegrees: 22,
-    fingers: {thumb: 'closed', index: 'extended', middle: 'extended', ring: 'extended', pinky: 'closed'},
-  },
-  {
-    number: 4,
-    gloss: 'CUATRO',
-    speechAliases: ['cuatro', '4'],
-    lateralFingerSpread: 1.8,
-    rigFingerSplayDegrees: 16,
-    fingers: {thumb: 'closed', index: 'extended', middle: 'extended', ring: 'extended', pinky: 'extended'},
-  },
-  {
-    number: 5,
-    gloss: 'CINCO',
-    speechAliases: ['cinco', '5'],
-    // Open the four long fingers beyond the default parallel rig pose.
-    lateralFingerSpread: 1.8,
-    rigFingerSplayDegrees: 20,
-    fingers: {thumb: 'extended', index: 'extended', middle: 'extended', ring: 'extended', pinky: 'extended'},
-  },
-  {
-    number: 6,
-    gloss: 'SEIS',
-    speechAliases: ['seis', '6'],
-    fingers: {thumb: 'closed', index: 'captured', middle: 'closed', ring: 'closed', pinky: 'closed'},
-    movement: {type: 'index-flexion', flexStartFrame: 12, fullFlexFrame: 24, extensionEndFrame: 36, flexAmount: 0.9},
-    source: NUMERAL_REFERENCE,
-  },
-];
 
 function roundPoint(point) {
   return point.map(value => Number(value.toFixed(5)));
@@ -190,12 +139,51 @@ function easedProgress(value) {
   return amount * amount * (3 - 2 * amount);
 }
 
-function flexIndexFrame(frame, amount, states) {
+function frameCountFor(sign) {
+  const movement = sign.movement;
+  if (!movement) return 36;
+  if (movement.type !== 'finger-flexion-repetitions') {
+    throw new Error(`Unsupported number motion primitive: ${movement.type}`);
+  }
+  const values = [movement.repetitions, movement.startFrame, movement.flexionFrames,
+    movement.returnFrames, movement.pauseFrames, movement.holdFrames];
+  if (values.some(value => !Number.isInteger(value) || value < 0)
+      || movement.repetitions < 1 || movement.flexionFrames < 1 || movement.returnFrames < 1
+      || !Number.isFinite(movement.flexAmount) || movement.flexAmount <= 0 || movement.flexAmount > 1) {
+    throw new Error(`Invalid finger-flexion-repetitions plan for ${sign.gloss}.`);
+  }
+  const cycleLength = movement.flexionFrames + movement.returnFrames + movement.pauseFrames;
+  return movement.startFrame + movement.repetitions * cycleLength + movement.holdFrames;
+}
+
+function movementProgressAtFrame(frameIndex, movement) {
+  if (!movement) return 0;
+  const cycleLength = movement.flexionFrames + movement.returnFrames + movement.pauseFrames;
+  let progress = 0;
+  for (let repetition = 0; repetition < movement.repetitions; repetition += 1) {
+    const startFrame = movement.startFrame + repetition * cycleLength;
+    const flexionEndFrame = startFrame + movement.flexionFrames;
+    const returnEndFrame = flexionEndFrame + movement.returnFrames;
+    const cycleProgress = frameIndex < startFrame
+      ? 0
+      : frameIndex <= flexionEndFrame
+        ? easedProgress((frameIndex - startFrame) / movement.flexionFrames)
+        : frameIndex <= returnEndFrame
+          ? 1 - easedProgress((frameIndex - flexionEndFrame) / movement.returnFrames)
+          : 0;
+    progress = Math.max(progress, cycleProgress);
+  }
+  return progress * movement.flexAmount;
+}
+
+function flexFingerFrame(frame, finger, amount, states) {
   if (amount <= 0) return frame;
+  const chain = FINGER_LANDMARK_CHAINS[finger];
+  if (!chain) throw new Error(`Unsupported finger-flexion target: ${finger}`);
   const bodyHands = frame.bodyHands.map(point => [...point]);
   const hand = bodyHands.slice(33, 54);
-  const foldedHand = applyNumberFingerStates(hand, {...states, index: 'closed'});
-  [6, 7, 8].forEach(index => {
+  const foldedHand = applyNumberFingerStates(hand, {...states, [finger]: 'closed'});
+  chain.slice(1).forEach(index => {
     bodyHands[33 + index] = roundPoint(hand[index].map((value, axis) => (
       value + (foldedHand[index][axis] - value) * amount
     )));
@@ -203,32 +191,26 @@ function flexIndexFrame(frame, amount, states) {
   return {bodyHands, face: frame.face.map(point => [...point])};
 }
 
-function motionFor(sign) {
+function motionFor(sign, defaultSource) {
   const lateralFingerSpread = sign.lateralFingerSpread ?? 1;
   const rest = canonicalFrame(lateralFingerSpread);
   const target = raisedNumberFrame(rest, lateralFingerSpread);
-  const frameCount = sign.movement?.type === 'index-flexion' ? 48 : 36;
+  const frameCount = frameCountFor(sign);
   const frames = Array.from({length: frameCount}, (_, index) => {
     const armProgress = Math.min(1, index / 6);
     const frame = shapedFrame(interpolateFrame(rest, target, armProgress), sign.fingers);
-    if (sign.movement?.type !== 'index-flexion') {
-      return frame;
-    }
-    const {flexStartFrame, fullFlexFrame, extensionEndFrame, flexAmount} = sign.movement;
-    const flexProgress = index < flexStartFrame
-      ? 0
-      : index <= fullFlexFrame
-        ? easedProgress((index - flexStartFrame) / (fullFlexFrame - flexStartFrame))
-        : index < extensionEndFrame
-          ? 1 - easedProgress((index - fullFlexFrame) / (extensionEndFrame - fullFlexFrame))
-          : 0;
-    return flexIndexFrame(frame, flexProgress * flexAmount, sign.fingers);
+    if (!sign.movement) return frame;
+    return flexFingerFrame(
+      frame,
+      sign.movement.finger,
+      movementProgressAtFrame(index, sign.movement),
+      sign.fingers,
+    );
   });
-  const source = sign.source ?? {
-    title: 'Diccionario Básico de la Lengua de Señas Colombiana',
-    publisher: 'Ministerio de Educación Nacional e INSOR',
-    url: DICTIONARY_URL,
-  };
+  const source = sign.source ?? defaultSource;
+  const movementPresentationNote = sign.movement
+    ? `The ${sign.movement.finger} extends and flexes down ${sign.movement.repetitions} times, returning toward extension between flexions; the timing is authored for this avatar prototype and is not source timing evidence.`
+    : undefined;
   return {
     version: 2,
     fps: 30,
@@ -251,9 +233,7 @@ function motionFor(sign) {
       number: sign.number,
       source,
       handshape: sign.fingers,
-      ...(sign.movement ? {
-        movementPresentationNote: 'The index extends and flexes while the other fingers remain folded, following the cited LSC numeral description. The avatar timing is authored for this prototype and is not source timing evidence.',
-      } : {}),
+      ...(movementPresentationNote ? {movementPresentationNote} : {}),
       ...(lateralFingerSpread > 1 ? {
         handshapePresentationNote: `Extended fingers use a ${lateralFingerSpread} lateral landmark spread factor and a ${sign.rigFingerSplayDegrees}-degree rig splay for visual clarity in this avatar prototype; this is not regional performance evidence.`,
       } : {}),
@@ -276,21 +256,23 @@ function motionFor(sign) {
 }
 
 function main() {
+  const authoringCatalog = JSON.parse(fs.readFileSync(AUTHORING_CATALOG_PATH, 'utf8'));
+  if (authoringCatalog.schema !== 'vozual.number-motion-authoring'
+      || !Array.isArray(authoringCatalog.entries)
+      || !authoringCatalog.source) {
+    throw new Error('The number motion authoring catalog is invalid.');
+  }
   fs.mkdirSync(OUTPUT_DIR, {recursive: true});
   const catalog = {
     schema: 'vozual.number-motion-draft-catalog',
-    status: 'owner-approved-prototype',
-    languageId: 'lsc-co',
-    source: {
-      title: 'Diccionario Básico de la Lengua de Señas Colombiana',
-      publisher: 'Ministerio de Educación Nacional e INSOR',
-      url: DICTIONARY_URL,
-    },
+    status: authoringCatalog.status,
+    languageId: authoringCatalog.languageId,
+    source: authoringCatalog.source,
     entries: [],
   };
 
-  NUMBER_SIGNS.forEach(sign => {
-    const motion = motionFor(sign);
+  authoringCatalog.entries.forEach(sign => {
+    const motion = motionFor(sign, authoringCatalog.source);
     const fileName = `${sign.gloss.toLocaleLowerCase('es-CO')}.motion.json`;
     const filePath = path.join(OUTPUT_DIR, fileName);
     const content = `${JSON.stringify(motion)}\n`;

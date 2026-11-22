@@ -2,6 +2,28 @@ const fs = require('fs') as typeof import('fs');
 const path = require('path') as typeof import('path');
 
 const NUMBER_DRAFTS = path.resolve(__dirname, '../../assets/motions/drafts/numbers');
+const AUTHORING_CATALOG = path.join(NUMBER_DRAFTS, 'number-motion-authoring.json');
+
+type NumberMovementPlan = {
+  type: string;
+  finger: string;
+  repetitions: number;
+  startFrame: number;
+  flexionFrames: number;
+  returnFrames: number;
+  pauseFrames: number;
+  holdFrames: number;
+  flexAmount: number;
+};
+
+function readAuthoringEntry(gloss: string): {movement?: NumberMovementPlan} {
+  const catalog = JSON.parse(fs.readFileSync(AUTHORING_CATALOG, 'utf8')) as {
+    entries: Array<{gloss: string; movement?: NumberMovementPlan}>;
+  };
+  const entry = catalog.entries.find(candidate => candidate.gloss === gloss);
+  if (!entry) throw new Error(`Missing authoring entry for ${gloss}.`);
+  return entry;
+}
 
 function readMotion(gloss: string): {
   avatarProfile: {
@@ -82,8 +104,9 @@ describe('LSC number motion drafts', () => {
     }
   });
 
-  it('animates the SEIS index flex while keeping the other fingers folded', () => {
+  it('interprets the SEIS two-flexion plan while keeping the other fingers folded', () => {
     const motion = readMotion('SEIS');
+    const authoring = readAuthoringEntry('SEIS');
     const indexExtensionRatio = (frameIndex: number) => {
       const hands = motion.frames[frameIndex].bodyHands;
       const chain = [38, 39, 40, 41];
@@ -96,7 +119,12 @@ describe('LSC number motion drafts', () => {
       return distance(chain[0], chain[3]) / length;
     };
 
-    expect(motion.frames).toHaveLength(48);
+    expect(authoring.movement).toMatchObject({
+      type: 'finger-flexion-repetitions',
+      finger: 'index',
+      repetitions: 2,
+    });
+    expect(motion.frames).toHaveLength(72);
     expect(motion.avatarProfile.rigLeftFingerStates).toEqual({
       thumb: 'closed',
       index: 'captured',
@@ -104,12 +132,15 @@ describe('LSC number motion drafts', () => {
       ring: 'closed',
       pinky: 'closed',
     });
-    expect(indexExtensionRatio(24)).toBeLessThan(indexExtensionRatio(9));
-    expect(indexExtensionRatio(47)).toBeCloseTo(indexExtensionRatio(9), 5);
+    expect(indexExtensionRatio(22)).toBeLessThan(indexExtensionRatio(9));
+    expect(indexExtensionRatio(32)).toBeGreaterThan(indexExtensionRatio(22));
+    expect(indexExtensionRatio(46)).toBeLessThan(indexExtensionRatio(32));
+    expect(indexExtensionRatio(56)).toBeGreaterThan(indexExtensionRatio(46));
+    expect(indexExtensionRatio(71)).toBeCloseTo(indexExtensionRatio(9), 5);
     expect(motion.semantic.source).toMatchObject({
       title: 'Elementos para una didáctica del lenguaje y las matemáticas en estudiantes sordos de niveles iniciales',
       pages: '94-96',
     });
-    expect(motion.semantic.movementPresentationNote).toMatch(/index extends and flexes/);
+    expect(motion.semantic.movementPresentationNote).toMatch(/flexes down 2 times/);
   });
 });
