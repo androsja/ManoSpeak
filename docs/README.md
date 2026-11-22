@@ -16,5 +16,6 @@ This directory contains the standard specifications, guidelines, and policies fo
 | [DESIGN.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/docs/DESIGN.md) | Visual styles, TTS speech rate controls, and accent settings. |
 | [RECOGNITION_CONTRACT.md](RECOGNITION_CONTRACT.md) | Recognition levels, input/output semantics, boundaries, commits, and claim rules. |
 | [EVALUATION_PROTOCOL.md](EVALUATION_PROTOCOL.md) | Signer/session partitions, metric formulas, thresholds, and failure actions. |
+| [LSC Reference Manuals](references/lsc-manuals/README.md) | Downloaded LSC dictionaries and research references with source links and a review tracker. |
 | [AI_AGENT_ONBOARDING.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/docs/AI_AGENT_ONBOARDING.md) | Environment setup guides and initial workspace tests. |
 | [AI_AGENT_COLLAB.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/docs/AI_AGENT_COLLAB.md) | Joint contracts and coordinate array shape agreements. |

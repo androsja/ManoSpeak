@@ -1,0 +1,3 @@
+3229f40b115cca1457aefa0b554ec3655b7cdad25a27bd33c6d4fe7564b33f42  docs/references/lsc-manuals/diccionario-basico-lsc-insor-mineducacion.pdf
+4b70801e0f45e36d376f7ba6a3d9c38d1f7359674ba9e0b877b6a4c590b4c22c  docs/references/lsc-manuals/diccionario-lsc-signwriting-2023.pdf
+96a1bc5f47247eca366465ce34cb4e517ebfebab244f9a18d40fc489f7e128af  docs/references/lsc-manuals/elementos-didactica-lsc-y-matematicas-estudiantes-sordos.pdf

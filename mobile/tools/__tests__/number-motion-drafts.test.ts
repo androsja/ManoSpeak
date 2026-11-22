@@ -8,7 +8,13 @@ function readMotion(gloss: string): {
     rigLeftFingerStates: Record<string, string>;
     rigLeftFingerSplayDegrees?: number;
   };
-  semantic: {gloss: string; handshapePresentationNote?: string; locationPresentationNote: string};
+  semantic: {
+    gloss: string;
+    source?: {title: string; pages?: string; url: string};
+    handshapePresentationNote?: string;
+    movementPresentationNote?: string;
+    locationPresentationNote: string;
+  };
   frames: Array<{bodyHands: number[][]}>;
 } {
   return JSON.parse(fs.readFileSync(path.join(NUMBER_DRAFTS, `${gloss.toLowerCase()}.motion.json`), 'utf8'));
@@ -55,7 +61,7 @@ describe('LSC number motion drafts', () => {
   });
 
   it('keeps the inactive right hand absent in every generated number pose', () => {
-    for (const gloss of ['UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO']) {
+    for (const gloss of ['UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS']) {
       const motion = readMotion(gloss);
       expect(motion.frames.every(frame => (
         frame.bodyHands.slice(54, 75).every(point => point.every(value => value === 0))
@@ -63,8 +69,8 @@ describe('LSC number motion drafts', () => {
     }
   });
 
-  it('raises the active hand beside the face for every number from one to five', () => {
-    for (const gloss of ['UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO']) {
+  it('raises the active hand beside the face for every number from one to six', () => {
+    for (const gloss of ['UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS']) {
       const motion = readMotion(gloss);
       const lastFrame = motion.frames[motion.frames.length - 1].bodyHands;
 
@@ -74,5 +80,36 @@ describe('LSC number motion drafts', () => {
       expect(lastFrame[15][1]).toBeLessThan(0.6);
       expect(motion.semantic.locationPresentationNote).toMatch(/not centered in front of the face/);
     }
+  });
+
+  it('animates the SEIS index flex while keeping the other fingers folded', () => {
+    const motion = readMotion('SEIS');
+    const indexExtensionRatio = (frameIndex: number) => {
+      const hands = motion.frames[frameIndex].bodyHands;
+      const chain = [38, 39, 40, 41];
+      const distance = (from: number, to: number) => Math.hypot(
+        ...hands[to].map((value, axis) => value - hands[from][axis]),
+      );
+      const length = chain.slice(1).reduce((sum, point, index) => (
+        sum + distance(chain[index], point)
+      ), 0);
+      return distance(chain[0], chain[3]) / length;
+    };
+
+    expect(motion.frames).toHaveLength(48);
+    expect(motion.avatarProfile.rigLeftFingerStates).toEqual({
+      thumb: 'closed',
+      index: 'captured',
+      middle: 'closed',
+      ring: 'closed',
+      pinky: 'closed',
+    });
+    expect(indexExtensionRatio(24)).toBeLessThan(indexExtensionRatio(9));
+    expect(indexExtensionRatio(47)).toBeCloseTo(indexExtensionRatio(9), 5);
+    expect(motion.semantic.source).toMatchObject({
+      title: 'Elementos para una didáctica del lenguaje y las matemáticas en estudiantes sordos de niveles iniciales',
+      pages: '94-96',
+    });
+    expect(motion.semantic.movementPresentationNote).toMatch(/index extends and flexes/);
   });
 });

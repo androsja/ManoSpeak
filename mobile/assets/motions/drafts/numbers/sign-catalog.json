@@ -107,6 +107,26 @@
         "approvedAt": "2026-11-22",
         "scope": "Prototype release authorization; not professional LSC or regional validation."
       }
+    },
+    {
+      "id": "lsc-co-number-06",
+      "gloss": "SEIS",
+      "speechAliases": [
+        "seis",
+        "6"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "seis.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
     }
   ]
 }

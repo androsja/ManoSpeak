@@ -6,6 +6,14 @@ const path = require('path');
 const MOBILE_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(MOBILE_ROOT, 'assets/motions/drafts/numbers');
 const DICTIONARY_URL = 'https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf';
+const NUMERAL_REFERENCE = {
+  title: 'Elementos para una didáctica del lenguaje y las matemáticas en estudiantes sordos de niveles iniciales',
+  publisher: 'Editorial Universidad Distrital Francisco José de Caldas',
+  authors: ['Dora Inés Calderón', 'Olga Lucía León Corredor'],
+  year: 2016,
+  pages: '94-96',
+  url: 'https://repository.udistrital.edu.co/server/api/core/bitstreams/d0377a58-82c3-4c9a-a050-66670890541f/content',
+};
 
 const NUMBER_SIGNS = [
   {
@@ -46,6 +54,14 @@ const NUMBER_SIGNS = [
     lateralFingerSpread: 1.8,
     rigFingerSplayDegrees: 20,
     fingers: {thumb: 'extended', index: 'extended', middle: 'extended', ring: 'extended', pinky: 'extended'},
+  },
+  {
+    number: 6,
+    gloss: 'SEIS',
+    speechAliases: ['seis', '6'],
+    fingers: {thumb: 'closed', index: 'captured', middle: 'closed', ring: 'closed', pinky: 'closed'},
+    movement: {type: 'index-flexion', flexStartFrame: 12, fullFlexFrame: 24, extensionEndFrame: 36, flexAmount: 0.9},
+    source: NUMERAL_REFERENCE,
   },
 ];
 
@@ -169,16 +185,50 @@ function shapedFrame(frame, states) {
   return {bodyHands, face: frame.face.map(point => [...point])};
 }
 
+function easedProgress(value) {
+  const amount = Math.max(0, Math.min(1, value));
+  return amount * amount * (3 - 2 * amount);
+}
+
+function flexIndexFrame(frame, amount, states) {
+  if (amount <= 0) return frame;
+  const bodyHands = frame.bodyHands.map(point => [...point]);
+  const hand = bodyHands.slice(33, 54);
+  const foldedHand = applyNumberFingerStates(hand, {...states, index: 'closed'});
+  [6, 7, 8].forEach(index => {
+    bodyHands[33 + index] = roundPoint(hand[index].map((value, axis) => (
+      value + (foldedHand[index][axis] - value) * amount
+    )));
+  });
+  return {bodyHands, face: frame.face.map(point => [...point])};
+}
+
 function motionFor(sign) {
   const lateralFingerSpread = sign.lateralFingerSpread ?? 1;
   const rest = canonicalFrame(lateralFingerSpread);
   const target = raisedNumberFrame(rest, lateralFingerSpread);
-  const shapedRest = shapedFrame(rest, sign.fingers);
-  const shapedTarget = shapedFrame(target, sign.fingers);
-  const frames = Array.from({length: 36}, (_, index) => {
-    const progress = Math.min(1, index / 6);
-    return interpolateFrame(shapedRest, shapedTarget, progress);
+  const frameCount = sign.movement?.type === 'index-flexion' ? 48 : 36;
+  const frames = Array.from({length: frameCount}, (_, index) => {
+    const armProgress = Math.min(1, index / 6);
+    const frame = shapedFrame(interpolateFrame(rest, target, armProgress), sign.fingers);
+    if (sign.movement?.type !== 'index-flexion') {
+      return frame;
+    }
+    const {flexStartFrame, fullFlexFrame, extensionEndFrame, flexAmount} = sign.movement;
+    const flexProgress = index < flexStartFrame
+      ? 0
+      : index <= fullFlexFrame
+        ? easedProgress((index - flexStartFrame) / (fullFlexFrame - flexStartFrame))
+        : index < extensionEndFrame
+          ? 1 - easedProgress((index - fullFlexFrame) / (extensionEndFrame - fullFlexFrame))
+          : 0;
+    return flexIndexFrame(frame, flexProgress * flexAmount, sign.fingers);
   });
+  const source = sign.source ?? {
+    title: 'Diccionario Básico de la Lengua de Señas Colombiana',
+    publisher: 'Ministerio de Educación Nacional e INSOR',
+    url: DICTIONARY_URL,
+  };
   return {
     version: 2,
     fps: 30,
@@ -199,17 +249,18 @@ function motionFor(sign) {
       language: 'lsc-CO',
       gloss: sign.gloss,
       number: sign.number,
-      source: {
-        title: 'Diccionario Básico de la Lengua de Señas Colombiana',
-        publisher: 'Ministerio de Educación Nacional e INSOR',
-        url: DICTIONARY_URL,
-      },
+      source,
       handshape: sign.fingers,
+      ...(sign.movement ? {
+        movementPresentationNote: 'The index extends and flexes while the other fingers remain folded, following the cited LSC numeral description. The avatar timing is authored for this prototype and is not source timing evidence.',
+      } : {}),
       ...(lateralFingerSpread > 1 ? {
         handshapePresentationNote: `Extended fingers use a ${lateralFingerSpread} lateral landmark spread factor and a ${sign.rigFingerSplayDegrees}-degree rig splay for visual clarity in this avatar prototype; this is not regional performance evidence.`,
       } : {}),
       locationPresentationNote: 'The active hand is placed high beside the avatar face and offset to its screen-right side, not centered in front of the face; this is a constructed avatar placement, not regional performance evidence.',
-      realizationNote: 'Constructed avatar draft from the dictionary handshape description; not a recorded regional performance.',
+      realizationNote: sign.movement
+        ? 'Constructed avatar draft from the cited LSC numeral description; not a recorded regional performance.'
+        : 'Constructed avatar draft from the dictionary handshape description; not a recorded regional performance.',
       timingNote: 'Prototype transition and hold duration for renderer review; not source timing evidence.',
     },
     frames,
@@ -217,7 +268,9 @@ function motionFor(sign) {
       status: 'owner-approved-prototype',
       approvedAt: '2026-11-22',
       authority: 'project-owner-requested-production-publication',
-      scope: 'Hand configurations follow the cited dictionary; avatar movement and regional realization are not professionally validated.',
+      scope: sign.movement
+        ? 'The index-flexion pattern follows the cited academic description; avatar timing and regional realization are not professionally validated.'
+        : 'Hand configurations follow the cited dictionary; avatar movement and regional realization are not professionally validated.',
     },
   };
 }
