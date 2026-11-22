@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {AppState, StatusBar, StyleSheet} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import {AccountActivationScreen} from './src/components/AccountActivationScreen';
@@ -23,11 +23,10 @@ import {
   hasCompletedSignLanguageSetup,
   installedPhrasesForSelectedLanguage,
   installedSignsForSelectedLanguage,
-  listSignLanguages,
+  listVersionedJsonReleaseLanguages,
   selectedSignLanguageId,
   type InstalledPhrase,
   type InstalledSign,
-  unpromptedSignChangeCount,
 } from './src/services/SignLanguageService';
 import {I18nProvider} from './src/i18n/I18n';
 
@@ -43,6 +42,8 @@ function AppContent() {
   const [availableSigns, setAvailableSigns] = useState<InstalledSign[]>([]);
   const [availablePhrases, setAvailablePhrases] = useState<InstalledPhrase[]>([]);
   const [availableSignChangeCount, setAvailableSignChangeCount] = useState(0);
+  const initialSetupPending = useRef(true);
+  const allowJsonReleaseChecks = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -70,16 +71,44 @@ function AppContent() {
 
   useEffect(() => {
     let mounted = true;
+    let syncInFlight: Promise<void> | undefined;
+    const syncJsonRelease = (): Promise<void> => {
+      if (syncInFlight) return syncInFlight;
+      syncInFlight = (async () => {
+        try {
+          const [installed, phrases, statuses] = await Promise.all([
+            installedSignsForSelectedLanguage(),
+            installedPhrasesForSelectedLanguage(),
+            listVersionedJsonReleaseLanguages(),
+          ]);
+          if (!mounted) return;
+          setAvailableSigns(installed);
+          setAvailablePhrases(phrases);
+          const pendingJsonCount = statuses.reduce((total, status) => (
+            total + status.pendingSigns.filter(sign => sign.motionFormat === 'legacy-json-v2').length
+          ), 0);
+          setAvailableSignChangeCount(pendingJsonCount);
+        } catch {
+          const [installed, phrases] = await Promise.all([
+            installedSignsForSelectedLanguage(),
+            installedPhrasesForSelectedLanguage(),
+          ]).catch(() => [[], []] as [InstalledSign[], InstalledPhrase[]]);
+          if (!mounted) return;
+          setAvailableSigns(installed);
+          setAvailablePhrases(phrases);
+        }
+      })().finally(() => {
+        syncInFlight = undefined;
+      });
+      return syncInFlight;
+    };
     const refreshSignUpdateNotice = async () => {
-      try {
-        const available = await listSignLanguages();
-        if (mounted) setAvailableSignChangeCount(unpromptedSignChangeCount(available));
-      } catch {
-        // Existing local packages remain usable while offline.
-      }
+      await syncJsonRelease();
     };
     const appStateSubscription = AppState.addEventListener('change', nextAppState => {
-      if (nextAppState === 'active') void refreshSignUpdateNotice();
+      if (nextAppState === 'active'
+          && !initialSetupPending.current
+          && allowJsonReleaseChecks.current) void refreshSignUpdateNotice();
     });
     Promise.all([
       installedSignsForSelectedLanguage(),
@@ -91,16 +120,17 @@ function AppContent() {
         setAvailableSigns(installed);
         setAvailablePhrases(phrases);
         const firstSetup = installed.length === 0 && !setupComplete;
+        initialSetupPending.current = firstSetup;
+        allowJsonReleaseChecks.current = installed.length > 0;
         setInitialLibrarySetup(firstSetup);
         if (firstSetup) {
           setLibraryOpen(true);
           return;
         }
-        await refreshSignUpdateNotice();
+        if (installed.length > 0) await syncJsonRelease();
       })
       .catch(() => {
-        // A catalogue outage must not prevent an already configured app from
-        // opening. The library screen offers an explicit retry during setup.
+        // Existing local signs remain available while Firebase is offline.
       })
       .finally(() => {
         if (mounted) setLibraryCheckComplete(true);
@@ -165,9 +195,16 @@ function AppContent() {
                   installedSignsForSelectedLanguage(),
                   installedPhrasesForSelectedLanguage(),
                 ]);
+                initialSetupPending.current = false;
+                allowJsonReleaseChecks.current = signs.length > 0;
                 setAvailableSigns(signs);
                 setAvailablePhrases(phrases);
-                setAvailableSignChangeCount(0);
+                const pendingJsonCount = statuses.reduce((total, status) => (
+                  total + status.pendingSigns.filter(
+                    sign => sign.motionFormat === 'legacy-json-v2',
+                  ).length
+                ), 0);
+                setAvailableSignChangeCount(pendingJsonCount);
               } finally {
                 setLibraryOpen(false);
                 setInitialLibrarySetup(false);

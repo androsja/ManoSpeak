@@ -52,8 +52,9 @@ service cloud.firestore {
       allow delete: if owns(uid);
     }
 
-    // Public metadata only. Motion bytes and source material always live in
-    // Storage; trusted publisher tooling bypasses these client rules.
+    // Public metadata only for the original catalogue. Legacy JSON motion
+    // payloads use the isolated, versioned collections below; trusted
+    // publisher tooling bypasses these client rules.
     match /signLanguages/{languageId} {
       allow read: if resource.data.published == true;
       allow write: if false;
@@ -91,6 +92,26 @@ service cloud.firestore {
       // document that is not approved or does not satisfy the exact schema.
       allow read: if resource.data.published == true;
       allow write: if false;
+    }
+
+    // JSON motion releases are a separate, versioned catalogue for the
+    // lightweight Android starter experience. The legacy global signs query
+    // is never used to populate this release.
+    match /signJsonReleasePointers/{languageId} {
+      allow read: if resource.data.schema == 'vozual.sign-json-release-pointer'
+        && resource.data.published == true;
+      allow write: if false;
+    }
+
+    match /signJsonReleases/{releaseId} {
+      allow read: if resource.data.schema == 'vozual.sign-json-release'
+        && resource.data.published == true;
+      allow write: if false;
+
+      match /motions/{signId}/chunks/{chunkId} {
+        allow read: if get(/databases/$(database)/documents/signJsonReleases/$(releaseId)).data.published == true;
+        allow write: if false;
+      }
     }
 
     match /{document=**} {

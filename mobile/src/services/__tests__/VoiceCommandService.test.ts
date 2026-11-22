@@ -1,5 +1,6 @@
 import {
   advanceIncrementalSpeechMatches,
+  androidDirectSignVocabulary,
   extractKnownSpeechWords,
   mergeSpeechSegments,
   normalizeSpeech,
@@ -51,11 +52,97 @@ describe('advanceIncrementalSpeechMatches', () => {
       nextRecognizedWords: [],
     });
   });
+
+  it('queues each repeated sign occurrence once as partial results grow', () => {
+    const vocabulary = [{gloss: 'ADIÓS', aliases: ['adiós']}];
+    const repeatedWords = extractKnownSpeechWords('adiós adiós', vocabulary);
+    const firstPartial = advanceIncrementalSpeechMatches(
+      [],
+      extractKnownSpeechWords('adiós', vocabulary),
+      false,
+    );
+    expect(firstPartial.newWords).toEqual(['ADIÓS']);
+
+    const repeatedPartial = advanceIncrementalSpeechMatches(
+      firstPartial.nextRecognizedWords,
+      extractKnownSpeechWords('adiós adiós', vocabulary),
+      false,
+    );
+    expect(repeatedPartial.newWords).toEqual(['ADIÓS']);
+
+    const duplicateCallback = advanceIncrementalSpeechMatches(
+      repeatedPartial.nextRecognizedWords,
+      extractKnownSpeechWords('adiós adiós', vocabulary),
+      false,
+    );
+    expect(duplicateCallback.newWords).toEqual([]);
+
+    const finalResult = advanceIncrementalSpeechMatches(
+      duplicateCallback.nextRecognizedWords,
+      repeatedWords,
+      true,
+    );
+    expect(finalResult).toEqual({newWords: [], nextRecognizedWords: []});
+
+    expect(advanceIncrementalSpeechMatches([], repeatedWords, true).newWords).toEqual([
+      'ADIÓS',
+      'ADIÓS',
+    ]);
+  });
 });
 
 describe('VoiceCommandService', () => {
+  it('exposes every installed sign and its aliases to Android continuous listening', () => {
+    expect(androidDirectSignVocabulary([
+      {gloss: 'ADIÓS', speechAliases: ['adios', 'chao'], categories: ['despedidas'], lexicalClass: 'interjection'},
+      {gloss: 'UNO', speechAliases: ['uno'], categories: ['numeros_cantidades'], lexicalClass: 'numeral'},
+      {gloss: 'DOS', speechAliases: ['dos'], categories: ['numeros_cantidades'], lexicalClass: 'numeral'},
+      {gloss: 'MUCHO', speechAliases: ['mucho'], categories: ['numeros_cantidades'], lexicalClass: 'adjective'},
+      {gloss: 'HOLA', speechAliases: ['hola'], categories: ['saludos'], lexicalClass: 'interjection'},
+      {gloss: 'COMER', speechAliases: ['comer', 'come', 'comes', 'comía'], categories: ['acciones'], lexicalClass: 'verb'},
+    ])).toEqual([
+      {gloss: 'ADIÓS', aliases: ['adios', 'chao']},
+      {gloss: 'UNO', aliases: ['uno']},
+      {gloss: 'DOS', aliases: ['dos']},
+      {gloss: 'MUCHO', aliases: ['mucho']},
+      {gloss: 'HOLA', aliases: ['hola']},
+      {gloss: 'COMER', aliases: ['comer', 'come', 'comes', 'comía']},
+    ]);
+  });
+
+  it('keeps digit aliases from the installed Firebase sign metadata', () => {
+    const vocabulary = androidDirectSignVocabulary([
+      {gloss: 'UNO', speechAliases: ['uno', '1'], categories: ['numeros_cantidades'], lexicalClass: 'numeral'},
+      {gloss: 'DOS', speechAliases: ['dos', '2'], categories: ['numeros_cantidades'], lexicalClass: 'numeral'},
+    ]);
+
+    expect(vocabulary).toEqual([
+      {gloss: 'UNO', aliases: ['uno', '1']},
+      {gloss: 'DOS', aliases: ['dos', '2']},
+    ]);
+    expect(extractKnownSpeechWords('1 y dos', vocabulary)).toEqual(['UNO', 'DOS']);
+  });
+
   it('normalizes accents and punctuation', () => {
     expect(normalizeSpeech('¡HÓLA, cómo estás!')).toBe('hola como estas');
+  });
+
+  it('matches recognized digits to the installed Spanish number signs', () => {
+    const vocabulary = [
+      {gloss: 'UNO', aliases: ['uno']},
+      {gloss: 'DOS', aliases: ['dos']},
+      {gloss: 'TRES', aliases: ['tres']},
+      {gloss: 'CUATRO', aliases: ['cuatro']},
+      {gloss: 'CINCO', aliases: ['cinco']},
+    ];
+
+    expect(extractKnownSpeechWords('1 2 3 4 5', vocabulary)).toEqual([
+      'UNO',
+      'DOS',
+      'TRES',
+      'CUATRO',
+      'CINCO',
+    ]);
   });
 
   it('matches a complete word and not a substring', () => {
@@ -125,11 +212,26 @@ describe('VoiceCommandService', () => {
     expect(mergeSpeechSegments('hola', 'buenas tardes')).toBe('hola buenas tardes');
   });
 
-  it('maps verb conjugations to one canonical sign clip', () => {
-    expect(extractKnownSpeechWords('yo necesito ayuda y nosotros necesitamos agua', [{
-      gloss: 'NECESITAR',
-      aliases: ['necesito', 'necesitas', 'necesita', 'necesitamos'],
-    }])).toEqual(['NECESITAR', 'NECESITAR']);
+  it('maps common forms of a verb to its canonical sign clip', () => {
+    const vocabulary = androidDirectSignVocabulary([{
+      gloss: 'COMER',
+      speechAliases: ['comer', 'come', 'comes', 'comemos', 'comen', 'comía', 'comían'],
+      categories: ['acciones'],
+      lexicalClass: 'verb',
+    }]);
+
+    expect(extractKnownSpeechWords(
+      'comer, come, comes, comemos, comen, comía y comían',
+      vocabulary,
+    )).toEqual([
+      'COMER',
+      'COMER',
+      'COMER',
+      'COMER',
+      'COMER',
+      'COMER',
+      'COMER',
+    ]);
   });
 
   it('selects a later recognition alternative when it contains a published sign', () => {

@@ -47,6 +47,7 @@ import {
   RiggedFingerName,
   RiggedHandFingerStates,
   RiggedHandPresentation,
+  riggedFingerFanAngles,
   riggedElbowPivotTarget,
   riggedHandBoneTarget,
   riggedHandPositionOffset,
@@ -195,6 +196,9 @@ type AvatarProfile = {
   /** Adds a small lateral gap between the index and middle MCPs. */
   rigLeftIndexMiddleSpread?: number;
   rigRightIndexMiddleSpread?: number;
+  /** Fans configured extended fingers apart by this angle per neighbor. */
+  rigLeftFingerSplayDegrees?: number;
+  rigRightFingerSplayDegrees?: number;
   rigLeftForearmMinimumScreenLength?: number;
   rigRightForearmMinimumScreenLength?: number;
   rigLeftHandTrackingRepair?: RiggedHandTrackingRepair;
@@ -225,6 +229,11 @@ declare global {
     installVozualMotionBase64: (
       clip: string,
       contentBase64: string,
+      avatarProfile?: AvatarProfile,
+    ) => boolean;
+    installVozualMotionJson: (
+      clip: string,
+      motion: Motion,
       avatarProfile?: AvatarProfile,
     ) => boolean;
     setVozualPlaybackPaused: (paused: boolean) => boolean;
@@ -761,6 +770,7 @@ const motions = new Map<ClipName, Motion>();
 const motionLoads = new Map<ClipName, Promise<Motion>>();
 const kinematicPlanLoads = new Map<ClipName, Promise<KinematicRuntimePlan>>();
 const installedMotionBytes = new Map<ClipName, Uint8Array>();
+const installedMotionDocuments = new Map<ClipName, Motion>();
 const motionCacheOrder: ClipName[] = [];
 // A decoded motion contains thousands of nested JavaScript arrays. Keeping the
 // complete published library resident can make iOS terminate WKWebView's
@@ -2751,6 +2761,33 @@ function applyRiggedFingerSplay(side: 'L' | 'R') {
   riggedAvatar?.updateMatrixWorld(true);
 }
 
+function applyRiggedConfiguredFingerFan(side: 'L' | 'R') {
+  const spreadDegrees = side === 'L'
+    ? activeProfile?.rigLeftFingerSplayDegrees
+    : activeProfile?.rigRightFingerSplayDegrees;
+  if (typeof spreadDegrees !== 'number' || !Number.isFinite(spreadDegrees) || spreadDegrees <= 0) return;
+  const angles = riggedFingerFanAngles(
+    activeRiggedFingerStates[side] ?? {},
+    spreadDegrees,
+    side === 'L' ? 'left' : 'right',
+  );
+  Object.entries(angles).forEach(([finger, degrees]) => {
+    const bone = riggedBone(`DEF-f_${finger}.01.${side}`);
+    const rest = bone ? riggedBoneRests.get(bone.name) : undefined;
+    if (!bone || !rest || degrees === undefined) return;
+    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      0,
+      0,
+      THREE.MathUtils.degToRad(degrees),
+      'XYZ',
+    ));
+    bone.quaternion.copy(rest.localQuaternion).multiply(rotation).normalize();
+    bone.updateMatrix();
+    bone.updateWorldMatrix(false, true);
+  });
+  riggedAvatar?.updateMatrixWorld(true);
+}
+
 const COMPACT_FIST_FINGER_STATES: RiggedHandFingerStates = {
   thumb: 'closed',
   index: 'closed',
@@ -3026,6 +3063,7 @@ function driveRiggedPalmAndFingers(
   // Apply the authored splay last: captured retargeting and per-frame curl
   // edits both rotate the MCP bones and would otherwise flatten the gap.
   applyRiggedFingerSplay(side);
+  applyRiggedConfiguredFingerFan(side);
 }
 
 function driveRiggedHand(
@@ -4444,16 +4482,22 @@ function markMotionUsed(clip: ClipName) {
 
 async function loadMotion(clip: string): Promise<Motion> {
   const normalizedClip = clip.trim().toUpperCase();
+  const installedDocument = installedMotionDocuments.get(normalizedClip);
   const installedBytes = installedMotionBytes.get(normalizedClip);
-  let bytes: Uint8Array;
-  if (installedBytes) {
-    bytes = installedBytes;
+  let motion: Motion;
+  if (installedDocument) {
+    motion = installedDocument;
   } else {
-    const response = await fetch(`./motions/${motionAssetName(clip)}.motion.bin`);
-    if (!response.ok) throw new Error(`No se pudo cargar el movimiento ${clip}.`);
-    bytes = new Uint8Array(await response.arrayBuffer());
+    let bytes: Uint8Array;
+    if (installedBytes) {
+      bytes = installedBytes;
+    } else {
+      const response = await fetch(`./motions/${motionAssetName(clip)}.motion.bin`);
+      if (!response.ok) throw new Error(`No se pudo cargar el movimiento ${clip}.`);
+      bytes = new Uint8Array(await response.arrayBuffer());
+    }
+    motion = decodeCompactMotion(bytes);
   }
-  const motion = decodeCompactMotion(bytes);
   if (!Array.isArray(motion.frames) || motion.frames.length < 2) {
     throw new Error(`El movimiento ${clip} no contiene cuadros suficientes.`);
   }
@@ -4529,7 +4573,29 @@ window.installVozualMotionBase64 = (
     // Never replace or reshape a sign-specific hand pose at runtime.
     avatarProfiles.set(normalizedClip, avatarProfile);
   }
+  installedMotionDocuments.delete(normalizedClip);
   installedMotionBytes.set(normalizedClip, decodeBase64Bytes(contentBase64));
+  motions.delete(normalizedClip);
+  motionLoads.delete(normalizedClip);
+  return true;
+};
+
+window.installVozualMotionJson = (
+  clip: string,
+  motion: Motion,
+  avatarProfile?: AvatarProfile,
+) => {
+  const normalizedClip = clip.trim().toUpperCase();
+  if (!normalizedClip || !motion || !Number.isFinite(motion.fps) || motion.fps <= 0
+      || !Array.isArray(motion.frames) || motion.frames.length < 2
+      || motion.frames.some(frame => !Array.isArray(frame.bodyHands) || !Array.isArray(frame.face))) {
+    return false;
+  }
+  if (avatarProfile && typeof avatarProfile === 'object' && !Array.isArray(avatarProfile)) {
+    avatarProfiles.set(normalizedClip, avatarProfile);
+  }
+  installedMotionBytes.delete(normalizedClip);
+  installedMotionDocuments.set(normalizedClip, motion);
   motions.delete(normalizedClip);
   motionLoads.delete(normalizedClip);
   return true;
@@ -4791,9 +4857,11 @@ function requestClip(
     if (requestId !== latestPlaybackRequest) return;
     playClip(normalizedClip, playbackId, playbackSpeed, continuePhrase);
   });
-  // A runtime execution plan takes precedence whenever the sign provides one.
-  // Otherwise this falls back to the established compact-motion playback path.
-  const load = renderMode === 'rigged'
+  // ADIOS is installed and integrity-checked with the other Firebase signs.
+  // Prefer those released bytes over the local authoring preview plan.
+  const load = normalizedClip === 'ADIOS'
+    ? startLegacyPlayback()
+    : renderMode === 'rigged'
     ? ensureKinematicPlan(normalizedClip).then(plan => {
       if (requestId !== latestPlaybackRequest) return;
       const started = window.playVozualKinematicPlan(plan, playbackId, playbackSpeed);
@@ -4837,7 +4905,7 @@ window.playVozualKinematicPlan = (plan, playbackId, playbackSpeed = 1) => {
   for (const side of ['left', 'right'] as const) {
     for (const name of kinematicRigArmBoneNames(side)) {
       const bone = riggedBone(name);
-      const rest = bone ? riggedBoneRests.get(name) : undefined;
+      const rest = bone ? riggedBoneRests.get(bone.name) : undefined;
       if (!bone || !rest) continue;
 
       // A declarative plan must have identical output on every replay. Never

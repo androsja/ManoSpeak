@@ -9,8 +9,8 @@ jest.mock('react-native-fs', () => ({
     if (content === undefined) throw new Error(`Missing ${path}`);
     return content;
   }),
-  writeFile: jest.fn(async (path: string, content: string) => {
-    mockFiles.set(path, content);
+  writeFile: jest.fn(async (path: string, content: string, encoding?: string) => {
+    mockFiles.set(path, encoding === 'base64' ? Buffer.from(content, 'base64').toString('utf8') : content);
   }),
   unlink: jest.fn(async (path: string) => {
     if (!mockFiles.delete(path)) throw new Error(`Missing ${path}`);
@@ -46,6 +46,7 @@ import {
   installedSignsForSelectedLanguage,
   listSignLanguages,
   listSignLanguagesWithMigration,
+  listVersionedJsonReleaseLanguages,
   mergeSignLanguageStatuses,
   installSignLanguageChanges,
   parsePublishedSign,
@@ -186,6 +187,127 @@ describe('SignLanguageService', () => {
   it('does not query every Firestore collection during the normal startup route', async () => {
     await expect(listSignLanguages()).resolves.toEqual([]);
     expect(getDocsFromServer).not.toHaveBeenCalled();
+  });
+
+  it('reads the separate versioned JSON release without querying the legacy catalogue', async () => {
+    const jsonSign = {
+      id: 'lsc-co-adios',
+      languageId: 'lsc-co',
+      gloss: 'ADIÓS',
+      version: 1,
+      assetName: 'adios.motion.json',
+      sizeBytes: 117,
+      sha256: 'a'.repeat(64),
+      profileSha256: 'b'.repeat(64),
+      releaseSha256: 'c'.repeat(64),
+      speechAliases: ['ADIÓS', 'adiós', 'chao'],
+      categories: ['saludos_cortesia'],
+      lexicalClass: 'fixed_expression',
+      verbType: 'none',
+      requiresSubjectMarker: false,
+      motionFormat: 'legacy-json-v2',
+      jsonChunkCount: 2,
+      approved: true,
+      compiled: true,
+      published: true,
+    };
+    (getDoc as jest.Mock)
+      .mockResolvedValueOnce({exists: () => true, data: () => ({
+        schema: 'vozual.sign-json-release-pointer',
+        languageId: 'lsc-co',
+        releaseId: 'lsc-co-json-v1',
+        version: 1,
+        published: true,
+      })})
+      .mockResolvedValueOnce({exists: () => true, data: () => ({
+        schema: 'vozual.sign-json-release',
+        releaseId: 'lsc-co-json-v1',
+        languageId: 'lsc-co',
+        version: 1,
+        published: true,
+        signs: [jsonSign],
+      })});
+
+    await expect(listVersionedJsonReleaseLanguages()).resolves.toEqual([
+      expect.objectContaining({
+        id: 'lsc-co',
+        changeCount: 1,
+        pendingSigns: [expect.objectContaining({
+          gloss: 'ADIÓS',
+          motionFormat: 'legacy-json-v2',
+          jsonChunkCount: 2,
+          jsonReleaseId: 'lsc-co-json-v1',
+        })],
+      }),
+    ]);
+    expect(getDoc).toHaveBeenCalledTimes(2);
+    expect(getDocsFromServer).not.toHaveBeenCalled();
+  });
+
+  it('installs JSON motion chunks together with their speech aliases after acceptance', async () => {
+    const motionDocument = {
+      version: 2,
+      fps: 30,
+      layout: 'pose33_left21_right21_face468',
+      avatarProfile: {activeHand: 'left'},
+      frames: [
+        {bodyHands: [[0, 0, 0]], face: [[0, 0, 0]]},
+        {bodyHands: [[0, 0, 0]], face: [[0, 0, 0]]},
+      ],
+    };
+    const compactJson = JSON.stringify(motionDocument);
+    const jsonText = compactJson + ' '.repeat(1024 - Buffer.byteLength(compactJson));
+    const contentBase64 = Buffer.from(jsonText).toString('base64');
+    const jsonSign = parsePublishedSign('lsc-co-number-01', {
+      languageId: 'lsc-co',
+      gloss: 'UNO',
+      version: 4,
+      assetName: 'uno.motion.json',
+      sizeBytes: 1024,
+      sha256: 'a'.repeat(64),
+      profileSha256: 'b'.repeat(64),
+      releaseSha256: 'c'.repeat(64),
+      speechAliases: ['uno', '1'],
+      categories: ['numeros_cantidades'],
+      lexicalClass: 'numeral',
+      verbType: 'none',
+      requiresSubjectMarker: false,
+      motionFormat: 'legacy-json-v2',
+      jsonReleaseId: 'lsc-co-json-v4',
+      jsonChunkCount: 1,
+      approved: true,
+      compiled: true,
+      published: true,
+    });
+    const status = mergeSignLanguageStatuses([language], [jsonSign], state())[0];
+    (getDoc as jest.Mock).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        releaseId: 'lsc-co-json-v4',
+        signId: jsonSign.id,
+        index: 0,
+        count: 1,
+        contentBase64,
+      }),
+    });
+    (require('react-native-fs').hash as jest.Mock).mockResolvedValueOnce(jsonSign.sha256);
+    (require('react-native-fs').stat as jest.Mock).mockResolvedValueOnce({size: jsonSign.sizeBytes});
+
+    await expect(installSignLanguageChanges(status)).resolves.toBe(1);
+
+    const installedState = JSON.parse(
+      mockFiles.get('/documents/vozual-sign-languages/library.json') ?? '{}',
+    ) as SignLibraryState;
+    expect(installedState.installedSigns[jsonSign.id]).toEqual(expect.objectContaining({
+      version: 4,
+      speechAliases: ['uno', '1'],
+      motionFormat: 'legacy-json-v2',
+    }));
+    await expect(readInstalledSignPayload('UNO')).resolves.toEqual(expect.objectContaining({
+      contentBase64: '',
+      motionDocument: expect.objectContaining({avatarProfile: {activeHand: 'left'}}),
+      avatarProfile: {activeHand: 'left'},
+    }));
   });
 
   it('accepts only independently downloadable approved compiled signs', () => {
@@ -476,6 +598,25 @@ describe('SignLanguageService', () => {
     expect(status.changeCount).toBe(1);
     expect(unpromptedSignChangeCount([status])).toBe(1);
     expect(hasUnpromptedSignChanges([status])).toBe(true);
+  });
+
+  it('does not request a re-download when only an unchanged sign version increases', () => {
+    const installed: InstalledSign = {
+      ...sign,
+      version: 3,
+      installedAt: '2026-08-30T00:00:00.000Z',
+      localPath: '/documents/agua-v3.motion.json',
+    };
+    const unchangedRelease = {...sign, version: 4};
+
+    const [status] = mergeSignLanguageStatuses(
+      [language],
+      [unchangedRelease],
+      state({[sign.id]: installed}),
+    );
+
+    expect(status.pendingSigns).toEqual([]);
+    expect(status.changeCount).toBe(0);
   });
 
   it('detects a visual-profile change even when motion bytes stay the same', () => {

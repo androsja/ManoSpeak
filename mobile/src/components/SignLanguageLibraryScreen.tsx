@@ -17,6 +17,7 @@ import {
   installSignLanguageChanges,
   type InstalledPhrase,
   listSignLanguages,
+  listVersionedJsonReleaseLanguages,
   selectSignLanguage,
   type PublishedSign,
   type SignLanguageStatus,
@@ -63,14 +64,6 @@ export function handleLibraryBack(
   return true;
 }
 
-export function shouldShowLibraryRetry(
-  loading: boolean,
-  error: string,
-  languageCount: number,
-): boolean {
-  return !loading && (Boolean(error) || languageCount === 0);
-}
-
 function megabytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 }
@@ -81,6 +74,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeLanguageId, setActiveLanguageId] = useState('');
+  const [activeSignId, setActiveSignId] = useState('');
   const [progress, setProgress] = useState(0);
   const [catalogLanguageId, setCatalogLanguageId] = useState('');
   const [search, setSearch] = useState('');
@@ -131,13 +125,16 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
     setLoading(true);
     setError('');
     try {
-      setLanguages(await listSignLanguages());
+      const availableLanguages = initialSetup
+        ? await listVersionedJsonReleaseLanguages()
+        : await listSignLanguages();
+      setLanguages(availableLanguages);
     } catch {
       setError(t('library.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [initialSetup, t]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setVisibleLimit(CATALOG_PAGE_SIZE); }, [category, search]);
@@ -154,6 +151,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
 
   const install = async (language: SignLanguageStatus) => {
     setActiveLanguageId(language.id);
+    setActiveSignId('');
     setProgress(0);
     try {
       const changed = await installSignLanguageChanges(language, setProgress);
@@ -163,6 +161,10 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
         // The local selection remains usable while the account profile syncs later.
       }
       await load();
+      if (initialSetup) {
+        onContinue(await listVersionedJsonReleaseLanguages());
+        return;
+      }
       Alert.alert(
         t('library.updated.title'),
         t('library.updated.detail', {count: changed, language: language.name}),
@@ -171,6 +173,45 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
       Alert.alert(t('library.downloadError.title'), t('library.downloadError.detail'));
     } finally {
       setActiveLanguageId('');
+      setProgress(0);
+    }
+  };
+
+  const installOneSign = async (language: SignLanguageStatus, sign: PublishedSign) => {
+    if (!language.pendingSigns.some(pending => pending.id === sign.id)) return;
+    setActiveLanguageId(language.id);
+    setActiveSignId(sign.id);
+    setProgress(0);
+    try {
+      const selectedSignStatus: SignLanguageStatus = {
+        ...language,
+        pendingSigns: language.pendingSigns.filter(pending => pending.id === sign.id),
+        removedSigns: [],
+        pendingPhrases: [],
+        removedPhrases: [],
+        pendingSizeBytes: sign.sizeBytes,
+      };
+      await installSignLanguageChanges(selectedSignStatus, setProgress);
+      try {
+        await onSelectedLanguageChange?.(language.id);
+      } catch {
+        // The local selection remains usable while the account profile syncs later.
+      }
+      await load();
+      if (initialSetup) {
+        onContinue(await listVersionedJsonReleaseLanguages());
+        return;
+      }
+      Alert.alert(
+        t('library.updated.title'),
+        t('library.updated.detail', {count: 1, language: language.name}),
+      );
+    } catch (downloadError) {
+      console.error(`Failed to download sign ${sign.gloss}`, downloadError);
+      Alert.alert(t('library.downloadError.title'), t('library.downloadError.detail'));
+    } finally {
+      setActiveLanguageId('');
+      setActiveSignId('');
       setProgress(0);
     }
   };
@@ -205,6 +246,8 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
   const renderSign = ({item}: {item: PublishedSign}) => {
     const installed = installedSignIds.has(item.id);
     const updateAvailable = installed && pendingSignIds.has(item.id);
+    const canInstall = pendingSignIds.has(item.id);
+    const downloading = activeLanguageId === catalogLanguage?.id && activeSignId === item.id;
     const aliases = item.speechAliases.filter(alias => (
       alias.trim().toLocaleUpperCase('es-CO') !== item.gloss
     ));
@@ -223,17 +266,27 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
             </Text>
           ) : null}
         </View>
-        <View style={[
-          styles.signStatus,
-          installed && styles.signStatusInstalled,
-          updateAvailable && styles.signStatusUpdate,
-        ]}>
-          <Text style={styles.signStatusText}>
-            {updateAvailable
-              ? t('library.status.update')
-              : installed ? t('library.status.installed') : t('library.status.available')}
-          </Text>
-        </View>
+        {canInstall ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={`${updateAvailable ? t('library.action.updateOne') : t('library.action.downloadOne')} ${item.gloss}`}
+            disabled={activeLanguageId !== ''}
+            onPress={() => {
+              if (catalogLanguage) installOneSign(catalogLanguage, item).catch(() => undefined);
+            }}
+            style={[styles.signAction, activeLanguageId !== '' && styles.disabled]}
+          >
+            <Text style={styles.signActionText}>
+              {downloading
+                ? t('library.downloading', {progress: Math.round(progress * 100)})
+                : updateAvailable ? t('library.action.updateOne') : t('library.action.downloadOne')}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.signStatus, styles.signStatusInstalled]}>
+            <Text style={styles.signStatusText}>{t('library.status.installed')}</Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -359,6 +412,11 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
         const unavailable = language.signs.length === 0 && language.installedSignCount === 0;
         const current = language.selected && language.installedSignCount > 0 && language.changeCount === 0;
         const canSelect = language.installedSignCount > 0 && language.changeCount === 0 && !language.selected;
+        const downloadLabel = initialSetup && language.pendingSigns.length === 1
+          ? t('library.action.downloadGloss', {gloss: language.pendingSigns[0].gloss})
+          : language.installedSignCount > 0
+            ? t('library.action.download', {count: language.changeCount})
+            : t('library.action.download', {count: language.signs.length});
         const label = unavailable
           ? t('library.action.unavailable')
           : current
@@ -367,9 +425,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
               ? t('library.action.use')
               : language.pendingSigns.length === 0 && language.removedSigns.length > 0
                 ? t('library.action.applyChanges', {count: language.changeCount})
-            : language.installedSignCount > 0
-              ? t('library.action.download', {count: language.changeCount})
-              : t('library.action.download', {count: language.signs.length});
+            : downloadLabel;
         return (
           <View key={language.id} style={styles.card}>
             <View style={styles.cardTop}>
@@ -425,11 +481,6 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
         );
       })}
 
-      {shouldShowLibraryRetry(loading, error, languages.length) ? (
-        <TouchableOpacity style={styles.secondary} onPress={() => void load()}>
-          <Text style={styles.secondaryText}>{t('library.retry')}</Text>
-        </TouchableOpacity>
-      ) : null}
       {!loading && !error && languages.length > 0 ? (
         <View style={styles.suggestionCard}>
           <Text style={styles.suggestionEyebrow}>{t('library.tryPhrase')}</Text>
@@ -474,6 +525,8 @@ const styles = StyleSheet.create({
   action: {backgroundColor: '#0284C7', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11},
   disabled: {backgroundColor: '#475569'},
   actionText: {color: '#FFFFFF', fontSize: 12, fontWeight: '900'},
+  signAction: {alignItems: 'center', backgroundColor: '#0284C7', borderRadius: 10, justifyContent: 'center', marginLeft: 10, minHeight: 42, paddingHorizontal: 12, minWidth: 100},
+  signActionText: {color: '#FFFFFF', fontSize: 11, fontWeight: '900', textAlign: 'center'},
   catalogButton: {alignItems: 'center', borderColor: '#38BDF8', borderRadius: 10, borderWidth: 1, marginTop: 14, padding: 11},
   catalogButtonDisabled: {borderColor: '#475569', opacity: 0.65},
   catalogButtonText: {color: '#7DD3FC', fontSize: 12, fontWeight: '900'},

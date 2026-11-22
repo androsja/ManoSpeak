@@ -35,4 +35,19 @@ describe('Listener speech confirmation contract', () => {
     expect(listenerScreenSource).not.toMatch(/t\('listener\.replayingPhrase'\)/);
     expect(listenerScreenSource).not.toMatch(/togglePlaybackPause/);
   });
+
+  it('plays each newly recognized repeated Android sign without replaying duplicate partials', () => {
+    expect(listenerScreenSource).toMatch(/androidRecognizedWordsRef/);
+    expect(listenerScreenSource).toMatch(/advanceIncrementalSpeechMatches\(/);
+    expect(listenerScreenSource).toMatch(/signQueue\.current\.push\(\.\.\.newWords\.map\(word => word\.toUpperCase\(\)\)\)/);
+    expect(listenerScreenSource).toMatch(/androidDirectSignVocabulary\(installedSigns\)/);
+    expect(listenerScreenSource).toMatch(/isFinal \? recognizedSigns : nextRecognizedWords/);
+    expect(listenerScreenSource).toMatch(/normalizeSpeech\(nextWord\)[\s\S]*?normalizeSpeech\(lastStartedSignRef\.current/);
+  });
+
+  it('keeps detected words in a fixed-height single-line strip', () => {
+    expect(listenerScreenSource).toMatch(/numberOfLines=\{1\}/);
+    expect(listenerScreenSource).toMatch(/detectedWordsCard: \{ height: 24/);
+    expect(listenerScreenSource).toMatch(/detectedWordsText: \{[^}]*fontSize: 10/);
+  });
 });

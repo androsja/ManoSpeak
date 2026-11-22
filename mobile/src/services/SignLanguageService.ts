@@ -8,6 +8,7 @@ import {
   where,
 } from '@react-native-firebase/firestore';
 import RNFS from 'react-native-fs';
+import {parseJsonMotionDocument, type JsonMotionDocument} from './JsonMotionLoader';
 
 const LIBRARY_ROOT = `${RNFS.DocumentDirectoryPath}/vozual-sign-languages`;
 const LIBRARY_STATE_PATH = `${LIBRARY_ROOT}/library.json`;
@@ -48,6 +49,9 @@ export type PublishedSign = {
   lexicalClass: string;
   verbType: 'none' | 'plain' | 'directional_review_required' | 'spatial_review_required';
   requiresSubjectMarker: boolean;
+  motionFormat: 'compact-v2' | 'legacy-json-v2';
+  jsonReleaseId?: string;
+  jsonChunkCount?: number;
   approved: boolean;
   compiled: boolean;
   published: boolean;
@@ -89,6 +93,7 @@ export type InstalledSign = Pick<PublishedSign,
   | 'verbType'
   | 'requiresSubjectMarker'
 > & {
+  motionFormat?: PublishedSign['motionFormat'];
   // Older local libraries did not persist the semantic release digest. Keep
   // this optional for migration; its absence intentionally triggers one
   // refresh from Firebase so aliases cannot remain stale on a device.
@@ -326,7 +331,23 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
   const assetReference = data.storagePath !== undefined || data.downloadUrl !== undefined
     ? parsePublishedAssetReference(data)
     : {};
-  if (!assetDocumentPath && !assetReference.storagePath && !assetReference.downloadUrl) {
+  const motionFormat = data.motionFormat === undefined ? 'compact-v2' : data.motionFormat;
+  if (motionFormat !== 'compact-v2' && motionFormat !== 'legacy-json-v2') {
+    throw new Error(`Sign ${id} has an unsupported motion format.`);
+  }
+  const jsonReleaseId = data.jsonReleaseId === undefined
+    ? undefined
+    : requiredString(data.jsonReleaseId, 'jsonReleaseId');
+  if (jsonReleaseId && !SAFE_PATH_SEGMENT.test(jsonReleaseId)) {
+    throw new Error(`Sign ${id} has an invalid JSON release ID.`);
+  }
+  const jsonChunkCount = data.jsonChunkCount === undefined
+    ? undefined
+    : positiveInteger(data.jsonChunkCount, 'jsonChunkCount');
+  const hasChunkedJsonSource = motionFormat === 'legacy-json-v2'
+    && Boolean(jsonReleaseId)
+    && jsonChunkCount !== undefined;
+  if (!assetDocumentPath && !assetReference.storagePath && !assetReference.downloadUrl && !hasChunkedJsonSource) {
     throw new Error(`Sign ${id} has no asset source.`);
   }
   const sha256 = sha256Digest(data.sha256, 'sha256');
@@ -355,6 +376,9 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
     lexicalClass: requiredString(data.lexicalClass, 'lexicalClass'),
     verbType: verbType(data.verbType),
     requiresSubjectMarker: data.requiresSubjectMarker === true,
+    motionFormat,
+    jsonReleaseId,
+    jsonChunkCount,
     approved: true,
     compiled: true,
     published: true,
@@ -512,8 +536,9 @@ export function mergeSignLanguageStatuses(
       .filter(sign => sign.languageId === language.id);
     const pendingSigns = languageSigns.filter(sign => {
       const local = state.installedSigns[sign.id];
+      // A release may include an unchanged sign at a higher catalog version.
+      // Prompt only when its motion, visual profile, or semantic metadata changed.
       return !local
-        || local.version !== sign.version
         || local.sha256 !== sign.sha256
         || local.releaseSha256 !== sign.releaseSha256
         // Libraries installed before visual profiles became independently
@@ -577,12 +602,117 @@ export function unpromptedSignChangeCount(statuses: readonly SignLanguageStatus[
   ), 0);
 }
 
+function localLibraryStatuses(state: SignLibraryState): SignLanguageStatus[] {
+  const languageIds = [...new Set(Object.values(state.installedSigns).map(sign => sign.languageId))];
+  return languageIds.map(id => {
+    const installedSigns = Object.values(state.installedSigns)
+      .filter(sign => sign.languageId === id)
+      .sort((left, right) => left.gloss.localeCompare(right.gloss));
+    const installedPhrases = Object.values(state.installedPhrases)
+      .filter(phrase => phrase.languageId === id)
+      .sort((left, right) => left.spanish.localeCompare(right.spanish, 'es-CO'));
+    const signs = installedSigns.map(sign => ({
+      ...sign,
+      motionFormat: sign.motionFormat ?? 'compact-v2',
+      profileSha256: sign.profileSha256 ?? '0'.repeat(64),
+      releaseSha256: sign.releaseSha256 ?? '0'.repeat(64),
+      approved: true,
+      compiled: true,
+      published: true,
+    }));
+    const revision = `${signRevision(signs)}||${phraseRevision(installedPhrases.map(phrase => ({
+      ...phrase,
+      approved: true,
+      published: true,
+    })))}`;
+    return {
+      id,
+      code: id,
+      name: id,
+      region: '',
+      published: true,
+      signs,
+      pendingSigns: [],
+      removedSigns: [],
+      installedSigns,
+      phrases: [],
+      pendingPhrases: [],
+      removedPhrases: [],
+      installedPhrases,
+      installedSignCount: installedSigns.length,
+      changeCount: 0,
+      totalSizeBytes: signs.reduce((total, sign) => total + sign.sizeBytes, 0),
+      pendingSizeBytes: 0,
+      revision,
+      followed: true,
+      dismissed: true,
+      selected: state.selectedLanguageId === id,
+    } satisfies SignLanguageStatus;
+  });
+}
+
+function parseVersionedJsonReleaseSign(id: string, releaseId: string, value: unknown): PublishedSign {
+  if (!isRecord(value)) throw new Error(`JSON release sign ${id} is not an object.`);
+  if (value.motionFormat !== 'legacy-json-v2') {
+    throw new Error(`JSON release sign ${id} is not a supported motion JSON.`);
+  }
+  return parsePublishedSign(id, {...value, jsonReleaseId: releaseId});
+}
+
+/** Reads only the versioned JSON-release pointer and its immutable manifest. */
+export async function listVersionedJsonReleaseLanguages(): Promise<SignLanguageStatus[]> {
+  const database = getFirestore();
+  const state = await readLibraryState();
+  const languageId = 'lsc-co';
+  const pointerSnapshot = await getDoc(doc(database, 'signJsonReleasePointers', languageId));
+  if (!pointerSnapshot.exists()) return localLibraryStatuses(state);
+  const pointer = pointerSnapshot.data();
+  if (pointer.schema !== 'vozual.sign-json-release-pointer'
+      || pointer.languageId !== languageId
+      || pointer.published !== true
+      || typeof pointer.releaseId !== 'string'
+      || !SAFE_PATH_SEGMENT.test(pointer.releaseId)
+      || !Number.isInteger(pointer.version)
+      || (pointer.version as number) < 1) {
+    throw new Error('The active JSON sign release pointer is invalid.');
+  }
+  const releaseSnapshot = await getDoc(doc(database, 'signJsonReleases', pointer.releaseId));
+  if (!releaseSnapshot.exists()) throw new Error('The active JSON sign release manifest is missing.');
+  const release = releaseSnapshot.data();
+  if (release.schema !== 'vozual.sign-json-release'
+      || release.releaseId !== pointer.releaseId
+      || release.languageId !== languageId
+      || release.version !== pointer.version
+      || release.published !== true
+      || !Array.isArray(release.signs)) {
+    throw new Error('The active JSON sign release manifest is invalid.');
+  }
+  const signs = release.signs.map((entry: unknown) => {
+    if (!isRecord(entry) || typeof entry.id !== 'string') {
+      throw new Error('The active JSON sign release contains an invalid sign entry.');
+    }
+    return parseVersionedJsonReleaseSign(entry.id, pointer.releaseId, entry);
+  });
+  const language: SignLanguage = {
+    id: languageId,
+    code: typeof release.code === 'string' ? release.code : languageId,
+    name: typeof release.name === 'string' ? release.name : 'Lengua de Señas Colombiana',
+    region: typeof release.region === 'string' ? release.region : 'Colombia',
+    published: true,
+  };
+  return mergeSignLanguageStatuses([language], signs, state, []);
+}
+
 export function hasUnpromptedSignChanges(statuses: readonly SignLanguageStatus[]): boolean {
   return unpromptedSignChangeCount(statuses) > 0;
 }
 
 export async function listSignLanguages(): Promise<SignLanguageStatus[]> {
-  return listSignLanguagesWithMigration({enableLegacyCatalogMigration: false});
+  try {
+    return await listVersionedJsonReleaseLanguages();
+  } catch {
+    return localLibraryStatuses(await readLibraryState());
+  }
 }
 
 /**
@@ -595,13 +725,7 @@ export async function listSignLanguagesWithMigration(
 ): Promise<SignLanguageStatus[]> {
   if (!enableLegacyCatalogMigration) {
     const state = await readLibraryState();
-    const languageIds = [...new Set(Object.values(state.installedSigns).map(sign => sign.languageId))];
-    return mergeSignLanguageStatuses(
-      languageIds.map(id => ({id, code: id, name: id, region: '', published: true})),
-      [],
-      state,
-      [],
-    );
+    return localLibraryStatuses(state);
   }
   const database = getFirestore();
   const [languageSnapshot, signSnapshot, phraseSnapshot, state] = await Promise.all([
@@ -673,11 +797,13 @@ export async function installedPhrasesForSelectedLanguage(): Promise<InstalledPh
 }
 
 export async function readInstalledSignMotionBase64(gloss: string): Promise<string | undefined> {
-  return (await readInstalledSignPayload(gloss))?.contentBase64;
+  const payload = await readInstalledSignPayload(gloss);
+  return payload?.motionDocument ? undefined : payload?.contentBase64;
 }
 
 export type InstalledSignPayload = {
   contentBase64: string;
+  motionDocument?: JsonMotionDocument;
   avatarProfile?: Record<string, unknown>;
   storagePath?: string;
   downloadUrl?: string;
@@ -701,6 +827,21 @@ export async function readInstalledSignPayload(
     candidate.gloss.trim().toUpperCase() === normalizedGloss
   ));
   if (!sign || !await RNFS.exists(sign.localPath)) return undefined;
+  if (sign.motionFormat === 'legacy-json-v2') {
+    const motionDocument = parseJsonMotionDocument(
+      JSON.parse(await RNFS.readFile(sign.localPath, 'utf8')) as unknown,
+      sign.assetName,
+    );
+    return {
+      contentBase64: '',
+      motionDocument,
+      avatarProfile: isRecord(motionDocument.avatarProfile) ? motionDocument.avatarProfile : undefined,
+      storagePath: sign.storagePath,
+      downloadUrl: sign.downloadUrl,
+      semanticPath: sign.semanticPath,
+      profilePath: sign.profilePath,
+    };
+  }
   return {
     contentBase64: await RNFS.readFile(sign.localPath, 'base64'),
     avatarProfile: sign.avatarProfile,
@@ -788,6 +929,9 @@ export async function installSignLanguageChanges(
       const legacyContent = typeof asset.contentBase64 === 'string' && asset.contentBase64.length > 0
         ? asset.contentBase64
         : undefined;
+      const hasChunkedJsonSource = sign.motionFormat === 'legacy-json-v2'
+        && sign.jsonReleaseId !== undefined
+        && sign.jsonChunkCount !== undefined;
       if (
         asset.approved !== true
         || asset.compiled !== true
@@ -800,10 +944,26 @@ export async function installSignLanguageChanges(
         // a present value that disagrees with the signed release metadata.
         || (asset.releaseSha256 !== undefined && asset.releaseSha256 !== sign.releaseSha256)
         || asset.sizeBytes !== sign.sizeBytes
-        || (!downloadUrl && !assetReference?.storagePath && !legacyContent)
-        || !isRecord(asset.avatarProfile)
+        || (!downloadUrl && !assetReference?.storagePath && !legacyContent && !hasChunkedJsonSource)
+        || (sign.motionFormat === 'compact-v2' && !isRecord(asset.avatarProfile))
       ) throw new Error(`Sign ${sign.gloss} has invalid asset metadata.`);
-      if (downloadUrl) {
+      if (hasChunkedJsonSource) {
+        const chunkCollection = `signJsonReleases/${sign.jsonReleaseId}/motions/${sign.id}/chunks`;
+        const chunks = await Promise.all(Array.from({length: sign.jsonChunkCount!}, async (_, index) => {
+          const chunkId = String(index).padStart(4, '0');
+          const chunkSnapshot = await getDoc(doc(getFirestore(), `${chunkCollection}/${chunkId}`));
+          if (!chunkSnapshot.exists()) throw new Error(`Sign ${sign.gloss} is missing JSON chunk ${index}.`);
+          return chunkSnapshot.data();
+        }));
+        if (chunks.length !== sign.jsonChunkCount || chunks.some((chunk, index) => (
+          chunk.releaseId !== sign.jsonReleaseId
+          || chunk.signId !== sign.id
+          || chunk.index !== index
+          || chunk.count !== sign.jsonChunkCount
+          || typeof chunk.contentBase64 !== 'string'
+        ))) throw new Error(`Sign ${sign.gloss} has incomplete JSON motion chunks.`);
+        await RNFS.writeFile(temporaryPath, chunks.map(chunk => chunk.contentBase64).join(''), 'base64');
+      } else if (downloadUrl) {
         await RNFS.downloadFile({fromUrl: downloadUrl, toFile: temporaryPath}).promise;
       } else if (assetReference?.storagePath && storageAdapter) {
         await storageAdapter.downloadToFile(assetReference.storagePath, temporaryPath);
@@ -819,9 +979,24 @@ export async function installSignLanguageChanges(
       }
       const digest = (await RNFS.hash(temporaryPath, 'sha256')).toLowerCase();
       if (digest !== sign.sha256) throw new Error(`Sign ${sign.gloss} failed its integrity check.`);
+      let avatarProfile: Record<string, unknown> | undefined = isRecord(asset.avatarProfile)
+        ? asset.avatarProfile
+        : undefined;
+      if (sign.motionFormat === 'legacy-json-v2') {
+        const document = parseJsonMotionDocument(
+          JSON.parse(await RNFS.readFile(temporaryPath, 'utf8')) as unknown,
+          sign.assetName,
+        );
+        if (!Number.isInteger(document.fps) || document.fps <= 0
+            || !Array.isArray(document.frames) || document.frames.length < 2) {
+          throw new Error(`Sign ${sign.gloss} JSON motion has no playable frames.`);
+        }
+        avatarProfile = isRecord(document.avatarProfile) ? document.avatarProfile : avatarProfile;
+      }
+      if (!avatarProfile) throw new Error(`Sign ${sign.gloss} has no avatar profile.`);
       staged.push({
         sign: {...sign, ...assetReference},
-        avatarProfile: asset.avatarProfile,
+        avatarProfile,
         temporaryPath,
         finalPath,
       });
@@ -873,6 +1048,7 @@ export async function installSignLanguageChanges(
         lexicalClass: item.sign.lexicalClass,
         verbType: item.sign.verbType,
         requiresSubjectMarker: item.sign.requiresSubjectMarker,
+        motionFormat: item.sign.motionFormat,
         installedAt: new Date().toISOString(),
         localPath: item.finalPath,
       };
@@ -895,7 +1071,13 @@ export async function installSignLanguageChanges(
       nextState.followedLanguageIds.push(status.id);
     }
     nextState.selectedLanguageId = status.id;
-    nextState.dismissedRevisions[status.id] = status.revision;
+    const appliedChangeCount = status.pendingSigns.length
+      + status.removedSigns.length
+      + status.pendingPhrases.length
+      + status.removedPhrases.length;
+    if (appliedChangeCount >= status.changeCount) {
+      nextState.dismissedRevisions[status.id] = status.revision;
+    }
     await writeLibraryState(nextState);
   } catch (error) {
     for (const temporaryPath of temporaryPaths) await bestEffortDelete(temporaryPath);

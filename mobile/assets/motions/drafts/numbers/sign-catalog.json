@@ -1,0 +1,112 @@
+{
+  "schema": "vozual.number-motion-draft-catalog",
+  "status": "owner-approved-prototype",
+  "languageId": "lsc-co",
+  "source": {
+    "title": "Diccionario Básico de la Lengua de Señas Colombiana",
+    "publisher": "Ministerio de Educación Nacional e INSOR",
+    "url": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf"
+  },
+  "entries": [
+    {
+      "id": "lsc-co-number-01",
+      "gloss": "UNO",
+      "speechAliases": [
+        "uno",
+        "1"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "uno.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
+    },
+    {
+      "id": "lsc-co-number-02",
+      "gloss": "DOS",
+      "speechAliases": [
+        "dos",
+        "2"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "dos.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
+    },
+    {
+      "id": "lsc-co-number-03",
+      "gloss": "TRES",
+      "speechAliases": [
+        "tres",
+        "3"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "tres.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
+    },
+    {
+      "id": "lsc-co-number-04",
+      "gloss": "CUATRO",
+      "speechAliases": [
+        "cuatro",
+        "4"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "cuatro.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
+    },
+    {
+      "id": "lsc-co-number-05",
+      "gloss": "CINCO",
+      "speechAliases": [
+        "cinco",
+        "5"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "cinco.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
+    }
+  ]
+}

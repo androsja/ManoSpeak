@@ -19,10 +19,13 @@ import {
 import RNFS from 'react-native-fs';
 import {
   advanceIncrementalSpeechMatches,
+  androidDirectSignVocabulary,
+  extractKnownSpeechWords,
   mergeSpeechSegments,
   resolvePictureInPictureTransition,
   selectKnownSpeechAlternative,
   shouldDeferSpeechMatch,
+  normalizeSpeech,
 } from '../services/VoiceCommandService';
 import type {InstalledPhrase, InstalledSign} from '../services/SignLanguageService';
 import {
@@ -188,11 +191,15 @@ export function ListenerScreen({
   const recognitionReadyRef = useRef(false);
   const lastRecognitionActivity = useRef(0);
   const nativeStartInFlight = useRef(false);
+  const listeningStartInFlight = useRef(false);
+  const autoListeningAttempted = useRef(false);
   const listeningRef = useRef(false);
   const listeningModeRef = useRef<ListeningMode>('phrase');
   const phrasePartialTextRef = useRef('');
   const playingRef = useRef(false);
   const phraseInProgressRef = useRef(false);
+  const lastStartedSignRef = useRef<KnownWord | undefined>(undefined);
+  const androidRecognizedWordsRef = useRef<KnownWord[]>([]);
   const pictureInPictureModeRef = useRef(false);
   const nativePictureInPictureEventRef = useRef(false);
   const usageRemainderMillisRef = useRef(0);
@@ -248,7 +255,8 @@ export function ListenerScreen({
   // start request is still unwinding. A terminal session must never leave the
   // primary action visually busy: only render its spinner while a session is
   // still active.
-  const speechActionBusy = listening && (starting || phraseFinalizing);
+  const speechActionBusy = starting || (listening && phraseFinalizing);
+  const speechButtonDisabled = speechActionBusy || (!listening && (!avatarReady || playingSign));
   const listenerFlowState = useMemo(() => deriveListenerFlowState({
     listening,
     starting,
@@ -280,9 +288,15 @@ export function ListenerScreen({
   const phraseSuggestion = phraseSuggestions.length > 0
     ? phraseSuggestions[phraseSuggestionIndex % phraseSuggestions.length]
     : '';
+  const androidAutoVocabulary = useMemo(
+    () => androidDirectSignVocabulary(installedSigns),
+    [installedSigns],
+  );
+  const androidAutoSignsAvailable = Platform.OS === 'android' && androidAutoVocabulary.length > 0;
   const knownWords = useMemo(() => {
+    if (Platform.OS === 'android') return androidAutoVocabulary;
     return playableLscPhraseVocabulary(installedSigns);
-  }, [installedSigns]);
+  }, [androidAutoVocabulary, installedSigns]);
   const installedSignCount = installedSigns.length;
   // Development builds exercise the complete Plus flow without contacting a
   // store or charging a real payment method. Release builds always use the
@@ -352,6 +366,7 @@ export function ListenerScreen({
 
   useEffect(() => {
     let active = true;
+    if (Platform.OS === 'android') return () => { active = false; };
     RNFS.exists(LISTENER_TUTORIAL_PATH)
       .then(completed => {
         if (active && !completed) setTutorialVisible(true);
@@ -567,8 +582,11 @@ export function ListenerScreen({
   }, [avatarRenderMode, avatarZoom, playbackSpeed]);
 
   useEffect(() => {
-    pictureInPicture?.setListeningMode(listeningMode, listening);
-  }, [listening, listeningMode]);
+    const nativeMode = Platform.OS === 'android' && androidAutoSignsAvailable
+      ? 'continuous'
+      : listeningMode;
+    pictureInPicture?.setListeningMode(nativeMode, listening);
+  }, [androidAutoSignsAvailable, listening, listeningMode]);
 
   const applyPictureInPictureState = useCallback((compact: boolean) => {
     const wasCompact = pictureInPictureModeRef.current;
@@ -601,6 +619,8 @@ export function ListenerScreen({
 
   const startSign = useCallback((word: KnownWord, continuation: boolean) => {
     clearPhraseContinuationTimer();
+    speechDebug('avatar-sign-requested', word);
+    lastStartedSignRef.current = word;
     playingRef.current = true;
     phraseInProgressRef.current = true;
     pictureInPicture?.reportPlaybackEvent('play-sign', word);
@@ -614,6 +634,7 @@ export function ListenerScreen({
   const finishPhrase = useCallback(() => {
     clearPhraseContinuationTimer();
     phraseInProgressRef.current = false;
+    lastStartedSignRef.current = undefined;
     playingRef.current = false;
     setContinuePhrase(false);
     setPlaybackPaused(false);
@@ -629,7 +650,9 @@ export function ListenerScreen({
     if (!word) {
       return;
     }
-    startSign(word, phraseInProgressRef.current);
+    const continuation = phraseInProgressRef.current
+      && normalizeSpeech(word) !== normalizeSpeech(lastStartedSignRef.current ?? '');
+    startSign(word, continuation);
   }, [startSign]);
 
   const handleText = useCallback((text: string, isFinal = false, selectedEntryId?: string) => {
@@ -743,6 +766,36 @@ export function ListenerScreen({
       hasMeasuredConfidence,
       lowConfidenceFinal,
     });
+    if (Platform.OS === 'android') {
+      if (bestText) setTranscript(bestText);
+      const recognizedSigns = bestText ? extractKnownSpeechWords(bestText, knownWords) : [];
+      const previousRecognizedWords = androidRecognizedWordsRef.current;
+      const {newWords, nextRecognizedWords} = advanceIncrementalSpeechMatches(
+        previousRecognizedWords,
+        recognizedSigns,
+        isFinal,
+      );
+      if (recognizedSigns.length > 0 || isFinal) {
+        // Keep the final result until the next recognizer start so a duplicate
+        // native callback cannot replay it; each new utterance resets below.
+        androidRecognizedWordsRef.current = isFinal ? recognizedSigns : nextRecognizedWords;
+      }
+      speechDebug('android-direct-sign-match-check', {
+        final: isFinal,
+        matchedOccurrences: recognizedSigns.length,
+        newlyMatchedOccurrences: newWords.length,
+        lowConfidenceFinal,
+      });
+      // Queue matches from the complete installed sign vocabulary.
+      // Repeated partial callbacks do not replay a word, while repeated words
+      // in one utterance remain separate sign requests.
+      if (!androidAutoSignsAvailable || (isFinal && lowConfidenceFinal) || newWords.length === 0) return;
+      recognizedWords.current = [];
+      signQueue.current.push(...newWords.map(word => word.toUpperCase()));
+      playNextSign();
+      setErrorMessage('');
+      return;
+    }
     if (listeningModeRef.current === 'phrase' && !isFinal) {
       if (bestText) {
         phrasePartialTextRef.current = bestText;
@@ -819,7 +872,7 @@ export function ListenerScreen({
       setPhraseFinalizing(false);
       void pictureInPicture?.stopListeningService();
     }
-  }, [clearDeferredSpeech, handleText, installedSigns, knownWords, requestTranscriptConfirmation]);
+  }, [androidAutoSignsAvailable, clearDeferredSpeech, handleText, installedSigns, knownWords, playNextSign, requestTranscriptConfirmation]);
 
   const markRecognitionUnavailable = useCallback(() => {
     recognitionReadyRef.current = false;
@@ -968,9 +1021,14 @@ export function ListenerScreen({
   startActivityRecognitionRef.current = startActivityRecognition;
 
   const startListening = useCallback(async () => {
-    if (listeningRef.current) return;
+    if (listeningRef.current || listeningStartInFlight.current) return;
+    listeningStartInFlight.current = true;
     nativePipSpeechActiveRef.current = false;
     setStarting(true);
+    if (Platform.OS === 'android') {
+      setTranscript('');
+      setPlannedLsc('');
+    }
     setErrorMessage('');
     setMicrophonePermissionBlocked(false);
     try {
@@ -1011,6 +1069,7 @@ export function ListenerScreen({
       recognitionGeneration.current += 1;
       listeningRef.current = true;
       setListening(true);
+      setStarting(false);
       await startActivityRecognition();
     } catch (error) {
       listeningRef.current = false;
@@ -1018,6 +1077,7 @@ export function ListenerScreen({
       setListening(false);
       setErrorMessage(error instanceof Error ? error.message : 'No se pudo iniciar el reconocimiento de voz.');
     } finally {
+      listeningStartInFlight.current = false;
       setStarting(false);
     }
   }, [markRecognitionUnavailable, startActivityRecognition]);
@@ -1036,6 +1096,20 @@ export function ListenerScreen({
     if (pictureInPictureModeRef.current) pictureInPicture?.resetPlayback();
     await startListening();
   }, [startListening]);
+
+  useEffect(() => {
+    if (
+      Platform.OS !== 'android'
+      || !androidAutoSignsAvailable
+      || !avatarReady
+      || autoListeningAttempted.current
+    ) return;
+    autoListeningAttempted.current = true;
+    speechDebug('android-direct-sign-auto-start', 'listener-ready');
+    startPhraseListening().catch(error => {
+      speechDebug('android-direct-sign-auto-start-failed', error);
+    });
+  }, [androidAutoSignsAvailable, avatarReady, startPhraseListening]);
 
   const finishPhraseListening = useCallback(async () => {
     if (!listeningRef.current || listeningModeRef.current !== 'phrase' || phraseFinalizing) return;
@@ -1117,6 +1191,7 @@ export function ListenerScreen({
     recognizedWords.current = [];
     clearPhraseContinuationTimer();
     phraseInProgressRef.current = false;
+    lastStartedSignRef.current = undefined;
     playingRef.current = false;
     setContinuePhrase(false);
     setPlayingSign(false);
@@ -1262,6 +1337,7 @@ export function ListenerScreen({
     // Disable the session before calling the native module: stop/cancel emit
     // end and error events, and those events must not resurrect recognition.
     listeningRef.current = false;
+    listeningStartInFlight.current = false;
     nativePipSpeechActiveRef.current = false;
     recognitionGeneration.current += 1;
     markRecognitionUnavailable();
@@ -1302,6 +1378,11 @@ export function ListenerScreen({
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('onVozualPipPrimaryAction', () => {
       if (!pictureInPictureModeRef.current) return;
+      if (Platform.OS === 'android' && androidAutoSignsAvailable) {
+        if (listeningRef.current) stopListening().catch(() => undefined);
+        else startListening().catch(() => undefined);
+        return;
+      }
       if (listeningModeRef.current === 'phrase') {
         if (listeningRef.current) void finishPhraseListening();
         else void startPhraseListening();
@@ -1311,7 +1392,7 @@ export function ListenerScreen({
       else void startListening();
     });
     return () => subscription.remove();
-  }, [finishPhraseListening, startListening, startPhraseListening, stopListening]);
+  }, [androidAutoSignsAvailable, finishPhraseListening, startListening, startPhraseListening, stopListening]);
 
   useEffect(() => {
     if (Platform.OS === 'ios') {
@@ -1445,7 +1526,7 @@ export function ListenerScreen({
         speechDebug('android-service-event', {
           type: event.type,
           error: event.error,
-          results: event.value ?? [],
+          resultCount: event.value?.length ?? 0,
           listening: listeningRef.current,
         });
         if (!listeningRef.current || !nativePipSpeechActiveRef.current) {
@@ -1457,6 +1538,7 @@ export function ListenerScreen({
           recognitionReadyRef.current = true;
           setRecognitionReady(true);
           recognizedWords.current = [];
+          androidRecognizedWordsRef.current = [];
           setMicrophonePermissionBlocked(false);
           setErrorMessage('');
           return;
@@ -1515,7 +1597,11 @@ export function ListenerScreen({
           pictureInPicture?.stopListeningService().catch(() => false);
           return;
         }
-        if (event.type === 'error' && listeningModeRef.current === 'phrase') {
+        if (
+          event.type === 'error'
+          && listeningModeRef.current === 'phrase'
+          && !(Platform.OS === 'android' && androidAutoSignsAvailable)
+        ) {
           if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
           phraseFinalizeTimer.current = undefined;
           listeningRef.current = false;
@@ -1555,12 +1641,14 @@ export function ListenerScreen({
       clearDeferredSpeech();
       clearPhraseContinuationTimer();
     };
-  }, [clearDeferredSpeech, clearPhraseContinuationTimer, finalizeIosSpeechResult, markRecognitionUnavailable, onSpeechResults, scheduleIosRecognitionRestart]);
+  }, [androidAutoSignsAvailable, clearDeferredSpeech, clearPhraseContinuationTimer, finalizeIosSpeechResult, markRecognitionUnavailable, onSpeechResults, scheduleIosRecognitionRestart]);
 
   const onSignEnd = useCallback(() => {
     const nextWord = signQueue.current.shift();
     if (nextWord) {
-      startSign(nextWord, true);
+      const continuation = normalizeSpeech(nextWord)
+        !== normalizeSpeech(lastStartedSignRef.current ?? '');
+      startSign(nextWord, continuation);
       return;
     }
     playingRef.current = false;
@@ -1717,7 +1805,7 @@ export function ListenerScreen({
             );
           })}
         </View>}
-        {tutorialVisible && (
+        {Platform.OS !== 'android' && tutorialVisible && (
           <View style={styles.tutorialCard} accessibilityLabel={t('listener.tutorial.label')}>
             <View style={styles.tutorialHeader}>
               <Text style={styles.tutorialTitle}>{t('listener.tutorial.title')}</Text>
@@ -1736,7 +1824,7 @@ export function ListenerScreen({
             <Text style={styles.tutorialPointer}>{t('listener.tutorial.pointer')}</Text>
           </View>
         )}
-        {__DEV__ && <Pressable
+        {Platform.OS !== 'android' && __DEV__ && <Pressable
           accessibilityRole="button"
           accessibilityLabel="Reproducir la seña de prueba ADIÓS"
           disabled={!avatarReady || playingSign}
@@ -1748,22 +1836,26 @@ export function ListenerScreen({
         >
           <Text style={styles.adiosPreviewButtonText}>VER SEÑA ADIÓS</Text>
         </Pressable>}
-        <Pressable
+        {(Platform.OS !== 'android' || androidAutoSignsAvailable) && <Pressable
           accessibilityRole="button"
-          style={[styles.button, listening && styles.buttonActive, (speechActionBusy || (!listening && playingSign)) && styles.buttonDisabled]}
-          onPress={listeningMode === 'phrase'
-            ? (listening ? finishPhraseListening : startPhraseListening)
-            : (listening ? stopListening : startListening)}
-          disabled={speechActionBusy || (!listening && playingSign)}
+          style={[styles.button, listening && styles.buttonActive, speechButtonDisabled && styles.buttonDisabled]}
+          onPress={Platform.OS === 'android'
+            ? (listening ? stopListening : startListening)
+            : listeningMode === 'phrase'
+              ? (listening ? finishPhraseListening : startPhraseListening)
+              : (listening ? stopListening : startListening)}
+          disabled={speechButtonDisabled}
         >
           {speechActionBusy
             ? <ActivityIndicator color="#07111F" />
             : <Text style={styles.buttonText}>
-              {listeningMode === 'phrase'
+              {Platform.OS === 'android'
+                ? (listening ? t('listener.stopListening') : t('listener.speak'))
+                : listeningMode === 'phrase'
                 ? (playingSign ? t('listener.replaying') : listening ? t('listener.finishPhrase') : t('listener.speak'))
                 : listening ? t('listener.stopListening') : t('listener.activateMicrophone')}
             </Text>}
-        </Pressable>
+        </Pressable>}
         {accessPolicy.canUsePictureInPicture && <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('listener.openFloating')}
@@ -1781,7 +1873,19 @@ export function ListenerScreen({
             {t('listener.openFloatingAction')}
           </Text>
         </Pressable>}
-        {phraseFinalizing ? (
+        {Platform.OS === 'android' && androidAutoSignsAvailable ? (
+          <Text style={styles.status} accessibilityLiveRegion="polite">
+            {starting || microphonePreparing
+              ? 'Activando el micrófono…'
+              : listening
+                ? t('listener.liveListening')
+                : t('listener.liveIdle')}
+          </Text>
+        ) : Platform.OS === 'android' ? (
+          <Text style={styles.status}>
+            {t('listener.liveRequiresDownload')}
+          </Text>
+        ) : phraseFinalizing ? (
           <View style={styles.microphoneProgress} accessibilityLabel={t('listener.preparingTranslation')}>
             <ActivityIndicator size="small" color="#16D9D1" />
             <Text style={styles.microphoneProgressText}>{t('listener.preparingSign')}</Text>
@@ -1797,6 +1901,18 @@ export function ListenerScreen({
               ? t('listener.listeningFinish')
               : t('listener.continuousActive')}
           </Text>
+        )}
+        {Platform.OS === 'android' && androidAutoSignsAvailable && (
+          <View style={styles.detectedWordsCard}>
+            <Text
+              accessibilityLiveRegion="polite"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={styles.detectedWordsText}
+            >
+              {t('listener.detectedWords', {words: transcript || '—'})}
+            </Text>
+          </View>
         )}
         {!!errorMessage && (
           <Text style={styles.error}>
@@ -1843,7 +1959,7 @@ export function ListenerScreen({
             </Pressable>
           </View>
         )}
-        {transcript ? (
+        {Platform.OS !== 'android' && transcript ? (
           <View
             testID={`listener-flow-${listenerFlowState}`}
             style={styles.recognizedCard}
@@ -1906,7 +2022,7 @@ export function ListenerScreen({
             ))}
           </View>
         )}
-        <View style={styles.suggestionCard}>
+        {Platform.OS !== 'android' && <View style={styles.suggestionCard}>
           {phraseSuggestions.length > 0 ? (
             <>
             <View style={styles.suggestionHeader}>
@@ -1955,7 +2071,7 @@ export function ListenerScreen({
               </Pressable>
             </>
           )}
-        </View>
+        </View>}
       </View>}
 
       {!compactMode && <Modal
@@ -2249,6 +2365,8 @@ const styles = StyleSheet.create({
   floatingButtonText: { color: '#16D9D1', fontWeight: '800', letterSpacing: 0.4 },
   floatingButtonTextDisabled: { color: '#7C899A' },
   status: { color: '#16D9D1', textAlign: 'center', fontSize: 11, fontWeight: '700', marginTop: 12 },
+  detectedWordsCard: { height: 24, marginTop: 5, paddingHorizontal: 8, borderRadius: 8, backgroundColor: '#102337', justifyContent: 'center', flexShrink: 0 },
+  detectedWordsText: { color: '#D8E1EC', fontSize: 10, lineHeight: 13, textAlign: 'center' },
   microphoneProgress: { height: 32, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   microphoneProgressText: { color: '#16D9D1', fontSize: 11, fontWeight: '800', letterSpacing: 0.25 },
   recognizedCard: { minHeight: 58, marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#102337', justifyContent: 'center' },

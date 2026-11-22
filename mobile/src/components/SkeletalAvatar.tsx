@@ -71,9 +71,8 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, paused, continu
         webView.current?.injectJavaScript(script);
         return;
       }
-      const usesBundledKinematicPlan = renderMode === 'rigged' && clip.toUpperCase() === 'ADIOS';
       let installScript = '';
-      if (clip !== 'IDLE' && clip !== 'PHRASE_WAIT' && !usesBundledKinematicPlan) {
+      if (clip !== 'IDLE' && clip !== 'PHRASE_WAIT') {
         const payload = await readInstalledSignPayload(clip);
         if (cancelled) return;
         if (!payload) {
@@ -82,8 +81,15 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, paused, continu
           onClipEnd();
           return;
         }
-        onPlaybackDiagnostic?.('avatar-motion-base64-bytes', String(payload.contentBase64.length));
-        installScript = `window.installVozualMotionBase64(${JSON.stringify(clip)}, ${JSON.stringify(payload.contentBase64)}, ${JSON.stringify(payload.avatarProfile)}); `;
+        onPlaybackDiagnostic?.(
+          payload.motionDocument ? 'avatar-motion-json-frames' : 'avatar-motion-base64-bytes',
+          payload.motionDocument
+            ? String(payload.motionDocument.frames.length)
+            : String(payload.contentBase64.length),
+        );
+        installScript = payload.motionDocument
+          ? `window.installVozualMotionJson(${JSON.stringify(clip)}, ${JSON.stringify(payload.motionDocument)}, ${JSON.stringify(payload.avatarProfile)}); `
+          : `window.installVozualMotionBase64(${JSON.stringify(clip)}, ${JSON.stringify(payload.contentBase64)}, ${JSON.stringify(payload.avatarProfile)}); `;
       }
       setRuntimeError('');
       // Keep the renderer selection and clip in one command. Android WebView
@@ -92,7 +98,14 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, paused, continu
       const script = `${installScript}window.setVozualRenderMode(${JSON.stringify(renderMode)}); window.playVozualClip(${JSON.stringify(clip)}, ${playbackId}, ${playbackSpeed}, ${continuePhrase}); window.tickVozualAnimation?.(); true;`;
       webView.current?.injectJavaScript(script);
     };
-    void send();
+    send().catch(error => {
+      if (cancelled) return;
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error(`[Captured skeleton] Motion load failed: ${detail}`);
+      setRuntimeError(`No se pudo cargar la seña ${clip}.`);
+      onPlaybackDiagnostic?.('avatar-motion-load-error', detail.slice(0, 120));
+      onClipEnd();
+    });
     return () => { cancelled = true; };
   }, [clip, continuePhrase, kinematicPlan, onClipEnd, onPlaybackDiagnostic, playbackId, playbackSpeed, ready, renderMode]);
 
@@ -142,14 +155,16 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, paused, continu
       }
       onReady?.();
     } else if (message.type === 'ended' && message.playbackId === playbackId) {
+      onPlaybackDiagnostic?.('avatar-playback-ended', clip);
       onClipEnd();
     } else if (message.type === 'error') {
       const detail = message.message || 'Error desconocido del motor 3D.';
       console.error(`[Captured skeleton] ${detail}`);
+      onPlaybackDiagnostic?.('avatar-playback-error', detail.slice(0, 120));
       setRuntimeError(`No se pudo cargar el esqueleto: ${detail}`);
       onPlaybackDiagnostic?.('avatar-runtime-error', 'reported');
     }
-  }, [onClipEnd, onPlaybackDiagnostic, onReady, playbackId]);
+  }, [clip, onClipEnd, onPlaybackDiagnostic, onReady, playbackId]);
 
   return (
     <View style={styles.container}>

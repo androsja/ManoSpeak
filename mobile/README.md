@@ -42,3 +42,37 @@ React Native PiP renderer and the full WebView renderer decode the same compact
 format, while VOZUAL continues to edit the lossless JSON source.
 
 Refer to [DEVELOPMENT_COMMANDS.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/docs/DEVELOPMENT_COMMANDS.md) for execution details.
+
+## JSON Motion Releases
+
+Local JSON edits do not upload themselves. Test each edited motion, then publish
+it through `tools/publish-json-motion-release.cjs` as a new immutable Firebase
+release; include every JSON sign in the active release so unchanged signs remain
+available. The publisher prints a dry run by default and requires `--publish`
+to activate a release. After activation, Android checks Firebase on app startup
+and when the app returns to the foreground. It shows an update notice and waits
+for the user to open the library and choose whether to download; installed
+motions stay unchanged until the user accepts. First-time language setup still
+happens in the sign library.
+
+Each release manifest carries the sign's `speechAliases` with its JSON motion
+metadata. The user's download choice installs both the motion file and these
+aliases into the local library, so speech matching uses the same version the
+user accepted. Firebase keeps the aliases as a metadata field on the sign entry;
+the motion JSON itself is stored separately in immutable release chunks. Android
+builds its continuous-listening vocabulary from every installed sign's gloss and
+`speechAliases`, then plays the JSON motion for the matched gloss.
+
+Firebase and the local library both record the published version for each sign.
+The app also compares the motion SHA-256 and a semantic release SHA-256 that
+covers the aliases. It offers an update when the motion or spoken vocabulary
+actually changed, and does not ask the user to re-download unchanged signs just
+because the language-wide release number advanced.
+
+`speechAliases` is the curated list of spoken words and phrases for one sign.
+It can include inflected forms that should select the same motion, such as
+`comer`, `come`, `comes`, and `comía` for a reviewed COMER entry. Add and review
+those forms in the release catalog; the app does not guess Spanish conjugations.
+This keeps ambiguous words and irregular forms under editorial control. The
+same metadata can hold synonyms or numeric forms such as `uno` and `1` without
+changing the motion JSON.

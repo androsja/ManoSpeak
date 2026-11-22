@@ -25,6 +25,7 @@ import {
   riggedApproachPalmScaleEnvelope,
   riggedApproachPalmScaleFactor,
   riggedHandsEditPoseAtFrame,
+  riggedFingerFanAngles,
   riggedFacialEditAtFrame,
   riggedSmileEditAtFrame,
   riggedWristDepth,
@@ -88,6 +89,32 @@ function rotateFace(face: MotionPoint[], yaw: number, pitch: number): MotionPoin
 }
 
 describe('avatar motion presentation', () => {
+  it('fans only configured extended digits with the requested adjacent gap', () => {
+    expect(riggedFingerFanAngles({
+      index: 'extended',
+      middle: 'extended',
+      ring: 'closed',
+      pinky: 'closed',
+    }, 28, 'left')).toEqual({index: 14, middle: -14});
+    expect(riggedFingerFanAngles({
+      index: 'extended',
+      middle: 'extended',
+      ring: 'extended',
+      pinky: 'closed',
+    }, 22, 'left')).toEqual({index: 22, middle: 0, ring: -22});
+    expect(riggedFingerFanAngles({
+      index: 'extended',
+      middle: 'extended',
+      ring: 'extended',
+      pinky: 'extended',
+    }, 16, 'left')).toEqual({index: 24, middle: 8, ring: -8, pinky: -24});
+    expect(riggedFingerFanAngles({
+      index: 'extended',
+      middle: 'extended',
+    }, 28, 'right')).toEqual({index: -14, middle: 14});
+    expect(riggedFingerFanAngles({index: 'extended'}, 28, 'left')).toEqual({});
+  });
+
   it('keeps a foreshortened forearm visible without moving its wrist', () => {
     const elbow = point(0.1, 0.1, 0.35);
     const wrist = point(0, 0, 0.8);

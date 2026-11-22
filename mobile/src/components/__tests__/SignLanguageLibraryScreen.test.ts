@@ -17,7 +17,6 @@ jest.mock('../../services/SignLanguageService', () => ({}));
 import {
   handleLibraryBack,
   recommendedPhrasesForInstalledLibrary,
-  shouldShowLibraryRetry,
 } from '../SignLanguageLibraryScreen';
 
 describe('SignLanguageLibraryScreen Android Back behavior', () => {
@@ -37,13 +36,6 @@ describe('SignLanguageLibraryScreen Android Back behavior', () => {
     expect(handleLibraryBack('', closeCatalog, closeLibrary)).toBe(true);
     expect(closeCatalog).not.toHaveBeenCalled();
     expect(closeLibrary).toHaveBeenCalledTimes(1);
-  });
-
-  test('offers retry when an offline clean install has no catalogue result', () => {
-    expect(shouldShowLibraryRetry(false, '', 0)).toBe(true);
-    expect(shouldShowLibraryRetry(false, 'network unavailable', 0)).toBe(true);
-    expect(shouldShowLibraryRetry(true, '', 0)).toBe(false);
-    expect(shouldShowLibraryRetry(false, '', 1)).toBe(false);
   });
 
   test('shows remote downloaded phrases only when every required sign is installed', () => {

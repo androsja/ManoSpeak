@@ -476,6 +476,13 @@ class VoiceListeningService : Service() {
       )
       putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
       putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+      putStringArrayListExtra(
+        RecognizerIntent.EXTRA_BIASING_STRINGS,
+        arrayListOf(
+          "adiós", "adios", "chao", "hasta luego",
+          "uno", "dos", "tres", "cuatro", "cinco",
+        ),
+      )
       // These are hints (recognition providers can choose their own limits),
       // but supported providers keep a listening session open long enough for
       // natural pauses instead of reporting a timeout immediately.

@@ -101,6 +101,30 @@ export type RiggedFingerJointEdits = Record<RiggedFingerName, [number, number, n
 export type RiggedFingerState = 'captured' | 'extended' | 'closed';
 export type RiggedHandFingerStates = Partial<Record<RiggedFingerName, RiggedFingerState>>;
 
+/**
+ * Fans configured extended fingers around their shared centerline. The value
+ * is the angle between neighboring extended fingers, in degrees.
+ */
+export function riggedFingerFanAngles(
+  states: RiggedHandFingerStates,
+  adjacentSpreadDegrees: number,
+  side: 'left' | 'right',
+): Partial<Record<Exclude<RiggedFingerName, 'thumb'>, number>> {
+  const extended = (['index', 'middle', 'ring', 'pinky'] as const)
+    .filter(finger => states[finger] === 'extended');
+  const spread = Math.max(0, Math.min(36, Number.isFinite(adjacentSpreadDegrees)
+    ? adjacentSpreadDegrees
+    : 0));
+  if (extended.length < 2 || spread === 0) return {};
+
+  const center = (extended.length - 1) / 2;
+  const sideSign = side === 'left' ? 1 : -1;
+  return Object.fromEntries(extended.map((finger, index) => [
+    finger,
+    (center - index) * spread * sideSign,
+  ]));
+}
+
 /** Model-local flexion profile for the editor's natural fist control. */
 export const EDITOR_FIST_FINGER_CURLS: Readonly<Record<RiggedFingerName, readonly number[]>> = {
   thumb: [0, 0, 0],

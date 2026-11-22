@@ -1,9 +1,18 @@
+const DIGIT_TO_SPANISH_NUMBER: Readonly<Record<string, string>> = {
+  '1': 'uno',
+  '2': 'dos',
+  '3': 'tres',
+  '4': 'cuatro',
+  '5': 'cinco',
+};
+
 export function normalizeSpeech(text: string): string {
   return text
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\b([1-5])\b/g, (_match, digit: string) => DIGIT_TO_SPANISH_NUMBER[digit])
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -210,3 +219,19 @@ export type SpeechSign = {
 };
 
 type SpeechVocabulary = readonly (string | SpeechSign)[];
+
+export type InstalledDirectSign = {
+  gloss: string;
+  speechAliases: readonly string[];
+  categories: readonly string[];
+  lexicalClass: string;
+};
+
+/** Uses the installed Firebase vocabulary for Android's continuous sign mode. */
+export function androidDirectSignVocabulary(
+  signs: readonly InstalledDirectSign[],
+): SpeechSign[] {
+  return signs
+    .filter(sign => sign.gloss.trim().length > 0)
+    .map(sign => ({gloss: sign.gloss, aliases: sign.speechAliases ?? []}));
+}

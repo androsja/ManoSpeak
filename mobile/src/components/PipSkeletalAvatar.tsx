@@ -10,7 +10,7 @@ import {
 } from '../services/CompactSignMotion';
 import {
   installedSignGlosses,
-  readInstalledSignMotionBase64,
+  readInstalledSignPayload,
 } from '../services/SignLanguageService';
 import {
   coarticulateSignMotion,
@@ -159,9 +159,11 @@ async function loadMotion(clip: string): Promise<Motion> {
   const key = clip.trim().toUpperCase();
   const cached = motionCache.get(key);
   if (cached) return cached;
-  const content = await readInstalledSignMotionBase64(clip);
-  if (!content) throw new Error(`Motion ${clip} is not installed.`);
-  const parsed = decodeCompactMotion(decodeBase64Bytes(content));
+  const payload = await readInstalledSignPayload(clip);
+  if (!payload) throw new Error(`Motion ${clip} is not installed.`);
+  const parsed = payload.motionDocument
+    ? payload.motionDocument
+    : decodeCompactMotion(decodeBase64Bytes(payload.contentBase64));
   if (!Array.isArray(parsed.frames) || parsed.frames.length < 2) {
     throw new Error(`Motion ${clip} does not contain enough frames.`);
   }
