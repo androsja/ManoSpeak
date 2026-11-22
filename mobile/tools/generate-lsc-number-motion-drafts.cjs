@@ -63,14 +63,14 @@ function canonicalFrame(lateralFingerSpread = 1) {
   return {bodyHands, face: Array.from({length: 468}, () => [0, 0, 0])};
 }
 
-function raisedNumberFrame(rest, lateralFingerSpread = 1) {
+function raisedNumberFrame(rest, lateralFingerSpread = 1, location = {}) {
   const frame = {
     bodyHands: rest.bodyHands.map(point => [...point]),
     face: rest.face.map(point => [...point]),
   };
   // Lift the active hand to the side of the avatar's face, away from its center.
-  frame.bodyHands[13] = [0.82, 0.75, -0.02];
-  frame.bodyHands[15] = [0.77, 0.58, -0.04];
+  frame.bodyHands[13] = location.elbow ?? [0.82, 0.75, -0.02];
+  frame.bodyHands[15] = location.wrist ?? [0.77, 0.58, -0.04];
   handAt(frame.bodyHands[15], -1, lateralFingerSpread).forEach((point, index) => { frame.bodyHands[33 + index] = point; });
   return frame;
 }
@@ -142,75 +142,165 @@ function easedProgress(value) {
 function frameCountFor(sign) {
   const movement = sign.movement;
   if (!movement) return 36;
-  if (movement.type !== 'finger-flexion-repetitions') {
+  if (!['finger-flexion-repetitions', 'arm-translation-repetitions'].includes(movement.type)) {
     throw new Error(`Unsupported number motion primitive: ${movement.type}`);
   }
-  const values = [movement.repetitions, movement.startFrame, movement.flexionFrames,
-    movement.returnFrames, movement.pauseFrames, movement.holdFrames];
+  const outboundFrames = movement.type === 'arm-translation-repetitions'
+    ? movement.inwardFrames
+    : movement.flexionFrames;
+  const returnFrames = movement.type === 'arm-translation-repetitions'
+    ? movement.outwardFrames
+    : movement.returnFrames;
+  const values = [movement.repetitions, movement.startFrame, outboundFrames,
+    returnFrames, movement.pauseFrames, movement.holdFrames];
   if (values.some(value => !Number.isInteger(value) || value < 0)
-      || movement.repetitions < 1 || movement.flexionFrames < 1 || movement.returnFrames < 1
-      || !Number.isFinite(movement.flexAmount) || movement.flexAmount <= 0 || movement.flexAmount > 1) {
-    throw new Error(`Invalid finger-flexion-repetitions plan for ${sign.gloss}.`);
+      || movement.repetitions < 1 || outboundFrames < 1 || returnFrames < 1
+      || (movement.type === 'finger-flexion-repetitions'
+        && (!Number.isFinite(movement.flexAmount) || movement.flexAmount <= 0 || movement.flexAmount > 1))
+      || (movement.type === 'arm-translation-repetitions'
+        && (!Number.isFinite(movement.amplitude) || movement.amplitude <= 0
+          || !Array.isArray(movement.axis) || movement.axis.length !== 3
+          || movement.axis.some(value => !Number.isFinite(value))))
+      || (movement.lateralSpacingScale !== undefined
+        && (!Number.isFinite(movement.lateralSpacingScale)
+          || movement.lateralSpacingScale < 0.5 || movement.lateralSpacingScale > 1))) {
+    throw new Error(`Invalid ${movement.type} plan for ${sign.gloss}.`);
   }
-  const cycleLength = movement.flexionFrames + movement.returnFrames + movement.pauseFrames;
+  const cycleLength = outboundFrames + returnFrames + movement.pauseFrames;
   return movement.startFrame + movement.repetitions * cycleLength + movement.holdFrames;
 }
 
 function movementProgressAtFrame(frameIndex, movement) {
   if (!movement) return 0;
-  const cycleLength = movement.flexionFrames + movement.returnFrames + movement.pauseFrames;
+  const outboundFrames = movement.type === 'arm-translation-repetitions'
+    ? movement.inwardFrames
+    : movement.flexionFrames;
+  const returnFrames = movement.type === 'arm-translation-repetitions'
+    ? movement.outwardFrames
+    : movement.returnFrames;
+  const cycleLength = outboundFrames + returnFrames + movement.pauseFrames;
   let progress = 0;
   for (let repetition = 0; repetition < movement.repetitions; repetition += 1) {
     const startFrame = movement.startFrame + repetition * cycleLength;
-    const flexionEndFrame = startFrame + movement.flexionFrames;
-    const returnEndFrame = flexionEndFrame + movement.returnFrames;
+    const flexionEndFrame = startFrame + outboundFrames;
+    const returnEndFrame = flexionEndFrame + returnFrames;
     const cycleProgress = frameIndex < startFrame
       ? 0
       : frameIndex <= flexionEndFrame
-        ? easedProgress((frameIndex - startFrame) / movement.flexionFrames)
+        ? easedProgress((frameIndex - startFrame) / outboundFrames)
         : frameIndex <= returnEndFrame
-          ? 1 - easedProgress((frameIndex - flexionEndFrame) / movement.returnFrames)
+          ? 1 - easedProgress((frameIndex - flexionEndFrame) / returnFrames)
           : 0;
     progress = Math.max(progress, cycleProgress);
   }
-  return progress * movement.flexAmount;
+  return progress * (movement.type === 'arm-translation-repetitions' ? 1 : movement.flexAmount);
 }
 
-function flexFingerFrame(frame, finger, amount, states) {
+function flexFingerFrame(frame, fingers, amount, states, movement = {}) {
   if (amount <= 0) return frame;
-  const chain = FINGER_LANDMARK_CHAINS[finger];
-  if (!chain) throw new Error(`Unsupported finger-flexion target: ${finger}`);
+  const targets = Array.isArray(fingers) ? fingers : [fingers];
+  const chains = targets.map(finger => {
+    const chain = FINGER_LANDMARK_CHAINS[finger];
+    if (!chain) throw new Error(`Unsupported finger-flexion target: ${finger}`);
+    return chain;
+  });
   const bodyHands = frame.bodyHands.map(point => [...point]);
   const hand = bodyHands.slice(33, 54);
-  const foldedHand = applyNumberFingerStates(hand, {...states, [finger]: 'closed'});
-  chain.slice(1).forEach(index => {
-    bodyHands[33 + index] = roundPoint(hand[index].map((value, axis) => (
-      value + (foldedHand[index][axis] - value) * amount
+  const spacedHand = movement.maintainLateralSpacing
+    ? evenlySpaceFingerLandmarks(hand, targets, movement.lateralSpacingScale ?? 1)
+    : hand;
+  const foldedStates = {...states};
+  targets.forEach(finger => { foldedStates[finger] = 'closed'; });
+  const foldedHand = applyNumberFingerStates(spacedHand, foldedStates);
+  chains.flatMap(chain => chain.slice(1)).forEach(index => {
+    bodyHands[33 + index] = roundPoint(hand[index].map((value, axis) => {
+      const targetValue = movement.maintainLateralSpacing && axis === 0
+        ? spacedHand[index][axis]
+        : foldedHand[index][axis];
+      return value + (targetValue - value) * amount;
+    }));
+  });
+  return {bodyHands, face: frame.face.map(point => [...point])};
+}
+
+function evenlySpaceFingerLandmarks(hand, fingers, spacingScale = 1) {
+  const result = hand.map(point => [...point]);
+  const chains = fingers.map(finger => {
+    const chain = FINGER_LANDMARK_CHAINS[finger];
+    if (!chain) throw new Error(`Unsupported finger-spacing target: ${finger}`);
+    return chain;
+  });
+  if (chains.length < 2) return result;
+
+  for (let jointIndex = 1; jointIndex < 4; jointIndex += 1) {
+    const firstX = result[chains[0][jointIndex]][0];
+    const lastX = result[chains[chains.length - 1][jointIndex]][0];
+    const spacing = ((lastX - firstX) / (chains.length - 1)) * spacingScale;
+    const centerX = (firstX + lastX) / 2;
+    chains.forEach((chain, fingerIndex) => {
+      result[chain[jointIndex]][0] = Number((
+        centerX + (fingerIndex - (chains.length - 1) / 2) * spacing
+      ).toFixed(5));
+    });
+  }
+  return result;
+}
+
+function translateArmFrame(frame, movement, amount) {
+  if (amount <= 0) return frame;
+  const bodyHands = frame.bodyHands.map(point => [...point]);
+  const activeLandmarks = [13, 15, ...Array.from({length: 21}, (_, index) => 33 + index)];
+  activeLandmarks.forEach(index => {
+    bodyHands[index] = roundPoint(bodyHands[index].map((value, axis) => (
+      value + movement.axis[axis] * movement.amplitude * amount
     )));
   });
   return {bodyHands, face: frame.face.map(point => [...point])};
 }
 
+function movementTargets(movement) {
+  return movement.fingers ?? (movement.finger ? [movement.finger] : []);
+}
+
 function motionFor(sign, defaultSource) {
   const lateralFingerSpread = sign.lateralFingerSpread ?? 1;
   const rest = canonicalFrame(lateralFingerSpread);
-  const target = raisedNumberFrame(rest, lateralFingerSpread);
+  const target = raisedNumberFrame(rest, lateralFingerSpread, sign.location);
   const frameCount = frameCountFor(sign);
   const frames = Array.from({length: frameCount}, (_, index) => {
     const armProgress = Math.min(1, index / 6);
     const frame = shapedFrame(interpolateFrame(rest, target, armProgress), sign.fingers);
     if (!sign.movement) return frame;
+    const progress = movementProgressAtFrame(index, sign.movement);
+    if (sign.movement.type === 'arm-translation-repetitions') {
+      return translateArmFrame(frame, sign.movement, progress);
+    }
     return flexFingerFrame(
       frame,
-      sign.movement.finger,
-      movementProgressAtFrame(index, sign.movement),
+      movementTargets(sign.movement),
+      progress,
       sign.fingers,
+      sign.movement,
     );
   });
   const source = sign.source ?? defaultSource;
-  const movementPresentationNote = sign.movement
-    ? `The ${sign.movement.finger} extends and flexes down ${sign.movement.repetitions} times, returning toward extension between flexions; the timing is authored for this avatar prototype and is not source timing evidence.`
-    : undefined;
+  const movementPresentationNote = sign.movement?.type === 'arm-translation-repetitions'
+    ? `The active hand moves inward and returns outward ${sign.movement.repetitions} times; the path and timing are authored for this avatar prototype and are not source timing evidence.`
+    : sign.movement
+      ? (() => {
+        const targets = movementTargets(sign.movement);
+        const targetPhrase = targets.length > 1
+          ? `${targets.slice(0, -1).join(', ')} and ${targets.at(-1)} fingers`
+          : `${targets[0]} finger`;
+        const verb = targets.length > 1 ? 'extend' : 'extends';
+        const spacingNote = sign.movement.maintainLateralSpacing
+          ? ` Their lateral spacing stays even while they flex${sign.movement.lateralSpacingScale !== undefined
+            ? ` and is narrowed to ${Math.round(sign.movement.lateralSpacingScale * 100)}% of the open-hand spread`
+            : ''}.`
+          : '';
+        return `The ${targetPhrase} ${verb} and flex down ${sign.movement.repetitions} times, returning toward extension between flexions; the timing is authored for this avatar prototype and is not source timing evidence.${spacingNote}`;
+      })()
+      : undefined;
   return {
     version: 2,
     fps: 30,
@@ -224,34 +314,44 @@ function motionFor(sign, defaultSource) {
       ...(sign.rigFingerSplayDegrees !== undefined ? {
         rigLeftFingerSplayDegrees: sign.rigFingerSplayDegrees,
       } : {}),
+      ...(sign.rigLeftForearmAxialRollDegrees !== undefined ? {
+        rigLeftForearmAxialRollDegrees: sign.rigLeftForearmAxialRollDegrees,
+      } : {}),
     },
     semantic: {
       schema: 'vozual.number-motion-draft',
       status: 'draft',
       language: 'lsc-CO',
       gloss: sign.gloss,
-      number: sign.number,
+      ...(sign.number !== undefined ? {number: sign.number} : {}),
+      ...(Array.isArray(sign.speechAliases) ? {speechAliases: sign.speechAliases} : {}),
       source,
       handshape: sign.fingers,
       ...(movementPresentationNote ? {movementPresentationNote} : {}),
       ...(lateralFingerSpread > 1 ? {
         handshapePresentationNote: `Extended fingers use a ${lateralFingerSpread} lateral landmark spread factor and a ${sign.rigFingerSplayDegrees}-degree rig splay for visual clarity in this avatar prototype; this is not regional performance evidence.`,
       } : {}),
-      locationPresentationNote: 'The active hand is placed high beside the avatar face and offset to its screen-right side, not centered in front of the face; this is a constructed avatar placement, not regional performance evidence.',
+      locationPresentationNote: sign.locationPresentationNote ?? 'The active hand is placed high beside the avatar face and offset to its screen-right side, not centered in front of the face; this is a constructed avatar placement, not regional performance evidence.',
       realizationNote: sign.movement
         ? 'Constructed avatar draft from the cited LSC numeral description; not a recorded regional performance.'
         : 'Constructed avatar draft from the dictionary handshape description; not a recorded regional performance.',
       timingNote: 'Prototype transition and hold duration for renderer review; not source timing evidence.',
     },
     frames,
-    publicationReview: {
-      status: 'owner-approved-prototype',
-      approvedAt: '2026-11-22',
-      authority: 'project-owner-requested-production-publication',
-      scope: sign.movement
-        ? 'The index-flexion pattern follows the cited academic description; avatar timing and regional realization are not professionally validated.'
-        : 'Hand configurations follow the cited dictionary; avatar movement and regional realization are not professionally validated.',
-    },
+    publicationReview: sign.status === 'draft'
+      ? {status: 'draft', scope: 'Locally generated for avatar review; no linguistic review or publication is implied.'}
+      : {
+          status: 'owner-approved-prototype',
+          approvedAt: '2026-11-22',
+          authority: 'project-owner-requested-production-publication',
+          scope: sign.movement?.type === 'arm-translation-repetitions'
+            ? 'The closed hand with extended thumb and inward/outward movement follow the cited dictionary description; avatar placement, timing, and regional realization are not professionally validated.'
+            : sign.movement
+              ? sign.number === 6
+                ? 'The index flexion pattern follows the cited academic description; avatar timing and regional realization are not professionally validated.'
+                : 'The moving finger configuration follows the cited dictionary description; avatar timing and regional realization are not professionally validated.'
+              : 'Hand configurations follow the cited dictionary; avatar movement and regional realization are not professionally validated.',
+        },
   };
 }
 
@@ -285,12 +385,14 @@ function main() {
       lexicalClass: 'numeral',
       motionFormat: 'legacy-json-v2',
       assetName: fileName,
-      approvalStatus: 'owner-approved-prototype',
-      ownerApproval: {
-        approvedBy: 'project_owner',
-        approvedAt: '2026-11-22',
-        scope: 'Prototype release authorization; not professional LSC or regional validation.',
-      },
+      approvalStatus: sign.status ?? 'owner-approved-prototype',
+      ...((sign.status ?? 'owner-approved-prototype') === 'owner-approved-prototype' ? {
+        ownerApproval: {
+          approvedBy: 'project_owner',
+          approvedAt: '2026-11-22',
+          scope: 'Prototype release authorization; not professional LSC or regional validation.',
+        },
+      } : {}),
     });
     process.stdout.write(`${fileName}\t${Buffer.byteLength(content)} bytes\n`);
   });

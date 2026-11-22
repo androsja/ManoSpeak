@@ -1,23 +1,22 @@
 # LSC number motion drafts
 
-These six JSON files are Android-runtime motion sources for UNO through SEIS. The hand configurations for UNO through CINCO follow the number entries in the [INSOR and Ministry of Education dictionary](https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf). SEIS follows the academic description in [Elementos para una didáctica del lenguaje y las matemáticas en estudiantes sordos de niveles iniciales](../../../../../docs/references/lsc-manuals/README.md): palm forward, index extending and flexing, with the other fingers folded. The source describes the index movement; the two flexions in the avatar are the requested prototype timing. Neither source nor generated JSON validates a regional variant.
+The editable source for UNO through DIEZ is `number-motion-authoring.json`. Run `npm run generate:number-motion-drafts` from `mobile/` to expand its recipes into frame-based motion JSON and `sign-catalog.json`.
 
-The generator builds a canonical one-arm transition and hold pose with explicit finger landmarks. In all six signs, it raises the active hand beside the avatar's face and offsets it to the screen-right side, without placing it over the center of the face. DOS, TRES, and CUATRO use a 1.8 lateral landmark spread plus rig finger splay of 28, 22, and 16 degrees respectively. CINCO uses the same landmark spread with 20 degrees of splay for its four long fingers. These are avatar-clarity adjustments, not regional performance evidence. The inactive hand landmark block is all zero, the runtime's marker that the hand was not captured; this lets the renderer keep the other rig hand at rest. Each JSON also includes the finger-state profile used by the rigged renderer. The motion timing and avatar realization are constructed for a prototype and have not received professional or regional LSC review.
+UNO through CINCO follow the numeral descriptions in the [INSOR and Ministry of Education dictionary](https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf). SIETE, OCHO, NUEVE, and DIEZ follow the descriptions on printed pages 157–158. SEIS follows the academic description in [Elementos para una didáctica del lenguaje y las matemáticas en estudiantes sordos de niveles iniciales](../../../../../docs/references/lsc-manuals/README.md). The sources describe hand configurations and actions, not the timing of this avatar prototype or a validated regional performance.
 
-## Authoring and playback
+The generator interprets two reusable movement plans:
 
-`number-motion-authoring.json` is the editable source for these signs. Finger states, aliases, and supported movement plans live in this data file. Run `npm run generate:number-motion-drafts` from `mobile/` to expand each entry into a frame-based motion JSON and the release catalog.
+- `finger-flexion-repetitions` flexes and returns one or more selected fingers together. Its `maintainLateralSpacing` option keeps the moving fingertips evenly spaced as they curl, and `lateralSpacingScale` adjusts how close they sit while bent. NUEVE uses 0.85 to keep its four fingers aligned with a slightly narrower, more natural spread. SEIS uses the index; SIETE, OCHO, and NUEVE use the index and middle, index through ring, and all four long fingers respectively. Their two cycles and timing are prototype choices.
+- `arm-translation-repetitions` moves the hand along an authored axis and returns it. DIEZ uses this for the dictionary's inward/outward motion. Its position, palm rotation, distance, and timing are avatar approximations.
 
-The generator currently interprets the reusable `finger-flexion-repetitions` movement plan. Its JSON fields select the finger, repetition count, flexion and return duration, pause, and flex amount. SEIS sets `repetitions` to `2`; the generator emits two downward flexions with a return to extension between them. The existing app runtime plays those frames and applies the declared finger profile, so this correction does not add a SEIS-specific runtime rule.
+The renderer uses explicit landmarks for the active left hand and a zeroed landmark block for the resting hand. The avatar finger profile reinforces the authored hand shape. The generator does not add per-sign runtime code: a new sign selects a movement primitive and provides its finger states, location, repetitions, and timing as JSON data. A movement family outside these primitives still needs one reusable generator operation before it can be authored this way.
 
-This authoring generator currently covers one-arm number signs and the listed finger movement primitive. It is not yet a universal LSC sign compiler. Other sign families need either captured/authored frame sequences or additional reusable movement primitives described by JSON. A new recurring movement should be added to the generator once as a reusable primitive, then selected and parameterized in sign data.
+The numbered JSON files in this folder are local authoring sources. They are not app-bundled release assets; Firebase stores a runtime copy with authoring-only semantic metadata removed. Firebase release v14 contains ADIÓS and UNO through DIEZ; v14 updates only NUEVE. Each release includes existing signs as well as new signs so that the active catalog remains complete; unchanged motion and semantic hashes do not prompt existing installs to download them again.
 
-Firebase release version 11 contains ADIÓS and the one-arm number signs. Spoken and numeric aliases (`uno` and `1`, for example) remain in Firebase manifest metadata, separate from each motion JSON. These are owner-approved prototypes, not professional linguistic validation. `sign-catalog.json` records listening metadata, and the JSON release publisher copies those aliases into each Firebase manifest entry for Android to store with the motion after the user accepts the download.
+These prototypes are grounded in the cited sources and authorized for project review. That is not professional linguistic or regional validation. Review the avatar playback in Vozual after downloading each release and revise the JSON when the hand shape or movement needs correction.
 
-Regenerate the local motion sources from `mobile/` with:
+Regenerate local motion sources from `mobile/` with:
 
 ```sh
 npm run generate:number-motion-drafts
 ```
-
-The generator does not publish a new Firebase release. The base motions remain constructed prototypes; their handshape descriptions are grounded in the cited references.

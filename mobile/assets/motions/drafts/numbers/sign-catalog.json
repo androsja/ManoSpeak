@@ -127,6 +127,86 @@
         "approvedAt": "2026-11-22",
         "scope": "Prototype release authorization; not professional LSC or regional validation."
       }
+    },
+    {
+      "id": "lsc-co-number-07",
+      "gloss": "SIETE",
+      "speechAliases": [
+        "siete",
+        "7"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "siete.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
+    },
+    {
+      "id": "lsc-co-number-08",
+      "gloss": "OCHO",
+      "speechAliases": [
+        "ocho",
+        "8"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "ocho.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
+    },
+    {
+      "id": "lsc-co-number-09",
+      "gloss": "NUEVE",
+      "speechAliases": [
+        "nueve",
+        "9"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "nueve.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
+    },
+    {
+      "id": "lsc-co-number-10",
+      "gloss": "DIEZ",
+      "speechAliases": [
+        "diez",
+        "10"
+      ],
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "motionFormat": "legacy-json-v2",
+      "assetName": "diez.motion.json",
+      "approvalStatus": "owner-approved-prototype",
+      "ownerApproval": {
+        "approvedBy": "project_owner",
+        "approvedAt": "2026-11-22",
+        "scope": "Prototype release authorization; not professional LSC or regional validation."
+      }
     }
   ]
 }

@@ -70,6 +70,113 @@
         "pages": "94-96",
         "url": "https://repository.udistrital.edu.co/server/api/core/bitstreams/d0377a58-82c3-4c9a-a050-66670890541f/content"
       }
+    },
+    {
+      "number": 7,
+      "gloss": "SIETE",
+      "status": "owner-approved-prototype",
+      "speechAliases": ["siete", "7"],
+      "source": {
+        "title": "Diccionario Básico de la Lengua de Señas Colombiana",
+        "publisher": "Ministerio de Educación Nacional e INSOR",
+        "pages": "157",
+        "url": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf"
+      },
+      "lateralFingerSpread": 1.8,
+      "rigFingerSplayDegrees": 28,
+      "fingers": {"thumb": "closed", "index": "captured", "middle": "captured", "ring": "closed", "pinky": "closed"},
+      "movement": {
+        "type": "finger-flexion-repetitions",
+        "fingers": ["index", "middle"],
+        "repetitions": 2,
+        "startFrame": 12,
+        "flexionFrames": 10,
+        "returnFrames": 10,
+        "pauseFrames": 4,
+        "holdFrames": 12,
+        "flexAmount": 1
+      }
+    },
+    {
+      "number": 8,
+      "gloss": "OCHO",
+      "status": "owner-approved-prototype",
+      "speechAliases": ["ocho", "8"],
+      "source": {
+        "title": "Diccionario Básico de la Lengua de Señas Colombiana",
+        "publisher": "Ministerio de Educación Nacional e INSOR",
+        "pages": "157",
+        "url": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf"
+      },
+      "lateralFingerSpread": 1.8,
+      "rigFingerSplayDegrees": 22,
+      "fingers": {"thumb": "closed", "index": "captured", "middle": "captured", "ring": "captured", "pinky": "closed"},
+      "movement": {
+        "type": "finger-flexion-repetitions",
+        "fingers": ["index", "middle", "ring"],
+        "repetitions": 2,
+        "startFrame": 12,
+        "flexionFrames": 10,
+        "returnFrames": 10,
+        "pauseFrames": 4,
+        "holdFrames": 12,
+        "flexAmount": 1
+      }
+    },
+    {
+      "number": 9,
+      "gloss": "NUEVE",
+      "status": "owner-approved-prototype",
+      "speechAliases": ["nueve", "9"],
+      "source": {
+        "title": "Diccionario Básico de la Lengua de Señas Colombiana",
+        "publisher": "Ministerio de Educación Nacional e INSOR",
+        "pages": "158",
+        "url": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf"
+      },
+      "lateralFingerSpread": 1.8,
+      "rigFingerSplayDegrees": 18,
+      "fingers": {"thumb": "closed", "index": "captured", "middle": "captured", "ring": "captured", "pinky": "captured"},
+      "movement": {
+        "type": "finger-flexion-repetitions",
+        "fingers": ["index", "middle", "ring", "pinky"],
+        "maintainLateralSpacing": true,
+        "lateralSpacingScale": 0.85,
+        "repetitions": 2,
+        "startFrame": 12,
+        "flexionFrames": 10,
+        "returnFrames": 10,
+        "pauseFrames": 4,
+        "holdFrames": 12,
+        "flexAmount": 1
+      }
+    },
+    {
+      "number": 10,
+      "gloss": "DIEZ",
+      "status": "owner-approved-prototype",
+      "speechAliases": ["diez", "10"],
+      "source": {
+        "title": "Diccionario Básico de la Lengua de Señas Colombiana",
+        "publisher": "Ministerio de Educación Nacional e INSOR",
+        "pages": "158",
+        "url": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf"
+      },
+      "rigLeftForearmAxialRollDegrees": 90,
+      "locationPresentationNote": "The active hand is posed around upper-chest level with the palm turned inward and the thumb raised; this is an avatar approximation of the cited dictionary description, not regional performance evidence.",
+      "fingers": {"thumb": "extended", "index": "closed", "middle": "closed", "ring": "closed", "pinky": "closed"},
+      "location": {"elbow": [0.75, 0.76, -0.02], "wrist": [0.69, 0.86, -0.04]},
+      "movement": {
+        "type": "arm-translation-repetitions",
+        "axis": [-1, 0, 0],
+        "amplitude": 0.12,
+        "repetitions": 2,
+        "startFrame": 12,
+        "inwardFrames": 8,
+        "outwardFrames": 8,
+        "pauseFrames": 4,
+        "holdFrames": 12
+      }
     }
   ]
 }
