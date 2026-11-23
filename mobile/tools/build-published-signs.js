@@ -114,8 +114,11 @@ function buildPublishedSigns() {
     const entry = approvedCatalogEntry(catalog.entries, gloss);
     if (!entry) throw new Error(`${gloss} is listed for publication but lacks owner approval.`);
     const assetName = `${motionAssetName(gloss)}.motion.bin`;
-    const sourcePath = path.join(MOTION_SOURCE_DIR, `${gloss.toLowerCase()}.motion.json`);
-    if (!fs.existsSync(sourcePath)) {
+    const sourceNames = [gloss, entry.gloss, ...(entry.spanish?.lemmas ?? []), ...(entry.spanish?.forms ?? []).map(form => form.text)];
+    const sourcePath = sourceNames
+      .map(value => path.join(MOTION_SOURCE_DIR, `${String(value).toLocaleLowerCase('es-CO')}.motion.json`))
+      .find(candidate => fs.existsSync(candidate));
+    if (!sourcePath) {
       throw new Error(`${gloss} is approved but its source motion is missing.`);
     }
     const sourceMotion = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
@@ -174,6 +177,10 @@ function buildPublishedSigns() {
         status: 'awaiting_storage',
         approvedAt: entry.review.ownerApproval.approvedAt,
         approvedBy: entry.review.ownerApproval.approvedBy,
+        ...(entry.review.publicationStatus
+          ? {publicationStatus: entry.review.publicationStatus}
+          : {}),
+        ...(entry.review.reviewScope ? {reviewScope: entry.review.reviewScope} : {}),
       },
     };
   });

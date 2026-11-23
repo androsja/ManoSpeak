@@ -62,9 +62,6 @@ function releaseInputs(gloss, options = {}) {
   if (!existing || existing.data.approved !== true || existing.data.compiled !== true) {
     throw new Error(`${gloss} is not an approved compiled sign in the local publishing catalog.`);
   }
-  const sourcePath = path.join(motionDirectory, `${gloss.toLocaleLowerCase('es-CO')}.motion.json`);
-  if (!fs.existsSync(sourcePath)) throw new Error(`Missing JSON motion source: ${sourcePath}`);
-  const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
   const motionCatalogPath = path.join(motionDirectory, 'sign-catalog.json');
   const motionCatalog = fs.existsSync(motionCatalogPath)
     ? JSON.parse(fs.readFileSync(motionCatalogPath, 'utf8'))
@@ -76,6 +73,12 @@ function releaseInputs(gloss, options = {}) {
   if (!Array.isArray(speechAliases) || speechAliases.some(alias => typeof alias !== 'string' || !alias.trim())) {
     throw new Error(`${gloss} has invalid speechAliases in its release catalog.`);
   }
+  const sourceNames = [gloss, ...speechAliases];
+  const sourcePath = sourceNames
+    .map(value => path.join(motionDirectory, `${String(value).toLocaleLowerCase('es-CO')}.motion.json`))
+    .find(candidate => fs.existsSync(candidate));
+  if (!sourcePath) throw new Error(`Missing JSON motion source for ${gloss}.`);
+  const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
   const overridesPath = path.join(motionDirectory, path.basename(OVERRIDES_PATH));
   const overrides = fs.existsSync(overridesPath)
     ? JSON.parse(fs.readFileSync(overridesPath, 'utf8'))

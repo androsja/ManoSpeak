@@ -5372,6 +5372,47 @@
         "status": "approved",
         "regionalVariants": []
       }
+    },
+    {
+      "id": "diez",
+      "gloss": "DIEZ",
+      "categories": [
+        "numeros_cantidades"
+      ],
+      "lexicalClass": "numeral",
+      "spanish": {
+        "lemmas": [
+          "diez"
+        ],
+        "synonyms": [],
+        "forms": [
+          {
+            "text": "10"
+          },
+          {
+            "text": "diez"
+          }
+        ]
+      },
+      "lsc": {
+        "verbType": "none",
+        "requiresSubjectMarker": false
+      },
+      "motion": {
+        "clip": "DIEZ",
+        "published": true
+      },
+      "review": {
+        "status": "approved",
+        "regionalVariants": [],
+        "ownerApproval": {
+          "status": "approved",
+          "approvedBy": "project_owner",
+          "approvedAt": "2026-11-23T19:43:40Z"
+        },
+        "publicationStatus": "owner-approved-prototype",
+        "reviewScope": "Project owner approved this avatar prototype against the cited dictionary description. It has not been professionally validated by Deaf LSC or regional reviewers."
+      }
     }
   ]
 }
