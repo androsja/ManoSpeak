@@ -18,16 +18,29 @@ function roundPoint(point) {
   return point.map(value => Number(value.toFixed(5)));
 }
 
-function handAt(wrist, thumbDirection, lateralFingerSpread = 1) {
+function validateThumbLandmarkOffsets(offsets, gloss) {
+  if (offsets === undefined) return undefined;
+  if (!Array.isArray(offsets) || offsets.length !== 4
+      || offsets.some(point => !Array.isArray(point) || point.length !== 3
+        || point.some(value => !Number.isFinite(value) || Math.abs(value) > 0.25))) {
+    throw new Error(`Invalid thumbLandmarkOffsets for ${gloss}.`);
+  }
+  return offsets.map(point => [...point]);
+}
+
+function handAt(wrist, thumbDirection, lateralFingerSpread = 1, thumbLandmarkOffsets) {
   const point = (x, y, z = 0) => roundPoint([wrist[0] + x, wrist[1] + y, wrist[2] + z]);
   const hand = [roundPoint(wrist)];
   // MediaPipe hand landmarks: thumb, then index, middle, ring, and little finger.
-  hand.push(
-    point(thumbDirection * 0.035, 0.008),
-    point(thumbDirection * 0.057, -0.006, 0.004),
-    point(thumbDirection * 0.078, -0.029, 0.008),
-    point(thumbDirection * 0.091, -0.055, 0.012),
-  );
+  const thumb = thumbLandmarkOffsets
+    ? thumbLandmarkOffsets.map(([x, y, z]) => point(x, y, z))
+    : [
+        point(thumbDirection * 0.035, 0.008),
+        point(thumbDirection * 0.057, -0.006, 0.004),
+        point(thumbDirection * 0.078, -0.029, 0.008),
+        point(thumbDirection * 0.091, -0.055, 0.012),
+      ];
+  hand.push(...thumb);
   const fingers = [
     {x: -0.044, mcpY: -0.022, pipY: -0.076, dipY: -0.12, tipY: -0.16},
     {x: -0.015, mcpY: -0.026, pipY: -0.087, dipY: -0.14, tipY: -0.18},
@@ -63,7 +76,7 @@ function canonicalFrame(lateralFingerSpread = 1) {
   return {bodyHands, face: Array.from({length: 468}, () => [0, 0, 0])};
 }
 
-function raisedNumberFrame(rest, lateralFingerSpread = 1, location = {}) {
+function raisedNumberFrame(rest, lateralFingerSpread = 1, location = {}, thumbLandmarkOffsets) {
   const frame = {
     bodyHands: rest.bodyHands.map(point => [...point]),
     face: rest.face.map(point => [...point]),
@@ -71,7 +84,8 @@ function raisedNumberFrame(rest, lateralFingerSpread = 1, location = {}) {
   // Lift the active hand to the side of the avatar's face, away from its center.
   frame.bodyHands[13] = location.elbow ?? [0.82, 0.75, -0.02];
   frame.bodyHands[15] = location.wrist ?? [0.77, 0.58, -0.04];
-  handAt(frame.bodyHands[15], -1, lateralFingerSpread).forEach((point, index) => { frame.bodyHands[33 + index] = point; });
+  handAt(frame.bodyHands[15], -1, lateralFingerSpread, thumbLandmarkOffsets)
+    .forEach((point, index) => { frame.bodyHands[33 + index] = point; });
   return frame;
 }
 
@@ -134,6 +148,18 @@ function shapedFrame(frame, states) {
   return {bodyHands, face: frame.face.map(point => [...point])};
 }
 
+function scalePalmRootLandmarks(frame, scale) {
+  if (scale === 1) return frame;
+  const bodyHands = frame.bodyHands.map(point => [...point]);
+  const wrist = bodyHands[33];
+  [38, 42, 46, 50].forEach(index => {
+    bodyHands[index] = roundPoint(wrist.map((value, axis) => (
+      value + (bodyHands[index][axis] - value) * scale
+    )));
+  });
+  return {bodyHands, face: frame.face.map(point => [...point])};
+}
+
 function easedProgress(value) {
   const amount = Math.max(0, Math.min(1, value));
   return amount * amount * (3 - 2 * amount);
@@ -142,11 +168,13 @@ function easedProgress(value) {
 function frameCountFor(sign) {
   const movement = sign.movement;
   if (!movement) return 36;
-  if (!['finger-flexion-repetitions', 'arm-translation-repetitions'].includes(movement.type)) {
+  if (!['finger-flexion-repetitions', 'arm-translation-repetitions', 'wrist-rotation-repetitions'].includes(movement.type)) {
     throw new Error(`Unsupported number motion primitive: ${movement.type}`);
   }
   const outboundFrames = movement.type === 'arm-translation-repetitions'
     ? movement.inwardFrames
+    : movement.type === 'wrist-rotation-repetitions'
+      ? movement.rotationFrames
     : movement.flexionFrames;
   const returnFrames = movement.type === 'arm-translation-repetitions'
     ? movement.outwardFrames
@@ -160,7 +188,16 @@ function frameCountFor(sign) {
       || (movement.type === 'arm-translation-repetitions'
         && (!Number.isFinite(movement.amplitude) || movement.amplitude <= 0
           || !Array.isArray(movement.axis) || movement.axis.length !== 3
-          || movement.axis.some(value => !Number.isFinite(value))))
+          || movement.axis.some(value => !Number.isFinite(value))
+          || (movement.translateElbow !== undefined && typeof movement.translateElbow !== 'boolean')))
+      || (movement.type === 'wrist-rotation-repetitions'
+        && (!Number.isFinite(movement.baseOrientationDegrees)
+          || Math.abs(movement.baseOrientationDegrees) > 90
+          || !Number.isFinite(movement.amplitudeDegrees)
+          || movement.amplitudeDegrees <= 0
+          || movement.amplitudeDegrees > 45
+          || (movement.alternateDirection !== undefined
+            && typeof movement.alternateDirection !== 'boolean')))
       || (movement.lateralSpacingScale !== undefined
         && (!Number.isFinite(movement.lateralSpacingScale)
           || movement.lateralSpacingScale < 0.5 || movement.lateralSpacingScale > 1))) {
@@ -174,6 +211,8 @@ function movementProgressAtFrame(frameIndex, movement) {
   if (!movement) return 0;
   const outboundFrames = movement.type === 'arm-translation-repetitions'
     ? movement.inwardFrames
+    : movement.type === 'wrist-rotation-repetitions'
+      ? movement.rotationFrames
     : movement.flexionFrames;
   const returnFrames = movement.type === 'arm-translation-repetitions'
     ? movement.outwardFrames
@@ -193,7 +232,46 @@ function movementProgressAtFrame(frameIndex, movement) {
           : 0;
     progress = Math.max(progress, cycleProgress);
   }
-  return progress * (movement.type === 'arm-translation-repetitions' ? 1 : movement.flexAmount);
+  return progress * (movement.type === 'finger-flexion-repetitions' ? movement.flexAmount : 1);
+}
+
+function rotatePointAroundAxis(point, origin, axis, angleRadians) {
+  const offset = point.map((value, index) => value - origin[index]);
+  const axisLength = Math.hypot(...axis);
+  if (axisLength === 0) return point;
+  const unit = axis.map(value => value / axisLength);
+  const cosine = Math.cos(angleRadians);
+  const sine = Math.sin(angleRadians);
+  const dot = unit.reduce((sum, value, index) => sum + value * offset[index], 0);
+  const cross = [
+    unit[1] * offset[2] - unit[2] * offset[1],
+    unit[2] * offset[0] - unit[0] * offset[2],
+    unit[0] * offset[1] - unit[1] * offset[0],
+  ];
+  return roundPoint(offset.map((value, index) => (
+    origin[index] + value * cosine + cross[index] * sine
+      + unit[index] * dot * (1 - cosine)
+  )));
+}
+
+function rotateHandAtWrist(frame, movement, offsetDegrees = 0) {
+  const bodyHands = frame.bodyHands.map(point => [...point]);
+  const wrist = bodyHands[33];
+  const elbow = bodyHands[13];
+  const forearmAxis = wrist.map((value, index) => value - elbow[index]);
+  const angleRadians = (movement.baseOrientationDegrees + offsetDegrees) * Math.PI / 180;
+  for (let index = 34; index < 54; index += 1) {
+    bodyHands[index] = rotatePointAroundAxis(bodyHands[index], wrist, forearmAxis, angleRadians);
+  }
+  return {bodyHands, face: frame.face.map(point => [...point])};
+}
+
+function wristRotationOffsetAtFrame(frameIndex, movement) {
+  const progress = movementProgressAtFrame(frameIndex, movement);
+  const cycleLength = movement.rotationFrames + movement.returnFrames + movement.pauseFrames;
+  const repetition = Math.floor((frameIndex - movement.startFrame) / cycleLength);
+  const direction = movement.alternateDirection && repetition % 2 === 1 ? -1 : 1;
+  return progress * movement.amplitudeDegrees * direction;
 }
 
 function flexFingerFrame(frame, fingers, amount, states, movement = {}) {
@@ -249,7 +327,11 @@ function evenlySpaceFingerLandmarks(hand, fingers, spacingScale = 1) {
 function translateArmFrame(frame, movement, amount) {
   if (amount <= 0) return frame;
   const bodyHands = frame.bodyHands.map(point => [...point]);
-  const activeLandmarks = [13, 15, ...Array.from({length: 21}, (_, index) => 33 + index)];
+  const activeLandmarks = [
+    ...(movement.translateElbow === false ? [] : [13]),
+    15,
+    ...Array.from({length: 21}, (_, index) => 33 + index),
+  ];
   activeLandmarks.forEach(index => {
     bodyHands[index] = roundPoint(bodyHands[index].map((value, axis) => (
       value + movement.axis[axis] * movement.amplitude * amount
@@ -262,18 +344,33 @@ function movementTargets(movement) {
   return movement.fingers ?? (movement.finger ? [movement.finger] : []);
 }
 
-function motionFor(sign, defaultSource) {
+function motionFor(sign, defaultSource, options = {}) {
   const lateralFingerSpread = sign.lateralFingerSpread ?? 1;
+  const palmRootScale = sign.palmRootScale ?? 1;
+  if (!Number.isFinite(palmRootScale) || palmRootScale < 0.75 || palmRootScale > 2) {
+    throw new Error(`Invalid palmRootScale for ${sign.gloss}.`);
+  }
+  const thumbLandmarkOffsets = validateThumbLandmarkOffsets(sign.thumbLandmarkOffsets, sign.gloss);
   const rest = canonicalFrame(lateralFingerSpread);
-  const target = raisedNumberFrame(rest, lateralFingerSpread, sign.location);
+  const target = raisedNumberFrame(rest, lateralFingerSpread, sign.location, thumbLandmarkOffsets);
   const frameCount = frameCountFor(sign);
   const frames = Array.from({length: frameCount}, (_, index) => {
     const armProgress = Math.min(1, index / 6);
-    const frame = shapedFrame(interpolateFrame(rest, target, armProgress), sign.fingers);
+    const frame = scalePalmRootLandmarks(
+      shapedFrame(interpolateFrame(rest, target, armProgress), sign.fingers),
+      palmRootScale,
+    );
     if (!sign.movement) return frame;
     const progress = movementProgressAtFrame(index, sign.movement);
     if (sign.movement.type === 'arm-translation-repetitions') {
       return translateArmFrame(frame, sign.movement, progress);
+    }
+    if (sign.movement.type === 'wrist-rotation-repetitions') {
+      return rotateHandAtWrist(
+        frame,
+        sign.movement,
+        wristRotationOffsetAtFrame(index, sign.movement),
+      );
     }
     return flexFingerFrame(
       frame,
@@ -285,7 +382,9 @@ function motionFor(sign, defaultSource) {
   });
   const source = sign.source ?? defaultSource;
   const movementPresentationNote = sign.movement?.type === 'arm-translation-repetitions'
-    ? `The active hand moves inward and returns outward ${sign.movement.repetitions} times; the path and timing are authored for this avatar prototype and are not source timing evidence.`
+    ? `The active hand moves side to side ${sign.movement.repetitions} times${sign.movement.translateElbow === false ? ' with the elbow held in place' : ''}; the path and timing are authored for this avatar prototype and are not source timing evidence.`
+    : sign.movement?.type === 'wrist-rotation-repetitions'
+      ? `The active wrist rotates ${sign.movement.repetitions} times in place around the forearm axis, with the elbow and wrist centers held fixed; the angle and timing are authored for this avatar prototype and are not source timing evidence.`
     : sign.movement
       ? (() => {
         const targets = movementTargets(sign.movement);
@@ -309,17 +408,22 @@ function motionFor(sign, defaultSource) {
       activeHand: 'left',
       contactAnchor: 'none',
       palmAtContact: 'camera',
-      rigLeftHandShape: 'fully-open',
-      rigLeftFingerStates: sign.fingers,
+      rigLeftHandShape: sign.avatarHandShape ?? 'fully-open',
+      ...(sign.avatarFingerStates || sign.avatarHandShape !== 'thumb-up' ? {
+        rigLeftFingerStates: sign.avatarFingerStates ?? sign.fingers,
+      } : {}),
       ...(sign.rigFingerSplayDegrees !== undefined ? {
         rigLeftFingerSplayDegrees: sign.rigFingerSplayDegrees,
+      } : {}),
+      ...(sign.rigLeftPalmAxialRollDegrees !== undefined ? {
+        rigLeftPalmAxialRollDegrees: sign.rigLeftPalmAxialRollDegrees,
       } : {}),
       ...(sign.rigLeftForearmAxialRollDegrees !== undefined ? {
         rigLeftForearmAxialRollDegrees: sign.rigLeftForearmAxialRollDegrees,
       } : {}),
     },
     semantic: {
-      schema: 'vozual.number-motion-draft',
+      schema: options.generic ? 'vozual.sign-motion-draft' : 'vozual.number-motion-draft',
       status: 'draft',
       language: 'lsc-CO',
       gloss: sign.gloss,
@@ -331,14 +435,21 @@ function motionFor(sign, defaultSource) {
       ...(lateralFingerSpread > 1 ? {
         handshapePresentationNote: `Extended fingers use a ${lateralFingerSpread} lateral landmark spread factor and a ${sign.rigFingerSplayDegrees}-degree rig splay for visual clarity in this avatar prototype; this is not regional performance evidence.`,
       } : {}),
-      locationPresentationNote: sign.locationPresentationNote ?? 'The active hand is placed high beside the avatar face and offset to its screen-right side, not centered in front of the face; this is a constructed avatar placement, not regional performance evidence.',
-      realizationNote: sign.movement
-        ? 'Constructed avatar draft from the cited LSC numeral description; not a recorded regional performance.'
-        : 'Constructed avatar draft from the dictionary handshape description; not a recorded regional performance.',
+      ...(thumbLandmarkOffsets ? {
+        handshapePresentationNote: 'The thumb rises nearly vertically from a closed fist presented toward the camera; its path is authored for this avatar prototype and is not regional performance evidence.',
+      } : {}),
+      locationPresentationNote: sign.locationPresentationNote ?? (options.generic
+        ? 'The active hand location is generated from the coordinates selected in VOZUAL Creator; the placement is a constructed avatar draft, not regional performance evidence.'
+        : 'The active hand is placed high beside the avatar face and offset to its screen-right side, not centered in front of the face; this is a constructed avatar placement, not regional performance evidence.'),
+      realizationNote: options.generic
+        ? 'Constructed avatar draft from local authoring inputs; not a recorded regional performance.'
+        : sign.movement
+          ? 'Constructed avatar draft from the cited LSC numeral description; not a recorded regional performance.'
+          : 'Constructed avatar draft from the dictionary handshape description; not a recorded regional performance.',
       timingNote: 'Prototype transition and hold duration for renderer review; not source timing evidence.',
     },
     frames,
-    publicationReview: sign.status === 'draft'
+    publicationReview: options.generic || sign.status === 'draft'
       ? {status: 'draft', scope: 'Locally generated for avatar review; no linguistic review or publication is implied.'}
       : {
           status: 'owner-approved-prototype',
@@ -346,6 +457,8 @@ function motionFor(sign, defaultSource) {
           authority: 'project-owner-requested-production-publication',
           scope: sign.movement?.type === 'arm-translation-repetitions'
             ? 'The closed hand with extended thumb and inward/outward movement follow the cited dictionary description; avatar placement, timing, and regional realization are not professionally validated.'
+            : sign.movement?.type === 'wrist-rotation-repetitions'
+              ? 'The closed fist with extended thumb and wrist rotation follow the cited dictionary description; avatar placement, angle, timing, and regional realization are not professionally validated.'
             : sign.movement
               ? sign.number === 6
                 ? 'The index flexion pattern follows the cited academic description; avatar timing and regional realization are not professionally validated.'
@@ -403,4 +516,6 @@ function main() {
   );
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = {motionFor};

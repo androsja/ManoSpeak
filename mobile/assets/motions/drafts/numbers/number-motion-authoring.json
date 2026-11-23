@@ -11,46 +11,100 @@
     {
       "number": 1,
       "gloss": "UNO",
-      "speechAliases": ["uno", "1"],
-      "fingers": {"thumb": "closed", "index": "extended", "middle": "closed", "ring": "closed", "pinky": "closed"}
+      "speechAliases": [
+        "uno",
+        "1"
+      ],
+      "fingers": {
+        "thumb": "closed",
+        "index": "extended",
+        "middle": "closed",
+        "ring": "closed",
+        "pinky": "closed"
+      }
     },
     {
       "number": 2,
       "gloss": "DOS",
-      "speechAliases": ["dos", "2"],
+      "speechAliases": [
+        "dos",
+        "2"
+      ],
       "lateralFingerSpread": 1.8,
       "rigFingerSplayDegrees": 28,
-      "fingers": {"thumb": "closed", "index": "extended", "middle": "extended", "ring": "closed", "pinky": "closed"}
+      "fingers": {
+        "thumb": "closed",
+        "index": "extended",
+        "middle": "extended",
+        "ring": "closed",
+        "pinky": "closed"
+      }
     },
     {
       "number": 3,
       "gloss": "TRES",
-      "speechAliases": ["tres", "3"],
+      "speechAliases": [
+        "tres",
+        "3"
+      ],
       "lateralFingerSpread": 1.8,
       "rigFingerSplayDegrees": 22,
-      "fingers": {"thumb": "closed", "index": "extended", "middle": "extended", "ring": "extended", "pinky": "closed"}
+      "fingers": {
+        "thumb": "closed",
+        "index": "extended",
+        "middle": "extended",
+        "ring": "extended",
+        "pinky": "closed"
+      }
     },
     {
       "number": 4,
       "gloss": "CUATRO",
-      "speechAliases": ["cuatro", "4"],
+      "speechAliases": [
+        "cuatro",
+        "4"
+      ],
       "lateralFingerSpread": 1.8,
       "rigFingerSplayDegrees": 16,
-      "fingers": {"thumb": "closed", "index": "extended", "middle": "extended", "ring": "extended", "pinky": "extended"}
+      "fingers": {
+        "thumb": "closed",
+        "index": "extended",
+        "middle": "extended",
+        "ring": "extended",
+        "pinky": "extended"
+      }
     },
     {
       "number": 5,
       "gloss": "CINCO",
-      "speechAliases": ["cinco", "5"],
+      "speechAliases": [
+        "cinco",
+        "5"
+      ],
       "lateralFingerSpread": 1.8,
       "rigFingerSplayDegrees": 20,
-      "fingers": {"thumb": "extended", "index": "extended", "middle": "extended", "ring": "extended", "pinky": "extended"}
+      "fingers": {
+        "thumb": "extended",
+        "index": "extended",
+        "middle": "extended",
+        "ring": "extended",
+        "pinky": "extended"
+      }
     },
     {
       "number": 6,
       "gloss": "SEIS",
-      "speechAliases": ["seis", "6"],
-      "fingers": {"thumb": "closed", "index": "captured", "middle": "closed", "ring": "closed", "pinky": "closed"},
+      "speechAliases": [
+        "seis",
+        "6"
+      ],
+      "fingers": {
+        "thumb": "closed",
+        "index": "captured",
+        "middle": "closed",
+        "ring": "closed",
+        "pinky": "closed"
+      },
       "movement": {
         "type": "finger-flexion-repetitions",
         "finger": "index",
@@ -65,7 +119,10 @@
       "source": {
         "title": "Elementos para una didáctica del lenguaje y las matemáticas en estudiantes sordos de niveles iniciales",
         "publisher": "Editorial Universidad Distrital Francisco José de Caldas",
-        "authors": ["Dora Inés Calderón", "Olga Lucía León Corredor"],
+        "authors": [
+          "Dora Inés Calderón",
+          "Olga Lucía León Corredor"
+        ],
         "year": 2016,
         "pages": "94-96",
         "url": "https://repository.udistrital.edu.co/server/api/core/bitstreams/d0377a58-82c3-4c9a-a050-66670890541f/content"
@@ -75,7 +132,10 @@
       "number": 7,
       "gloss": "SIETE",
       "status": "owner-approved-prototype",
-      "speechAliases": ["siete", "7"],
+      "speechAliases": [
+        "siete",
+        "7"
+      ],
       "source": {
         "title": "Diccionario Básico de la Lengua de Señas Colombiana",
         "publisher": "Ministerio de Educación Nacional e INSOR",
@@ -84,10 +144,19 @@
       },
       "lateralFingerSpread": 1.8,
       "rigFingerSplayDegrees": 28,
-      "fingers": {"thumb": "closed", "index": "captured", "middle": "captured", "ring": "closed", "pinky": "closed"},
+      "fingers": {
+        "thumb": "closed",
+        "index": "captured",
+        "middle": "captured",
+        "ring": "closed",
+        "pinky": "closed"
+      },
       "movement": {
         "type": "finger-flexion-repetitions",
-        "fingers": ["index", "middle"],
+        "fingers": [
+          "index",
+          "middle"
+        ],
         "repetitions": 2,
         "startFrame": 12,
         "flexionFrames": 10,
@@ -101,7 +170,10 @@
       "number": 8,
       "gloss": "OCHO",
       "status": "owner-approved-prototype",
-      "speechAliases": ["ocho", "8"],
+      "speechAliases": [
+        "ocho",
+        "8"
+      ],
       "source": {
         "title": "Diccionario Básico de la Lengua de Señas Colombiana",
         "publisher": "Ministerio de Educación Nacional e INSOR",
@@ -110,10 +182,20 @@
       },
       "lateralFingerSpread": 1.8,
       "rigFingerSplayDegrees": 22,
-      "fingers": {"thumb": "closed", "index": "captured", "middle": "captured", "ring": "captured", "pinky": "closed"},
+      "fingers": {
+        "thumb": "closed",
+        "index": "captured",
+        "middle": "captured",
+        "ring": "captured",
+        "pinky": "closed"
+      },
       "movement": {
         "type": "finger-flexion-repetitions",
-        "fingers": ["index", "middle", "ring"],
+        "fingers": [
+          "index",
+          "middle",
+          "ring"
+        ],
         "repetitions": 2,
         "startFrame": 12,
         "flexionFrames": 10,
@@ -127,7 +209,10 @@
       "number": 9,
       "gloss": "NUEVE",
       "status": "owner-approved-prototype",
-      "speechAliases": ["nueve", "9"],
+      "speechAliases": [
+        "nueve",
+        "9"
+      ],
       "source": {
         "title": "Diccionario Básico de la Lengua de Señas Colombiana",
         "publisher": "Ministerio de Educación Nacional e INSOR",
@@ -136,10 +221,21 @@
       },
       "lateralFingerSpread": 1.8,
       "rigFingerSplayDegrees": 18,
-      "fingers": {"thumb": "closed", "index": "captured", "middle": "captured", "ring": "captured", "pinky": "captured"},
+      "fingers": {
+        "thumb": "closed",
+        "index": "captured",
+        "middle": "captured",
+        "ring": "captured",
+        "pinky": "captured"
+      },
       "movement": {
         "type": "finger-flexion-repetitions",
-        "fingers": ["index", "middle", "ring", "pinky"],
+        "fingers": [
+          "index",
+          "middle",
+          "ring",
+          "pinky"
+        ],
         "maintainLateralSpacing": true,
         "lateralSpacingScale": 0.85,
         "repetitions": 2,
@@ -155,7 +251,10 @@
       "number": 10,
       "gloss": "DIEZ",
       "status": "owner-approved-prototype",
-      "speechAliases": ["diez", "10"],
+      "speechAliases": [
+        "diez",
+        "10"
+      ],
       "source": {
         "title": "Diccionario Básico de la Lengua de Señas Colombiana",
         "publisher": "Ministerio de Educación Nacional e INSOR",
@@ -163,17 +262,49 @@
         "url": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf"
       },
       "rigLeftForearmAxialRollDegrees": 90,
-      "locationPresentationNote": "The active hand is posed around upper-chest level with the palm turned inward and the thumb raised; this is an avatar approximation of the cited dictionary description, not regional performance evidence.",
-      "fingers": {"thumb": "extended", "index": "closed", "middle": "closed", "ring": "closed", "pinky": "closed"},
-      "location": {"elbow": [0.75, 0.76, -0.02], "wrist": [0.69, 0.86, -0.04]},
+      "palmRootScale": 1.6,
+      "avatarFingerStates": {
+        "thumb": "captured",
+        "index": "closed",
+        "middle": "closed",
+        "ring": "closed",
+        "pinky": "closed"
+      },
+      "locationPresentationNote": "The active hand is posed high beside the avatar face and offset to its screen-right side; this is an avatar approximation of the cited dictionary handshape and movement, not regional performance evidence.",
+      "fingers": {
+        "thumb": "extended",
+        "index": "closed",
+        "middle": "closed",
+        "ring": "closed",
+        "pinky": "closed"
+      },
+      "thumbLandmarkOffsets": [
+        [-0.035, 0.008, 0],
+        [-0.025, -0.015, 0.004],
+        [-0.017, -0.052, 0.008],
+        [-0.01, -0.098, 0.012]
+      ],
+      "location": {
+        "elbow": [
+          0.82,
+          0.75,
+          -0.02
+        ],
+        "wrist": [
+          0.77,
+          0.58,
+          -0.04
+        ]
+      },
       "movement": {
-        "type": "arm-translation-repetitions",
-        "axis": [-1, 0, 0],
-        "amplitude": 0.12,
+        "type": "wrist-rotation-repetitions",
+        "baseOrientationDegrees": -30,
+        "amplitudeDegrees": 32,
+        "alternateDirection": true,
         "repetitions": 2,
         "startFrame": 12,
-        "inwardFrames": 8,
-        "outwardFrames": 8,
+        "rotationFrames": 8,
+        "returnFrames": 8,
         "pauseFrames": 4,
         "holdFrames": 12
       }
