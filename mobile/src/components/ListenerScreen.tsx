@@ -224,7 +224,7 @@ export function ListenerScreen({
   const [plannedLsc, setPlannedLsc] = useState('');
   const [playingSign, setPlayingSign] = useState(false);
   const [playbackPaused, setPlaybackPaused] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState<(typeof PLAYBACK_SPEEDS)[number]>(1);
+  const [playbackSpeed, setPlaybackSpeed] = useState<(typeof PLAYBACK_SPEEDS)[number]>(2);
   const [avatarZoom, setAvatarZoom] = useState(DEFAULT_AVATAR_ZOOM);
   const [avatarRenderMode, setAvatarRenderMode] = useState<AvatarRenderMode>('rigged');
   const [activeClip, setActiveClip] = useState<AvatarClip>('IDLE');
@@ -520,7 +520,7 @@ export function ListenerScreen({
           setListeningMode(permittedMode);
         }
       })
-      // A first launch has no preference file. Playback remains at 1×.
+      // A first launch has no preference file. Playback starts at 2×.
       .catch(() => undefined);
     return () => { active = false; };
   }, [accessPolicy.canUseContinuousMode]);
@@ -1774,28 +1774,6 @@ export function ListenerScreen({
             <Text style={styles.signUpdateDetail}>{t('listener.newSignsDetail')}</Text>
           </View>
           <Text style={styles.signUpdateAction}>{t('listener.download')}</Text>
-        </Pressable>}
-        {__DEV__ && <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Reproducir la seña DIEZ de prueba temporal"
-          disabled={!avatarReady || playingSign || phraseFinalizing}
-          onPress={() => {
-            const playDiez = () => {
-              recognizedWords.current = [];
-              signQueue.current = [];
-              setPlannedLsc('DIEZ · PRUEBA TEMPORAL');
-              setErrorMessage('');
-              startSign('DIEZ', false);
-            };
-            if (listening) {
-              stopListening().then(playDiez).catch(() => undefined);
-            } else {
-              playDiez();
-            }
-          }}
-          style={[styles.adiosPreviewButton, (!avatarReady || playingSign || phraseFinalizing) && styles.adiosPreviewButtonDisabled]}
-        >
-          <Text style={styles.adiosPreviewButtonText}>PROBAR DIEZ · TEMPORAL</Text>
         </Pressable>}
         {availableListeningModes.length > 1 && <View style={styles.listeningModeControl}>
           {availableListeningModes.map(mode => {
