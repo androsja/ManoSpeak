@@ -160,6 +160,14 @@ describe('rig capability profile', () => {
     claimedDof.descriptor.degreesOfFreedom.status = 'measured';
     claimedDof.sha256 = profileSha256(claimedDof);
     expect(() => validateRigCapabilityProfile(claimedDof)).toThrow(expect.objectContaining({code: 'COMPATIBILITY.RIG_PROFILE'}));
+
+    const claimedJointLimits = JSON.parse(JSON.stringify(profile));
+    claimedJointLimits.descriptor.jointLimits = {status: 'measured', valuesDeg: {'DEF-thumb.01.L.x': [-10, 10]}};
+    claimedJointLimits.sha256 = profileSha256(claimedJointLimits);
+    expect(() => validateRigCapabilityProfile(claimedJointLimits)).toThrow(expect.objectContaining({
+      code: 'COMPATIBILITY.RIG_PROFILE',
+      message: expect.stringContaining('Observed mechanical responses cannot declare anatomical degrees of freedom or joint limits'),
+    }));
   });
 
 });

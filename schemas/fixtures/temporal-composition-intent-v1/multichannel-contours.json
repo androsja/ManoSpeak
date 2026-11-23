@@ -1,0 +1,297 @@
+{
+  "schema": "vozual.temporal-composition-intent",
+  "schemaVersion": 1,
+  "id": "fixture.task5-8-multichannel",
+  "revision": 1,
+  "durationMs": 1200,
+  "tracks": [
+    {
+      "id": "left-primary",
+      "channel": "manual.left",
+      "startMs": 0,
+      "segments": [
+        {
+          "id": "left-prep",
+          "phase": "preparation",
+          "durationMs": 100,
+          "intentRef": "opaque.left.prep"
+        },
+        {
+          "id": "left-stroke",
+          "phase": "stroke",
+          "phaseRef": "phase.main",
+          "durationMs": 400,
+          "repeatCount": 2,
+          "intentRef": "opaque.left.stroke",
+          "contour": {
+            "kind": "line",
+            "coordinateFrameRef": "frame.body",
+            "unit": "m",
+            "plane": "xy",
+            "direction": "reverse",
+            "parameters": {
+              "start": [
+                0.1,
+                0.2,
+                0
+              ],
+              "end": [
+                0.3,
+                0.2,
+                0
+              ]
+            }
+          },
+          "repeatedMovement": {
+            "kind": "oscillation",
+            "amplitudeM": 0.02,
+            "rateHz": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "nonmanual-primary",
+      "channel": "nonmanual",
+      "startMs": 100,
+      "segments": [
+        {
+          "id": "face-cue",
+          "phase": "stroke",
+          "phaseRef": "phase.main",
+          "durationMs": 500,
+          "intentRef": "opaque.nonmanual.cue"
+        }
+      ]
+    },
+    {
+      "id": "right-primary",
+      "channel": "manual.right",
+      "startMs": 900,
+      "segments": [
+        {
+          "id": "right-hold",
+          "phase": "hold",
+          "durationMs": 300,
+          "intentRef": "opaque.right.hold"
+        }
+      ]
+    },
+    {
+      "id": "contour-corpus",
+      "channel": "nonmanual",
+      "startMs": 0,
+      "segments": [
+        {
+          "id": "contour-arc",
+          "phase": "stroke",
+          "durationMs": 100,
+          "intentRef": "opaque.contour.arc",
+          "contour": {
+            "kind": "arc",
+            "coordinateFrameRef": "frame.body",
+            "unit": "m",
+            "plane": "xy",
+            "direction": "forward",
+            "parameters": {
+              "center": [
+                0,
+                0,
+                0
+              ],
+              "radiusM": 0.1,
+              "startAngleRad": 0,
+              "sweepRad": 1.5707963267948966
+            }
+          }
+        },
+        {
+          "id": "contour-circle",
+          "phase": "stroke",
+          "durationMs": 100,
+          "intentRef": "opaque.contour.circle",
+          "contour": {
+            "kind": "circle",
+            "coordinateFrameRef": "frame.body",
+            "unit": "m",
+            "plane": "xy",
+            "direction": "reverse",
+            "parameters": {
+              "center": [
+                0,
+                0,
+                0
+              ],
+              "radiusM": 0.08,
+              "startAngleRad": 0
+            }
+          }
+        },
+        {
+          "id": "contour-ellipse",
+          "phase": "stroke",
+          "durationMs": 100,
+          "intentRef": "opaque.contour.ellipse",
+          "contour": {
+            "kind": "ellipse",
+            "coordinateFrameRef": "frame.body",
+            "unit": "m",
+            "plane": "xy",
+            "direction": "forward",
+            "parameters": {
+              "center": [
+                0,
+                0,
+                0
+              ],
+              "majorRadiusM": 0.1,
+              "minorRadiusM": 0.05,
+              "startAngleRad": 0
+            }
+          }
+        },
+        {
+          "id": "contour-spiral",
+          "phase": "stroke",
+          "durationMs": 100,
+          "intentRef": "opaque.contour.spiral",
+          "contour": {
+            "kind": "spiral",
+            "coordinateFrameRef": "frame.body",
+            "unit": "m",
+            "plane": "xy",
+            "direction": "reverse",
+            "parameters": {
+              "center": [
+                0,
+                0,
+                0
+              ],
+              "startRadiusM": 0.02,
+              "endRadiusM": 0.1,
+              "turns": 2,
+              "startAngleRad": 0
+            }
+          }
+        },
+        {
+          "id": "contour-zigzag",
+          "phase": "stroke",
+          "durationMs": 100,
+          "intentRef": "opaque.contour.zigzag",
+          "contour": {
+            "kind": "zigzag",
+            "coordinateFrameRef": "frame.body",
+            "unit": "m",
+            "plane": "xy",
+            "direction": "forward",
+            "parameters": {
+              "start": [
+                0,
+                0,
+                0
+              ],
+              "end": [
+                0.4,
+                0,
+                0
+              ],
+              "amplitudeM": 0.03,
+              "cycles": 2
+            }
+          }
+        },
+        {
+          "id": "contour-seven-shape",
+          "phase": "stroke",
+          "durationMs": 100,
+          "intentRef": "opaque.contour.seven-shape",
+          "contour": {
+            "kind": "seven-shape",
+            "coordinateFrameRef": "frame.body",
+            "unit": "m",
+            "plane": "xy",
+            "direction": "reverse",
+            "parameters": {
+              "points": [
+                [
+                  0,
+                  0,
+                  0
+                ],
+                [
+                  0.1,
+                  0,
+                  0
+                ],
+                [
+                  0.2,
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  0,
+                  0
+                ],
+                [
+                  0.5,
+                  0,
+                  0
+                ],
+                [
+                  0.6,
+                  0,
+                  0
+                ]
+              ]
+            }
+          }
+        },
+        {
+          "id": "contour-spline",
+          "phase": "stroke",
+          "durationMs": 100,
+          "intentRef": "opaque.contour.spline",
+          "contour": {
+            "kind": "spline",
+            "coordinateFrameRef": "frame.body",
+            "unit": "m",
+            "plane": "xy",
+            "direction": "forward",
+            "parameters": {
+              "controlPoints": [
+                [
+                  0,
+                  0,
+                  0
+                ],
+                [
+                  0.1,
+                  0.1,
+                  0
+                ],
+                [
+                  0.2,
+                  0.1,
+                  0
+                ],
+                [
+                  0.3,
+                  0,
+                  0
+                ]
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "execution": "authoring-only-not-executable"
+}

@@ -1,0 +1,30 @@
+{
+  "source": {
+    "schema": "vozual.motion-source",
+    "schemaVersion": 4,
+    "purpose": "rig-conformance",
+    "id": "calibrated-hand-frame-normal",
+    "revision": 1,
+    "linguisticIntent": {"requiredRigCapabilities": []},
+    "temporalGraph": {"nodes": []},
+    "constraints": {
+      "handFrameNormalAlignments": [
+        {
+          "id": "left-hand-frame-z",
+          "anchorId": "hand.palm.left",
+          "frameId": "body",
+          "targetNormalBody": [0.505489434, 0.857096534, -0.099327563],
+          "minDot": 0.99,
+          "samples": [{"timeMs": 0, "poseId": "neutral-rest"}]
+        }
+      ]
+    },
+    "rigRealizationOverrides": {},
+    "provenanceAndReview": {"technicalConformanceOnly": true}
+  },
+  "calibration": {
+    "source": "hand-frame Z derived from the measured index-pinky and wrist-middle axes",
+    "poseId": "neutral-rest",
+    "minDot": 0.99
+  }
+}

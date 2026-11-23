@@ -1,0 +1,27 @@
+{
+  "schema": "vozual.nonmanual-documentary-intent-cases",
+  "schemaVersion": 1,
+  "id": "task8.lsc.contextual-contrasts",
+  "revision": 1,
+  "status": "draft-authoring-only",
+  "execution": "authoring-only-not-executable",
+  "cases": [
+    {"id": "question-assertion.meeting-place", "context": "Meeting-place question contrasted with an assertion", "physicalChannelMapping": "unmapped", "timing": "relative-order-only", "contrast": [
+      {"id": "question", "order": 1, "semanticIntentRef": "lsc.discourse.question.location", "abstractNonmanualIntentRefs": ["lsc.question.content-marker"]},
+      {"id": "assertion", "order": 2, "semanticIntentRef": "lsc.discourse.assertion.location", "abstractNonmanualIntentRefs": []}
+    ]},
+    {"id": "negation-affirmation.arrival", "context": "Matched arrival question with affirmative and negative answers", "physicalChannelMapping": "unmapped", "timing": "relative-order-only", "contrast": [
+      {"id": "affirmative", "order": 1, "semanticIntentRef": "lsc.polarity.affirmative", "abstractNonmanualIntentRefs": []},
+      {"id": "negative", "order": 2, "semanticIntentRef": "lsc.polarity.negative", "abstractNonmanualIntentRefs": ["lsc.negation.headshake"]}
+    ]},
+    {"id": "affect-neutral.arrival", "context": "Same arrival event reported with neutral and surprise affect", "physicalChannelMapping": "unmapped", "timing": "relative-order-only", "contrast": [
+      {"id": "neutral", "order": 1, "semanticIntentRef": "lsc.affect.neutral", "abstractNonmanualIntentRefs": []},
+      {"id": "surprise", "order": 2, "semanticIntentRef": "lsc.affect.surprise", "abstractNonmanualIntentRefs": ["lsc.affective-intent.surprise"]}
+    ]},
+    {"id": "role-shift-narration.meeting", "context": "Narrator and participant perspectives in a meeting story", "physicalChannelMapping": "unmapped", "timing": "relative-order-only", "segments": [
+      {"id": "narrator-introduction", "order": 1, "perspectiveRef": "discourse.narrator", "abstractNonmanualIntentRefs": []},
+      {"id": "participant-perspective", "order": 2, "perspectiveRef": "discourse.participant-1", "abstractNonmanualIntentRefs": ["lsc.discourse.role-shift.participant-1"]},
+      {"id": "narrator-return", "order": 3, "perspectiveRef": "discourse.narrator", "abstractNonmanualIntentRefs": ["lsc.discourse.role-shift.return-to-narrator"]}
+    ]}
+  ]
+}

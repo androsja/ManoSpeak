@@ -24,6 +24,34 @@ function sourceMotion() {
 }
 
 describe('compileKinematicMotionV3', () => {
+  it('composes independent face, gaze, and head tracks and rejects same-channel overlap', () => {
+    const motion = sourceMotion() as any;
+    motion.kinematicRealization.nonManuals = [];
+    motion.linguisticIntent.phases[0].nonManualIds = ['head', 'gaze', 'brow', 'smile', 'mouth', 'pucker'];
+    motion.kinematicRealization.nonManualTracks = [
+      {id: 'head', channel: 'headRotationDeg', fromMs: 0, toMs: 1000, value: [10, 0, 0]},
+      {id: 'gaze', channel: 'gazeDirection', fromMs: 0, toMs: 1000, value: [0.2, 0.1, 0.97]},
+      {id: 'brow', channel: 'browRaise', fromMs: 100, toMs: 900, value: 0.4},
+      {id: 'smile', channel: 'smile', fromMs: 200, toMs: 800, value: 0.8},
+      {id: 'mouth', channel: 'mouthOpening', fromMs: 200, toMs: 800, value: 0.6},
+      {id: 'pucker', channel: 'mouthPucker', fromMs: 400, toMs: 700, value: 0.3},
+    ];
+    const result = compileKinematicMotionV3(motion, profile, {sampleRateHz: 60});
+    expect(result.plan.frames.find((frame: any) => frame.timeMs === 500).nonManual)
+      .toMatchObject({
+        headRotationDeg: [10, 0, 0], gazeDirection: [0.2, 0.1, 0.97],
+        browRaise: 0.4, smile: 0.8, mouthOpening: 0.6, mouthPucker: 0.3,
+      });
+    expect(result.plan.frames.find((frame: any) => frame.timeMs === 800).nonManual)
+      .toMatchObject({browRaise: 0.4, smile: 0, mouthOpening: 0, mouthPucker: 0});
+    motion.kinematicRealization.nonManualTracks.push(
+      {id: 'overlap', channel: 'smile', fromMs: 300, toMs: 900, value: 0.5},
+    );
+    expect(() => compileKinematicMotionV3(motion, profile)).toThrow(
+      expect.objectContaining({code: 'KINEMATIC.NON_MANUAL_OVERLAP'}),
+    );
+  });
+
   it('raises ADIOS once and alternates the forearm from the elbow while preserving the palm', () => {
     const {plan} = compileKinematicMotionV3(adios, profile, {sampleRateHz: 120});
     const raised = plan.frames.find((item: {timeMs: number}) => item.timeMs === 900);

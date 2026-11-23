@@ -2,6 +2,7 @@
   "schema": "vozual.number-motion-authoring",
   "status": "owner-approved-prototype",
   "languageId": "lsc-co",
+  "activeHand": "right",
   "source": {
     "title": "Diccionario Básico de la Lengua de Señas Colombiana",
     "publisher": "Ministerio de Educación Nacional e INSOR",
@@ -261,7 +262,59 @@
         "pages": "158",
         "url": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf"
       },
-      "rigLeftForearmAxialRollDegrees": 90,
+      "rigLeftForearmAxialRollDegrees": -7,
+      "rigLeftPalmAxialRollDegrees": -27,
+      "rigHandKeyframes": [
+        {
+          "frame": 6,
+          "transitionFrames": 6,
+          "left": {
+            "elbowRotation": -12,
+            "wristPitch": 0,
+            "wristYaw": 0,
+            "wristRoll": 21,
+            "horizontalOffset": 0,
+            "verticalOffset": 0,
+            "depthOffset": 0,
+            "fist": 0,
+            "pinch": 0,
+            "fingers": {
+              "thumb": 0,
+              "index": 0,
+              "middle": 0,
+              "ring": 0,
+              "pinky": 0
+            },
+            "fingerJoints": {
+              "thumb": [
+                0,
+                0,
+                0
+              ],
+              "index": [
+                0,
+                0,
+                0
+              ],
+              "middle": [
+                0,
+                0,
+                0
+              ],
+              "ring": [
+                0,
+                0,
+                0
+              ],
+              "pinky": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      ],
       "palmRootScale": 1.6,
       "avatarFingerStates": {
         "thumb": "captured",
@@ -270,7 +323,7 @@
         "ring": "closed",
         "pinky": "closed"
       },
-      "locationPresentationNote": "The active hand is posed high beside the avatar face and offset to its screen-right side; this is an avatar approximation of the cited dictionary handshape and movement, not regional performance evidence.",
+      "locationPresentationNote": "The active right hand is posed high beside the avatar face on its screen-left side; this is an avatar approximation of the cited dictionary handshape and movement, not regional performance evidence.",
       "fingers": {
         "thumb": "extended",
         "index": "closed",
@@ -279,10 +332,26 @@
         "pinky": "closed"
       },
       "thumbLandmarkOffsets": [
-        [-0.035, 0.008, 0],
-        [-0.025, -0.015, 0.004],
-        [-0.017, -0.052, 0.008],
-        [-0.01, -0.098, 0.012]
+        [
+          -0.035,
+          0.008,
+          0
+        ],
+        [
+          -0.045,
+          -0.025,
+          0.004
+        ],
+        [
+          -0.06,
+          -0.07,
+          0.008
+        ],
+        [
+          -0.075,
+          -0.125,
+          0.012
+        ]
       ],
       "location": {
         "elbow": [
@@ -298,15 +367,21 @@
       },
       "movement": {
         "type": "wrist-rotation-repetitions",
-        "baseOrientationDegrees": -30,
-        "amplitudeDegrees": 32,
-        "alternateDirection": true,
-        "repetitions": 2,
+        "baseOrientationDegrees": -45,
+        "amplitudeDegrees": 45,
+        "alternateDirection": false,
+        "repetitions": 3,
         "startFrame": 12,
         "rotationFrames": 8,
         "returnFrames": 8,
         "pauseFrames": 4,
         "holdFrames": 12
+      },
+      "fingerSpatialOffsets": {
+        "thumb": {
+          "lateral": 0.055,
+          "forward": -0.055
+        }
       }
     }
   ]

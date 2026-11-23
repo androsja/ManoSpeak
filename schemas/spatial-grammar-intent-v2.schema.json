@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/spatial-grammar-intent-v2.schema.json",
+  "title": "Vozual spatial grammar intent v2",
+  "description": "Authoring-only entity, locus, relation, classifier, and source-bounded modulation annotations. Linguistic context remains unreviewed and no motion is executable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "id", "revision", "profileBinding", "coordinateFrameRef", "loci", "entities", "relations", "execution"],
+  "properties": {
+    "schema": {"const": "vozual.spatial-grammar-intent"},
+    "schemaVersion": {"const": 2},
+    "id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 1},
+    "profileBinding": {"$ref": "#/$defs/profileBinding"},
+    "coordinateFrameRef": {"$ref": "#/$defs/id"},
+    "temporalTimelineBinding": {"$ref": "#/$defs/temporalTimelineBinding"},
+    "loci": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/locus"}},
+    "entities": {"type": "array", "items": {"$ref": "#/$defs/entity"}},
+    "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}},
+    "classifierAnnotations": {"type": "array", "items": {"$ref": "#/$defs/classifierAnnotation"}},
+    "modulationAnnotations": {"type": "array", "items": {"$ref": "#/$defs/modulationAnnotation"}},
+    "execution": {"const": "authoring-only-not-executable"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "profileBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "revision", "sha256", "candidateSha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "candidateSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "temporalTimelineBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "revision", "sha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "temporalRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["trackId", "segmentId"],
+      "properties": {
+        "trackId": {"$ref": "#/$defs/id"},
+        "segmentId": {"$ref": "#/$defs/id"}
+      }
+    },
+    "vector3m": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+    "locus": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "positionM"],
+      "properties": {"id": {"$ref": "#/$defs/id"}, "positionM": {"$ref": "#/$defs/vector3m"}}
+    },
+    "entity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "roleRef", "locusRef", "objectFrameRef"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "roleRef": {"$ref": "#/$defs/id"},
+        "locusRef": {"$ref": "#/$defs/id"},
+        "objectFrameRef": {"$ref": "#/$defs/id"}
+      }
+    },
+    "reference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"enum": ["entity", "locus"]},
+        "id": {"$ref": "#/$defs/id"}
+      }
+    },
+    "agreementRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "classifierEntityRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id", "role", "referentClass"],
+      "properties": {
+        "kind": {"const": "entity"},
+        "id": {"$ref": "#/$defs/id"},
+        "role": {"$ref": "#/$defs/id"},
+        "referentClass": {"$ref": "#/$defs/id"}
+      }
+    },
+    "classifierAnnotation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "inventoryRevision", "constructionId", "handshapeClass", "entityRef"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "inventoryRevision": {"type": "integer", "minimum": 1},
+        "constructionId": {"$ref": "#/$defs/id"},
+        "handshapeClass": {"$ref": "#/$defs/id"},
+        "entityRef": {"$ref": "#/$defs/classifierEntityRef"}
+      }
+    },
+    "modulationAnnotation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "inventoryRevision", "variantId", "sourceGloss"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "inventoryRevision": {"type": "integer", "minimum": 1},
+        "variantId": {"$ref": "#/$defs/id"},
+        "sourceGloss": {"type": "string", "minLength": 1, "maxLength": 120}
+      }
+    },
+    "relation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "sourceRef", "targetRef"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["direction", "agreement", "demonstrative"]},
+        "sourceRef": {"$ref": "#/$defs/reference"},
+        "targetRef": {"$ref": "#/$defs/reference"},
+        "agreementRef": {"$ref": "#/$defs/agreementRef"},
+        "temporalRefs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/temporalRef"}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "agreement"}}, "required": ["kind"]},
+          "then": {
+            "required": ["agreementRef"],
+            "properties": {"agreementRef": {"$ref": "#/$defs/agreementRef"}}
+          },
+          "else": {
+            "not": {
+              "required": ["agreementRef"],
+              "properties": {"agreementRef": {"$ref": "#/$defs/agreementRef"}}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

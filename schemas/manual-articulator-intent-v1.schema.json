@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/manual-articulator-intent-v1.schema.json",
+  "title": "Vozual independent-hand manual articulator intent v1",
+  "description": "Authoring-only bilateral hand intent. It contains no joint angles and cannot be compiled or played as motion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "kind", "id", "revision", "rigBinding", "durationMs", "hands", "requiredRigCapabilities", "execution", "review"],
+  "properties": {
+    "schema": {"const": "vozual.manual-articulator-intent"},
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "independent-hand-authoring"},
+    "id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 1},
+    "rigBinding": {"$ref": "#/$defs/rigBinding"},
+    "durationMs": {"type": "integer", "minimum": 1},
+    "hands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "right"],
+      "properties": {
+        "left": {"$ref": "#/$defs/handTrack"},
+        "right": {"$ref": "#/$defs/handTrack"}
+      }
+    },
+    "requiredRigCapabilities": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "execution": {"const": "authoring-only-not-executable"},
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewerId", "reviewedAt"],
+      "properties": {
+        "status": {"enum": ["draft", "needs_review"]},
+        "reviewerId": {"type": "null"},
+        "reviewedAt": {"type": "null"}
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "rigBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "profileRevision", "profileSha256", "candidateSha256"],
+      "properties": {
+        "profileId": {"$ref": "#/$defs/id"},
+        "profileRevision": {"type": "integer", "minimum": 1},
+        "profileSha256": {"$ref": "#/$defs/sha256"},
+        "candidateSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "handTrack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "events"],
+      "properties": {
+        "role": {"enum": ["dominant", "non-dominant-active", "non-dominant-passive", "independent"]},
+        "events": {"type": "array", "items": {"$ref": "#/$defs/event"}}
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "channel", "fromMs", "toMs", "intentRef"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "channel": {"enum": ["handshape", "trajectory", "orientation", "contact-intent"]},
+        "fromMs": {"type": "integer", "minimum": 0},
+        "toMs": {"type": "integer", "minimum": 0},
+        "intentRef": {"$ref": "#/$defs/id"}
+      }
+    }
+  }
+}

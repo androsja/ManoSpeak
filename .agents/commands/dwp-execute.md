@@ -1,13 +1,7 @@
 ---
-description: Execute a deep work plan task-by-task (provided by the installed `deepworkplan` skill)
+description: Execute a deep work plan task-by-task.
 ---
 
-# /dwp-execute — provided by the `deepworkplan` skill
+# /dwp-execute
 
-> Thin alias. The flow lives in the installed `deepworkplan` skill — this file only routes to it, so there is a single source of truth and no drift.
-
-## What to do
-
-Route this invocation to the **execute** sub-skill of the installed `deepworkplan` skill and follow it: read `/Users/jflorezgaleano/.gemini/skills/deepworkplan/execute/SKILL.md` and execute its flow.
-
-> Other agents: invoke the skill's `deepworkplan-execute` sub-skill directly (`/deepworkplan-execute` in Claude Code, `#deepworkplan-execute` elsewhere). This `dwp-execute` file is the shorter, conventional alias.
+Follow the **Execute** section in `.agents/skills/deepworkplan/SKILL.md`.

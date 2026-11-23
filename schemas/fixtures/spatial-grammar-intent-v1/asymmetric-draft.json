@@ -1,0 +1,46 @@
+{
+  "schema": "vozual.spatial-grammar-intent",
+  "schemaVersion": 1,
+  "id": "fixture.spatial-asymmetric-draft",
+  "revision": 1,
+  "coordinateFrameRef": "body",
+  "loci": [
+    {
+      "id": "locus.left",
+      "positionM": [
+        -0.2,
+        0.35,
+        0.1
+      ]
+    },
+    {
+      "id": "locus.right",
+      "positionM": [
+        0.25,
+        0.4,
+        -0.05
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "id": "entity.object-a",
+      "roleRef": "role.referent-a",
+      "locusRef": "locus.left",
+      "objectFrameRef": "object"
+    },
+    {
+      "id": "entity.object-b",
+      "roleRef": "role.referent-b",
+      "locusRef": "locus.right",
+      "objectFrameRef": "object"
+    }
+  ],
+  "execution": "authoring-only-not-executable",
+  "profileBinding": {
+    "id": "vozual-rig-1",
+    "revision": 8,
+    "sha256": "c97937e3642cfae25dbbbb91fdd4ed62228ecc17d062a6c13443c556097ced54",
+    "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a"
+  }
+}

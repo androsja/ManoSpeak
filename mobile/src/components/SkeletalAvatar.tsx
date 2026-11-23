@@ -2,7 +2,8 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Platform, Pressable, StyleSheet, Text, View} from 'react-native';
 import RNFS from 'react-native-fs';
 import {WebView, WebViewMessageEvent} from 'react-native-webview';
-import {readInstalledSignPayload} from '../services/SignLanguageService';
+import {readInstalledSignPayload, type InstalledSignPayload} from '../services/SignLanguageService';
+import type {JsonMotionDocument} from '../services/JsonMotionLoader';
 import {KinematicExecutionPlan} from '../services/KinematicExecutionPlan';
 
 // WebView 14 currently publishes cross-platform props as an intersection that
@@ -73,7 +74,19 @@ export function SkeletalAvatar({clip, playbackId, playbackSpeed, paused, continu
       }
       let installScript = '';
       if (clip !== 'IDLE' && clip !== 'PHRASE_WAIT') {
-        const payload = await readInstalledSignPayload(clip);
+        let payload: InstalledSignPayload | undefined;
+        if (__DEV__ && clip.toUpperCase() === 'DIEZ') {
+          // Keep the temporary DIEZ preview connected to the editable local
+          // draft so avatar checks on a device show the latest hand pose.
+          const motionDocument = require('../../assets/motions/drafts/numbers/diez.motion.json') as JsonMotionDocument;
+          payload = {
+            contentBase64: '',
+            motionDocument,
+            avatarProfile: motionDocument.avatarProfile,
+          };
+        } else {
+          payload = await readInstalledSignPayload(clip);
+        }
         if (cancelled) return;
         if (!payload) {
           setRuntimeError(`La seña ${clip} no está descargada.`);

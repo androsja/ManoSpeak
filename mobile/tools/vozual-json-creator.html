@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VOZUAL Creator</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #17202a; background: #f3f6fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { padding: 24px max(24px, calc((100vw - 1100px) / 2)); background: #102538; color: white; }
+    header h1 { margin: 0 0 5px; font-size: 26px; }
+    header p { margin: 0; color: #c1d0dc; }
+    main { max-width: 1100px; margin: 22px auto; padding: 0 20px 40px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr); gap: 18px; align-items: start; }
+    .card { background: white; border: 1px solid #d9e2ec; border-radius: 12px; padding: 20px; box-shadow: 0 3px 12px #21364b0a; }
+    .card + .card { margin-top: 16px; }
+    h2 { margin: 0 0 16px; font-size: 18px; }
+    h3 { margin: 18px 0 10px; font-size: 14px; color: #314c63; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    label { display: block; margin-bottom: 5px; color: #43586b; font-size: 12px; font-weight: 650; }
+    input, select { width: 100%; border: 1px solid #bfccd8; border-radius: 7px; padding: 9px 10px; background: white; color: #17202a; font: inherit; }
+    input:focus, select:focus { outline: 2px solid #75b5ee; border-color: #3485cb; }
+    .field { min-width: 0; }
+    .finger-row { display: grid; grid-template-columns: 1fr 150px; gap: 12px; align-items: center; margin: 8px 0; }
+    .finger-row label { margin: 0; font-size: 14px; }
+    .note { margin: 12px 0 0; padding: 11px 12px; border-radius: 8px; background: #edf5fb; color: #34536d; font-size: 13px; line-height: 1.45; }
+    .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
+    button { border: 0; border-radius: 7px; padding: 10px 15px; background: #1474b8; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+    .preview-link { display: inline-block; border-radius: 7px; padding: 10px 15px; background: #12614e; color: white; font-weight: 700; text-decoration: none; }
+    .preview-link[hidden] { display: none; }
+    button.secondary { background: #e8eef3; color: #24394c; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .movement-toggle { display: flex; gap: 9px; align-items: center; margin-bottom: 15px; }
+    .movement-toggle input { width: auto; }
+    .movement-toggle label { margin: 0; font-size: 14px; }
+    #movementFields[hidden] { display: none; }
+    #result { display: none; margin-top: 16px; padding: 13px; border-radius: 8px; background: #eff8f1; color: #1f5d30; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; }
+    #result.error { display: block; background: #fff1ef; color: #8f2419; }
+    #result.success { display: block; }
+    .small { color: #65788a; font-size: 12px; }
+    @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>VOZUAL Creator</h1>
+    <p>Configura una seña y genera sus JSON locales para probarla en Vozual.</p>
+  </header>
+  <main>
+    <div class="layout">
+      <section>
+        <div class="card">
+          <h2>Datos de la seña</h2>
+          <div class="grid">
+            <div class="field"><label for="gloss">Glosa</label><input id="gloss" value="NUEVA SEÑA" maxlength="80"></div>
+            <div class="field"><label for="aliases">Palabras reconocidas, separadas por coma</label><input id="aliases" placeholder="palabra, otra forma"></div>
+            <div class="field"><label for="sourceTitle">Referencia (opcional)</label><input id="sourceTitle" placeholder="Nombre del manual o video"></div>
+            <div class="field"><label for="sourceUrl">Enlace de referencia (opcional)</label><input id="sourceUrl" type="url" placeholder="https://..."></div>
+          </div>
+          <p class="note">La mano activa es la izquierda del avatar. Esta versión crea señas de una mano y guarda un JSON de autoría editable junto al JSON de movimiento que lee la app.</p>
+        </div>
+
+        <div class="card">
+          <h2>Forma de la mano</h2>
+          <div id="fingerControls"></div>
+          <div class="grid">
+            <div class="field"><label for="spread">Separación de los dedos (landmarks)</label><input id="spread" type="number" min="0.5" max="3" step="0.05" value="1.8"></div>
+            <div class="field"><label for="splay">Apertura de los dedos del avatar (grados)</label><input id="splay" type="number" min="0" max="36" step="1" value="20"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Ubicación de la mano</h2>
+          <h3>Muñeca activa</h3>
+          <div class="grid three">
+            <div class="field"><label for="wristX">X</label><input id="wristX" type="number" min="0" max="2" step="0.01" value="0.77"></div>
+            <div class="field"><label for="wristY">Y</label><input id="wristY" type="number" min="0" max="2" step="0.01" value="0.58"></div>
+            <div class="field"><label for="wristZ">Z</label><input id="wristZ" type="number" min="-1" max="2" step="0.01" value="-0.04"></div>
+          </div>
+          <h3>Codo</h3>
+          <div class="grid three">
+            <div class="field"><label for="elbowX">X</label><input id="elbowX" type="number" min="0" max="2" step="0.01" value="0.82"></div>
+            <div class="field"><label for="elbowY">Y</label><input id="elbowY" type="number" min="0" max="2" step="0.01" value="0.75"></div>
+            <div class="field"><label for="elbowZ">Z</label><input id="elbowZ" type="number" min="-1" max="2" step="0.01" value="-0.02"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Movimiento</h2>
+          <div class="movement-toggle"><input id="movementEnabled" type="checkbox"><label for="movementEnabled">Agregar flexiones repetidas de un dedo</label></div>
+          <div id="movementFields" hidden>
+            <div class="grid">
+              <div class="field"><label for="movementFinger">Dedo</label><select id="movementFinger"></select></div>
+              <div class="field"><label for="repetitions">Repeticiones</label><input id="repetitions" type="number" min="1" max="8" step="1" value="2"></div>
+              <div class="field"><label for="startFrame">Fotograma de inicio</label><input id="startFrame" type="number" min="0" max="300" step="1" value="12"></div>
+              <div class="field"><label for="flexionFrames">Fotogramas para flexionar</label><input id="flexionFrames" type="number" min="1" max="120" step="1" value="10"></div>
+              <div class="field"><label for="returnFrames">Fotogramas para regresar</label><input id="returnFrames" type="number" min="1" max="120" step="1" value="10"></div>
+              <div class="field"><label for="pauseFrames">Pausa entre repeticiones</label><input id="pauseFrames" type="number" min="0" max="120" step="1" value="4"></div>
+              <div class="field"><label for="holdFrames">Pausa final</label><input id="holdFrames" type="number" min="0" max="300" step="1" value="12"></div>
+              <div class="field"><label for="flexAmount">Intensidad (0.05 a 1)</label><input id="flexAmount" type="number" min="0.05" max="1" step="0.05" value="0.9"></div>
+            </div>
+          </div>
+          <p class="note">Por ahora, esta regla permite flexionar y regresar un dedo varias veces. Los movimientos nuevos se agregan al generador una vez y luego quedan disponibles aquí.</p>
+        </div>
+      </section>
+
+      <aside>
+        <div class="card">
+          <h2>Mostrarme cómo queda la mano</h2>
+          <p class="small">Abre el mismo avatar de la app con un puño de referencia. Arrastra y rota la muñeca hasta que se vea como quieres; luego puedes enviarme una captura o copiar los ángulos. Esta vista no cambia ni publica ningún JSON.</p>
+          <div class="actions">
+            <a class="preview-link" href="/hand-pose-reference" target="_blank" rel="noopener">Abrir referencia interactiva de mano</a>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Crear JSON</h2>
+          <p class="small">Los archivos se guardan en <code>mobile/assets/motions/drafts/creator/</code>. La vista previa usa el runtime y el avatar móvil de Vozual. Todo queda local; no se publica a Firebase.</p>
+          <div class="actions">
+            <button id="createButton" type="button">Generar y guardar JSON</button>
+            <a id="previewLink" class="preview-link" target="_blank" rel="noopener" hidden>Ver seña en el avatar</a>
+            <button id="loadButton" class="secondary" type="button">Abrir JSON de autoría</button>
+            <input id="authoringFile" type="file" accept="application/json,.json" hidden>
+          </div>
+          <div id="result" role="status" aria-live="polite"></div>
+        </div>
+      </aside>
+    </div>
+  </main>
+  <script>
+    const fingers = ['thumb', 'index', 'middle', 'ring', 'pinky'];
+    const fingerNames = {thumb: 'Pulgar', index: 'Índice', middle: 'Medio', ring: 'Anular', pinky: 'Meñique'};
+    const stateNames = {captured: 'Controlado por movimiento', extended: 'Extendido', closed: 'Cerrado'};
+    const byId = id => document.getElementById(id);
+
+    byId('fingerControls').innerHTML = fingers.map(finger => `
+      <div class="finger-row"><label for="finger-${finger}">${fingerNames[finger]}</label>
+      <select id="finger-${finger}">${Object.entries(stateNames).map(([value, label]) => `<option value="${value}" ${value === 'closed' ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
+    `).join('');
+    byId('movementFinger').innerHTML = fingers.map(finger => `<option value="${finger}" ${finger === 'index' ? 'selected' : ''}>${fingerNames[finger]}</option>`).join('');
+
+    byId('movementEnabled').addEventListener('change', event => {
+      byId('movementFields').hidden = !event.target.checked;
+      const selectedFinger = byId('movementFinger').value;
+      if (event.target.checked && byId(`finger-${selectedFinger}`).value === 'closed') {
+        byId(`finger-${selectedFinger}`).value = 'captured';
+      }
+    });
+    byId('movementFinger').addEventListener('change', event => {
+      if (byId('movementEnabled').checked && byId(`finger-${event.target.value}`).value === 'closed') {
+        byId(`finger-${event.target.value}`).value = 'captured';
+      }
+    });
+
+    function numeric(id) { return Number(byId(id).value); }
+    function readForm() {
+      const authoring = {
+        gloss: byId('gloss').value,
+        speechAliases: byId('aliases').value.split(',').map(value => value.trim()).filter(Boolean),
+        source: {title: byId('sourceTitle').value.trim(), url: byId('sourceUrl').value.trim()},
+        fingers: Object.fromEntries(fingers.map(finger => [finger, byId(`finger-${finger}`).value])),
+        lateralFingerSpread: numeric('spread'),
+        rigFingerSplayDegrees: numeric('splay'),
+        location: {
+          wrist: {x: numeric('wristX'), y: numeric('wristY'), z: numeric('wristZ')},
+          elbow: {x: numeric('elbowX'), y: numeric('elbowY'), z: numeric('elbowZ')},
+        },
+      };
+      authoring.movement = byId('movementEnabled').checked ? {
+        type: 'finger-flexion-repetitions',
+        finger: byId('movementFinger').value,
+        repetitions: numeric('repetitions'),
+        startFrame: numeric('startFrame'),
+        flexionFrames: numeric('flexionFrames'),
+        returnFrames: numeric('returnFrames'),
+        pauseFrames: numeric('pauseFrames'),
+        holdFrames: numeric('holdFrames'),
+        flexAmount: numeric('flexAmount'),
+      } : {type: 'none'};
+      return authoring;
+    }
+
+    function fillForm(authoring) {
+      byId('gloss').value = authoring.gloss || '';
+      byId('aliases').value = (authoring.speechAliases || []).join(', ');
+      byId('sourceTitle').value = authoring.source?.title || '';
+      byId('sourceUrl').value = authoring.source?.url || '';
+      for (const finger of fingers) byId(`finger-${finger}`).value = authoring.fingers?.[finger] || 'closed';
+      byId('spread').value = authoring.lateralFingerSpread ?? 1.8;
+      byId('splay').value = authoring.rigFingerSplayDegrees ?? 20;
+      const wrist = authoring.location?.wrist || [0.77, 0.58, -0.04];
+      const elbow = authoring.location?.elbow || [0.82, 0.75, -0.02];
+      ['X', 'Y', 'Z'].forEach((axis, index) => {
+        byId(`wrist${axis}`).value = Array.isArray(wrist) ? wrist[index] : wrist[axis.toLowerCase()];
+        byId(`elbow${axis}`).value = Array.isArray(elbow) ? elbow[index] : elbow[axis.toLowerCase()];
+      });
+      const movement = authoring.movement;
+      byId('movementEnabled').checked = Boolean(movement && movement.type && movement.type !== 'none');
+      byId('movementFields').hidden = !byId('movementEnabled').checked;
+      if (byId('movementEnabled').checked) {
+        byId('movementFinger').value = movement.finger || 'index';
+        for (const field of ['repetitions', 'startFrame', 'flexionFrames', 'returnFrames', 'pauseFrames', 'holdFrames', 'flexAmount']) {
+          byId(field).value = movement[field];
+        }
+      }
+    }
+
+    byId('createButton').addEventListener('click', async () => {
+      const button = byId('createButton');
+      const result = byId('result');
+      button.disabled = true;
+      byId('previewLink').hidden = true;
+      result.className = '';
+      result.textContent = 'Generando los JSON…';
+      result.style.display = 'block';
+      try {
+        const response = await fetch('/api/create', {
+          method: 'POST',
+          headers: {'content-type': 'application/json'},
+          body: JSON.stringify(readForm()),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'No se pudo generar el JSON.');
+        result.className = 'success';
+        result.textContent = `${payload.gloss}: ${payload.frameCount} fotogramas generados.\nAutoría: ${payload.authoringPath}\nMovimiento para la app: ${payload.motionPath}`;
+        if (payload.previewPath) {
+          byId('previewLink').href = payload.previewPath;
+          byId('previewLink').hidden = false;
+        } else {
+          result.textContent += `\nLos JSON quedaron guardados, pero no se pudo compilar la vista previa: ${payload.previewError || 'error desconocido'}`;
+        }
+      } catch (error) {
+        result.className = 'error';
+        result.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    byId('loadButton').addEventListener('click', () => byId('authoringFile').click());
+    byId('authoringFile').addEventListener('change', async event => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const result = byId('result');
+      try {
+        const authoring = JSON.parse(await file.text());
+        if (authoring.schema !== 'vozual.sign-motion-authoring' || authoring.schemaVersion !== 1) {
+          throw new Error('El archivo no es un borrador de VOZUAL Creator compatible.');
+        }
+        fillForm(authoring);
+        result.className = 'success';
+        result.style.display = 'block';
+        result.textContent = `Borrador cargado: ${authoring.gloss}.`;
+      } catch (error) {
+        result.className = 'error';
+        result.style.display = 'block';
+        result.textContent = error.message;
+      } finally {
+        event.target.value = '';
+      }
+    });
+  </script>
+</body>
+</html>

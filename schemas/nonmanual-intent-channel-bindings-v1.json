@@ -1,0 +1,18 @@
+{
+  "schema": "vozual.nonmanual-intent-channel-bindings",
+  "schemaVersion": 1,
+  "execution": "authoring-only-not-executable",
+  "channels": [
+    {"id": "nonmanual.intent.question", "abstractRole": "grammatical-question"},
+    {"id": "nonmanual.intent.polarity", "abstractRole": "grammatical-polarity"},
+    {"id": "nonmanual.intent.affect", "abstractRole": "affective-intent"},
+    {"id": "nonmanual.intent.perspective", "abstractRole": "discourse-perspective"}
+  ],
+  "bindings": [
+    {"intentRef": "lsc.question.content-marker", "channelId": "nonmanual.intent.question"},
+    {"intentRef": "lsc.negation.headshake", "channelId": "nonmanual.intent.polarity"},
+    {"intentRef": "lsc.affective-intent.surprise", "channelId": "nonmanual.intent.affect"},
+    {"intentRef": "lsc.discourse.role-shift.participant-1", "channelId": "nonmanual.intent.perspective"},
+    {"intentRef": "lsc.discourse.role-shift.return-to-narrator", "channelId": "nonmanual.intent.perspective"}
+  ]
+}

@@ -1,0 +1,168 @@
+{
+  "id": "vozual.lsc-modulation-inventory",
+  "revision": 1,
+  "status": "source-bounded-documentary-decisions",
+  "execution": "authoring-only-not-executable",
+  "source": {
+    "title": "Diccionario básico de la lengua de señas colombiana",
+    "sections": ["2.b.1", "2.b.2", "2.c.1", "2.c.2", "2.d.2"],
+    "printedPages": ["XXXV", "XXXVI", "XXXVII", "XXXVIII", "XXXIX", "XLII", "XLIII", "XLIV"],
+    "documentUrl": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf",
+    "pdfSha256": "3229f40b115cca1457aefa0b554ec3655b7cdad25a27bd33c6d4fe7564b33f42"
+  },
+  "domainDecisions": [
+    {
+      "domain": "size",
+      "decision": "documented-construction-specific",
+      "summary": "Spatial extent can describe or intensify size for the source-described signs; no universal amplitude scale is defined."
+    },
+    {
+      "domain": "manner",
+      "decision": "documented-construction-specific",
+      "summary": "Relative articulation speed has the source-described readings for VENIR and SEÑAR/SEÑA; no cross-sign speed threshold is defined."
+    },
+    {
+      "domain": "frequency",
+      "decision": "not-an-independent-numeric-domain",
+      "summary": "Documented repetition effects are classified under aspect or number; no standalone rate or event-count operator is defined."
+    },
+    {
+      "domain": "aspect",
+      "decision": "documented-patterns-with-lexical-context",
+      "summary": "Durative, habitual, iterative, and terminative readings are described; the base sign and context constrain the pattern."
+    },
+    {
+      "domain": "number",
+      "decision": "documented-construction-specific",
+      "summary": "Finger incorporation and spatial repetition are documented for listed signs only; arc count need not equal participant count."
+    }
+  ],
+  "variants": [
+    {
+      "id": "size.grande-person-height",
+      "domain": "size",
+      "operation": "relative-spatial-extent",
+      "sourceSignGlosses": ["GRANDE"],
+      "semanticEffect": "characterizes-person-height-through-a-sign-specific-endpoint",
+      "qualitativeParameters": {"endpoint": "interpreted-against-the-unmarked-form"},
+      "evidence": {"section": "2.b.1", "printedPages": ["XXXV", "XXXVI"], "kind": "source-described"}
+    },
+    {
+      "id": "size.pequeno-person-height",
+      "domain": "size",
+      "operation": "relative-spatial-extent",
+      "sourceSignGlosses": ["PEQUEÑO"],
+      "semanticEffect": "characterizes-exceptionally-small-person-height-through-a-sign-specific-endpoint",
+      "qualitativeParameters": {"endpoint": "below-the-unmarked-endpoint"},
+      "evidence": {"section": "2.b.1", "printedPages": ["XXXVI"], "kind": "source-described"}
+    },
+    {
+      "id": "size.libro-exceptional-dimensions",
+      "domain": "size",
+      "operation": "relative-spatial-extent",
+      "sourceSignGlosses": ["LIBRO"],
+      "semanticEffect": "describes-an-exceptionally-large-book",
+      "qualitativeParameters": {"arc": "full-arm-extent-instead-of-the-unmarked-shorter-arc"},
+      "evidence": {"section": "2.b.1", "printedPages": ["XXXVI"], "kind": "source-described"}
+    },
+    {
+      "id": "manner.venir-rapid-arrival",
+      "domain": "manner",
+      "operation": "relative-articulation-speed",
+      "sourceSignGlosses": ["VENIR"],
+      "semanticEffect": "coming-quickly",
+      "qualitativeParameters": {"speed": "faster-than-the-unmarked-form"},
+      "evidence": {"section": "2.b.2", "printedPages": ["XXXVII", "XXXVIII"], "kind": "source-described"}
+    },
+    {
+      "id": "manner.senar-slow-signing",
+      "domain": "manner",
+      "operation": "relative-articulation-speed",
+      "sourceSignGlosses": ["SEÑAR", "SEÑA"],
+      "semanticEffect": "signing-slowly",
+      "qualitativeParameters": {"speed": "slower-than-the-unmarked-form"},
+      "evidence": {"section": "2.b.2", "printedPages": ["XXXVII", "XXXVIII"], "kind": "source-described"}
+    },
+    {
+      "id": "aspect.durative.caminar-slow",
+      "domain": "aspect",
+      "operation": "relative-articulation-speed",
+      "sourceSignGlosses": ["CAMINAR"],
+      "semanticEffect": "durative-or-continuative-action",
+      "qualitativeParameters": {"speed": "very-slow", "repetition": "none-required"},
+      "evidence": {"section": "2.d.2", "printedPages": ["XLIII"], "kind": "source-described"}
+    },
+    {
+      "id": "aspect.durative.slow-broad-repetition",
+      "domain": "aspect",
+      "operation": "repeat-with-expanded-spatial-extent",
+      "sourceSignGlosses": [],
+      "semanticEffect": "durative-action-when-compatible-with-the-base-sign",
+      "qualitativeParameters": {"speed": "slow", "movementExtent": "broader-than-unmarked", "lexicalContextRequired": true},
+      "evidence": {"section": "2.d.2", "printedPages": ["XLIII"], "kind": "source-described-general-pattern"}
+    },
+    {
+      "id": "aspect.habitual.short-fast-repetition",
+      "domain": "aspect",
+      "operation": "repeat-short-fast-form",
+      "sourceSignGlosses": [],
+      "semanticEffect": "habitual-or-regular-action",
+      "qualitativeParameters": {"movementExtent": "shorter-than-unmarked", "speed": "faster-than-unmarked", "lexicalContextRequired": true},
+      "evidence": {"section": "2.d.2", "printedPages": ["XLIII", "XLIV"], "kind": "source-described-general-pattern"}
+    },
+    {
+      "id": "aspect.iterative.unmarked-form-repetition",
+      "domain": "aspect",
+      "operation": "repeat-unmodified-form",
+      "sourceSignGlosses": [],
+      "semanticEffect": "iterative-action-within-a-contextual-interval",
+      "qualitativeParameters": {"movementExtent": "unmodified", "speed": "unmodified", "lexicalContextRequired": true},
+      "evidence": {"section": "2.d.2", "printedPages": ["XLIII", "XLIV"], "kind": "source-described-general-pattern"}
+    },
+    {
+      "id": "aspect.terminative.abrupt-ending",
+      "domain": "aspect",
+      "operation": "end-predicative-movement-abruptly",
+      "sourceSignGlosses": [],
+      "semanticEffect": "action-conceived-as-reaching-its-end",
+      "qualitativeParameters": {"termination": "abrupt", "lexicalContextRequired": true},
+      "evidence": {"section": "2.d.2", "printedPages": ["XLIV"], "kind": "source-described-general-pattern"}
+    },
+    {
+      "id": "number.unit-sign-finger-incorporation",
+      "domain": "number",
+      "operation": "change-active-hand-finger-count",
+      "sourceSignGlosses": ["MIL", "AÑO", "DÍA", "HORA", "MES", "MINUTO", "SEMANA"],
+      "semanticEffect": "introduces-numeral-information-for-the-listed-unit-signs",
+      "qualitativeParameters": {"fingerCount": "source-described-numeral-incorporation"},
+      "evidence": {"section": "2.c.1", "printedPages": ["XXXVIII", "XXXIX"], "kind": "source-described"}
+    },
+    {
+      "id": "number.plural.spatial-repetition",
+      "domain": "number",
+      "operation": "repeat-form-at-distinct-spatial-points",
+      "sourceSignGlosses": ["ÁRBOL", "CASA", "RÍO"],
+      "semanticEffect": "plural-reference-for-the-listed-signs",
+      "qualitativeParameters": {"plurality": "more-than-one", "exactCount": "not-encoded-by-this-entry"},
+      "evidence": {"section": "2.c.2", "printedPages": ["XXXVIII", "XXXIX"], "kind": "source-described"}
+    },
+    {
+      "id": "number.plural.sentarse-correlated-arcs",
+      "domain": "number",
+      "operation": "repeat-arcs-across-distinct-contact-points",
+      "sourceSignGlosses": ["SENTARSE"],
+      "semanticEffect": "pluralizes-the-seated-participants",
+      "qualitativeParameters": {"arcCount": "correlates-with-but-is-not-equal-to-participant-count"},
+      "evidence": {"section": "2.c.2", "printedPages": ["XXXIX"], "kind": "source-described"}
+    },
+    {
+      "id": "number.plural.nino-horizontal-extension",
+      "domain": "number",
+      "operation": "extend-form-horizontally",
+      "sourceSignGlosses": ["NIÑO"],
+      "semanticEffect": "plural-reference-to-children",
+      "qualitativeParameters": {"extension": "continues-horizontally-past-the-unmarked-endpoint"},
+      "evidence": {"section": "2.c.2", "printedPages": ["XXXIX"], "kind": "source-described"}
+    }
+  ]
+}

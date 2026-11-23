@@ -6,8 +6,24 @@ const {
   verifyCandidateAsset,
 } = require('./rig-capability-profile.cjs');
 
+function rejectUnreviewedCapabilityRequests(requiredCapabilities, profile) {
+  if (!Array.isArray(requiredCapabilities)) return;
+  for (const capability of requiredCapabilities) {
+    if (typeof capability === 'string' &&
+        (capability.startsWith('anatomical.') || capability === 'manual.thumbJoints' ||
+         capability.startsWith('manual.thumb.') || capability.startsWith('sign.') || capability.startsWith('linguistic.sign.'))) {
+      throw new RigCapabilityError(
+        'COMPILER.UNSUPPORTED_REQUIRED_CAPABILITY',
+        `Rig ${profile?.id || 'unknown'}@${profile?.revision || 'unknown'} has no reviewed hash-bound admission for ${capability}`,
+        {capability, profileId: profile?.id, profileRevision: profile?.revision, profileSha256: profile?.sha256},
+      );
+    }
+  }
+}
+
 /** Prepare the immutable rig identity that a v4 compiler must bind to its output. */
 function bindRigForV4Compilation(profile, candidateBytes, requiredCapabilities, mechanicalObservation) {
+  rejectUnreviewedCapabilityRequests(requiredCapabilities, profile);
   verifyCandidateAsset(profile, candidateBytes);
   requireRigCapabilities(profile, requiredCapabilities);
   const inventorySha256 = profile.descriptor.boneInventory.restAxesInventory.sha256;
@@ -69,4 +85,4 @@ function assertV4CompiledRigBinding(artifact, binding) {
   return artifact;
 }
 
-module.exports = {assertV4CompiledRigBinding, bindRigForV4Compilation};
+module.exports = {assertV4CompiledRigBinding, bindRigForV4Compilation, rejectUnreviewedCapabilityRequests};

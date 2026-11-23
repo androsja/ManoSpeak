@@ -92,6 +92,31 @@
         "joints": {"type": "object", "additionalProperties": false, "required": ["thumb", "index", "middle", "ring", "pinky"], "properties": {"thumb": {"$ref": "#/$defs/thumbJoints"}, "index": {"$ref": "#/$defs/fingerJoints"}, "middle": {"$ref": "#/$defs/fingerJoints"}, "ring": {"$ref": "#/$defs/fingerJoints"}, "pinky": {"$ref": "#/$defs/fingerJoints"}}}
       }
     },
+    "nonManualTrack": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "channel", "fromMs", "toMs", "value"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "channel": {"enum": ["headRotationDeg", "gazeDirection", "browRaise", "smile", "mouthOpening", "mouthPucker"]},
+        "fromMs": {"$ref": "#/$defs/timeMs"},
+        "toMs": {"$ref": "#/$defs/timeMs"},
+        "value": {}
+      },
+      "allOf": [
+        {"if": {"properties": {"channel": {"const": "headRotationDeg"}}},
+         "then": {"properties": {"value": {"$ref": "#/$defs/vec3"}}}},
+        {"if": {"properties": {"channel": {"const": "gazeDirection"}}},
+         "then": {"properties": {"value": {"$ref": "#/$defs/vec3"}}}},
+        {"if": {"properties": {"channel": {"const": "browRaise"}}},
+         "then": {"properties": {"value": {"type": "number", "minimum": 0, "maximum": 1}}}},
+        {"if": {"properties": {"channel": {"const": "smile"}}},
+         "then": {"properties": {"value": {"type": "number", "minimum": 0, "maximum": 1}}}},
+        {"if": {"properties": {"channel": {"const": "mouthOpening"}}},
+         "then": {"properties": {"value": {"type": "number", "minimum": 0, "maximum": 1}}}},
+        {"if": {"properties": {"channel": {"const": "mouthPucker"}}},
+         "then": {"properties": {"value": {"type": "number", "minimum": 0, "maximum": 1}}}}
+      ]
+    },
     "nonManual": {
       "type": "object", "additionalProperties": false,
       "required": ["id", "fromMs", "toMs", "headRotationDeg", "gazeDirection", "browRaise", "mouthOpening", "mouthPucker"],
@@ -123,7 +148,7 @@
     "kinematicRealization": {
       "type": "object", "additionalProperties": false,
       "required": ["durationMs", "keyframes", "nonManuals", "contacts", "proximities", "relativePoses", "jointRelations", "trajectories", "transitions"],
-      "properties": {"durationMs": {"type": "integer", "minimum": 1}, "keyframes": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/keyframe"}}, "nonManuals": {"type": "array", "items": {"$ref": "#/$defs/nonManual"}}, "contacts": {"type": "array", "items": {"$ref": "#/$defs/contact"}}, "proximities": {"type": "array", "items": {"$ref": "#/$defs/proximity"}}, "relativePoses": {"type": "array", "items": {"$ref": "#/$defs/relativePose"}}, "jointRelations": {"type": "array", "items": {"$ref": "#/$defs/jointRelation"}}, "trajectories": {"type": "array", "items": {"$ref": "#/$defs/trajectory"}}, "transitions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/transition"}}}
+      "properties": {"durationMs": {"type": "integer", "minimum": 1}, "keyframes": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/keyframe"}}, "nonManuals": {"type": "array", "items": {"$ref": "#/$defs/nonManual"}}, "nonManualTracks": {"type": "array", "items": {"$ref": "#/$defs/nonManualTrack"}}, "contacts": {"type": "array", "items": {"$ref": "#/$defs/contact"}}, "proximities": {"type": "array", "items": {"$ref": "#/$defs/proximity"}}, "relativePoses": {"type": "array", "items": {"$ref": "#/$defs/relativePose"}}, "jointRelations": {"type": "array", "items": {"$ref": "#/$defs/jointRelation"}}, "trajectories": {"type": "array", "items": {"$ref": "#/$defs/trajectory"}}, "transitions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/transition"}}}
     },
     "provenance": {"type": "object", "additionalProperties": false, "required": ["authorId", "createdAt", "updatedAt", "sourceSha256"], "properties": {"authorId": {"type": "string", "minLength": 1}, "createdAt": {"type": "string", "format": "date-time"}, "updatedAt": {"type": "string", "format": "date-time"}, "sourceSha256": {"$ref": "#/$defs/sha256"}}},
     "review": {"type": "object", "additionalProperties": false, "required": ["status", "language", "reviewerId", "reviewedAt"], "properties": {"status": {"enum": ["draft", "pending", "approved", "rejected"]}, "language": {"const": "lsc-CO"}, "reviewerId": {"type": ["string", "null"]}, "reviewedAt": {"type": ["string", "null"], "format": "date-time"}}}

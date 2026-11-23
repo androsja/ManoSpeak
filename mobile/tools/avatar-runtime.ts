@@ -160,6 +160,10 @@ type AvatarProfile = {
   rigCanonicalPinchedPalm?: boolean;
   rigLeftFingerStates?: RiggedHandFingerStates;
   rigRightFingerStates?: RiggedHandFingerStates;
+  rigLeftThumbExtension?: number;
+  rigRightThumbExtension?: number;
+  rigLeftFingerSpatialOffsets?: Partial<Record<RiggedFingerName, {lateral: number; forward: number}>>;
+  rigRightFingerSpatialOffsets?: Partial<Record<RiggedFingerName, {lateral: number; forward: number}>>;
   rigHandKeyframes?: RiggedHandEditKeyframe[];
   rigPalmScaleMin?: number;
   rigPalmScaleMax?: number;
@@ -268,6 +272,23 @@ declare global {
       clip: string,
       side: 'left' | 'right',
       degrees: number,
+    ) => boolean;
+    setVozualPalmAxialRoll: (
+      clip: string,
+      side: 'left' | 'right',
+      degrees: number,
+    ) => boolean;
+    setVozualThumbExtension: (
+      clip: string,
+      side: 'left' | 'right',
+      amount: number,
+    ) => boolean;
+    setVozualFingerSpatialOffset: (
+      clip: string,
+      side: 'left' | 'right',
+      finger: RiggedFingerName,
+      lateral: number,
+      forward: number,
     ) => boolean;
     getVozualRigDiagnostics: () => Record<string, unknown>;
     ReactNativeWebView?: {postMessage: (message: string) => void};
@@ -3066,6 +3087,59 @@ function driveRiggedPalmAndFingers(
   applyRiggedConfiguredFingerFan(side);
 }
 
+function presentThumbExtension(hand: Point[], amount: number): Point[] {
+  if (hand.length < 21 || amount >= 0.999) return hand;
+  const thumbBase = hand[1];
+  const palmAnchors = [hand[5], hand[9], hand[13], hand[17]];
+  if (!valid(thumbBase) || !palmAnchors.every(valid)) return hand;
+
+  const extension = THREE.MathUtils.clamp(amount, 0, 1);
+  const palmCenter: Point = [0, 1, 2].map(axis => (
+    palmAnchors.reduce((sum, point) => sum + point[axis], 0) / palmAnchors.length
+  )) as Point;
+  const foldedFractions = [0, 0.42, 0.72, 0.92];
+  const result = hand.map(point => valid(point) ? [...point] as Point : point);
+  [1, 2, 3, 4].forEach((landmarkIndex, chainIndex) => {
+    const foldedFraction = foldedFractions[chainIndex];
+    const captured = hand[landmarkIndex];
+    if (!valid(captured)) return;
+    const folded: Point = [0, 1, 2].map(axis => (
+      thumbBase[axis] + (palmCenter[axis] - thumbBase[axis]) * foldedFraction
+    )) as Point;
+    result[landmarkIndex] = [0, 1, 2].map(axis => (
+      folded[axis] + (captured[axis] - folded[axis]) * extension
+    )) as Point;
+  });
+  return result;
+}
+
+function presentFingerSpatialOffsets(
+  hand: Point[],
+  offsets: Partial<Record<RiggedFingerName, {lateral: number; forward: number}>> | undefined,
+): Point[] {
+  if (hand.length < 21 || !offsets) return hand;
+  const result = hand.map(point => valid(point) ? [...point] as Point : point);
+  const chains: Record<RiggedFingerName, readonly [number, number, number, number]> = {
+    thumb: [1, 2, 3, 4],
+    index: [5, 6, 7, 8],
+    middle: [9, 10, 11, 12],
+    ring: [13, 14, 15, 16],
+    pinky: [17, 18, 19, 20],
+  };
+  const weights = [0, 0.34, 0.67, 1];
+  (Object.entries(offsets) as Array<[RiggedFingerName, {lateral: number; forward: number}]>)
+    .forEach(([finger, offset]) => {
+      chains[finger].forEach((landmarkIndex, jointIndex) => {
+        const point = result[landmarkIndex];
+        if (!valid(point)) return;
+        const weight = weights[jointIndex];
+        point[0] += offset.lateral * weight;
+        point[2] -= offset.forward * weight;
+      });
+    });
+  return result;
+}
+
 function driveRiggedHand(
   side: 'L' | 'R',
   frame: MotionFrame,
@@ -3076,9 +3150,19 @@ function driveRiggedHand(
   const shoulder = frame.bodyHands[binding.shoulder];
   const elbow = frame.bodyHands[binding.elbow];
   const wrist = frame.bodyHands[binding.wrist];
-  const hand = binding.handStart === undefined
+  const capturedHand = binding.handStart === undefined
     ? []
     : frame.bodyHands.slice(binding.handStart, binding.handStart + 21);
+  const thumbExtension = side === 'L'
+    ? activeProfile?.rigLeftThumbExtension
+    : activeProfile?.rigRightThumbExtension;
+  const extendedHand = typeof thumbExtension === 'number'
+    ? presentThumbExtension(capturedHand, thumbExtension)
+    : capturedHand;
+  const fingerSpatialOffsets = side === 'L'
+    ? activeProfile?.rigLeftFingerSpatialOffsets
+    : activeProfile?.rigRightFingerSpatialOffsets;
+  const hand = presentFingerSpatialOffsets(extendedHand, fingerSpatialOffsets);
   if (!lengths || !valid(shoulder) || !valid(elbow) || !valid(wrist)) return;
 
   // Hand landmark 0 and Pose wrist are estimated by different MediaPipe
@@ -5123,6 +5207,77 @@ window.setVozualForearmAxialRoll = (
   nextProfile[profileKey] = THREE.MathUtils.clamp(Number(degrees) || 0, -180, 180);
   avatarProfiles.set(normalizedClip, nextProfile);
   if (activeProfile === previousProfile) { activeProfile = nextProfile; if (displayedFrame) setFrame(displayedFrame); }
+  return true;
+};
+
+window.setVozualPalmAxialRoll = (
+  clip: string,
+  side: 'left' | 'right',
+  degrees: number,
+) => {
+  const normalizedClip = clip.trim().toUpperCase();
+  const previousProfile = avatarProfiles.get(normalizedClip);
+  if (!previousProfile) return false;
+  const nextProfile: AvatarProfile = {...previousProfile};
+  const profileKey = side === 'right'
+    ? 'rigRightPalmAxialRollDegrees'
+    : 'rigLeftPalmAxialRollDegrees';
+  nextProfile[profileKey] = THREE.MathUtils.clamp(Number(degrees) || 0, -180, 180);
+  avatarProfiles.set(normalizedClip, nextProfile);
+  if (activeProfile === previousProfile) {
+    activeProfile = nextProfile;
+    if (displayedFrame) setFrame(displayedFrame);
+  }
+  return true;
+};
+
+window.setVozualThumbExtension = (
+  clip: string,
+  side: 'left' | 'right',
+  amount: number,
+) => {
+  const normalizedClip = clip.trim().toUpperCase();
+  const previousProfile = avatarProfiles.get(normalizedClip);
+  if (!previousProfile) return false;
+  const nextProfile: AvatarProfile = {...previousProfile};
+  const profileKey = side === 'right'
+    ? 'rigRightThumbExtension'
+    : 'rigLeftThumbExtension';
+  nextProfile[profileKey] = THREE.MathUtils.clamp(Number(amount) || 0, 0, 1);
+  avatarProfiles.set(normalizedClip, nextProfile);
+  if (activeProfile === previousProfile) {
+    activeProfile = nextProfile;
+    if (displayedFrame) setFrame(displayedFrame);
+  }
+  return true;
+};
+
+window.setVozualFingerSpatialOffset = (
+  clip: string,
+  side: 'left' | 'right',
+  finger: RiggedFingerName,
+  lateral: number,
+  forward: number,
+) => {
+  const normalizedClip = clip.trim().toUpperCase();
+  const previousProfile = avatarProfiles.get(normalizedClip);
+  if (!previousProfile) return false;
+  const nextProfile: AvatarProfile = {...previousProfile};
+  const profileKey = side === 'right'
+    ? 'rigRightFingerSpatialOffsets'
+    : 'rigLeftFingerSpatialOffsets';
+  nextProfile[profileKey] = {
+    ...previousProfile[profileKey],
+    [finger]: {
+      lateral: THREE.MathUtils.clamp(Number(lateral) || 0, -0.12, 0.12),
+      forward: THREE.MathUtils.clamp(Number(forward) || 0, -0.12, 0.12),
+    },
+  };
+  avatarProfiles.set(normalizedClip, nextProfile);
+  if (activeProfile === previousProfile) {
+    activeProfile = nextProfile;
+    if (displayedFrame) setFrame(displayedFrame);
+  }
   return true;
 };
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -59,10 +60,15 @@ def require_facial_hierarchy(armature: bpy.types.Object) -> int:
 
 def main() -> None:
     source, profile_path = input_paths()
-    profile = json.loads(profile_path.read_text(encoding="utf-8"))
-    expected = profile.pop("sha256", None)
-    canonical = json.dumps(profile, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    if hashlib.sha256(canonical.encode("utf-8")).hexdigest() != expected:
+    profile_json = profile_path.read_bytes()
+    profile = json.loads(profile_json)
+    # Use the compiler's canonical number formatting for the same profile bytes.
+    digest = subprocess.run(
+        ["node", "-e", "const {profileSha256} = require('./rig-capability-profile.cjs');"
+         "process.stdout.write(profileSha256(JSON.parse(require('fs').readFileSync(0, 'utf8'))));"],
+        cwd=Path(__file__).resolve().parent, input=profile_json, stdout=subprocess.PIPE, check=True,
+    ).stdout.decode("ascii")
+    if digest != profile.get("sha256"):
         raise RuntimeError("Rig profile checksum mismatch")
     if profile.get("schema") != "vozual.rig-capability-profile" or profile.get("schemaVersion") != 2:
         raise RuntimeError("A v2 rig capability profile is required")

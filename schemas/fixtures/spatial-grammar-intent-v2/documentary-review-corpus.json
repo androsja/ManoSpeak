@@ -1,0 +1,1583 @@
+{
+  "schema": "vozual.spatial-authoring-review-corpus",
+  "schemaVersion": 1,
+  "scope": "documentary-draft-validation",
+  "sources": {
+    "dblsc": {
+      "title": "Diccionario básico de la lengua de señas colombiana",
+      "documentUrl": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf",
+      "pdfSha256": "3229f40b115cca1457aefa0b554ec3655b7cdad25a27bd33c6d4fe7564b33f42"
+    }
+  },
+  "draftDefaults": {
+    "schema": "vozual.spatial-grammar-intent",
+    "schemaVersion": 2,
+    "revision": 1,
+    "profileBinding": {
+      "id": "vozual-rig-1",
+      "revision": 8,
+      "sha256": "c97937e3642cfae25dbbbb91fdd4ed62228ecc17d062a6c13443c556097ced54",
+      "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a"
+    },
+    "coordinateFrameRef": "body",
+    "loci": [
+      {
+        "id": "locus.context",
+        "positionM": [0, 0.35, 0.1]
+      }
+    ],
+    "entities": [],
+    "relations": [],
+    "execution": "authoring-only-not-executable"
+  },
+  "cases": [
+    {
+      "id": "caminar-direction",
+      "group": "relations",
+      "rule": "Resolve declared endpoints for direction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXV"]},
+      "context": "A child walks from the school toward the park.",
+      "rationale": "CAMINAR can show the places between or toward which the child moves. The draft identifies the start and intended destination.",
+      "draft": {
+        "loci": [
+          {
+            "id": "locus.school",
+            "positionM": [-0.2, 0.35, 0.1]
+          },
+          {
+            "id": "locus.park",
+            "positionM": [0.25, 0.4, 0.1]
+          }
+        ],
+        "entities": [
+          {
+            "id": "entity.child",
+            "roleRef": "role.mover",
+            "locusRef": "locus.school",
+            "objectFrameRef": "object"
+          }
+        ],
+        "relations": [
+          {
+            "id": "relation.direction",
+            "kind": "direction",
+            "sourceRef": {
+              "kind": "locus",
+              "id": "locus.school"
+            },
+            "targetRef": {
+              "kind": "locus",
+              "id": "locus.park"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "relations": [
+            {
+              "id": "relation.direction",
+              "kind": "direction",
+              "sourceRef": {
+                "kind": "locus",
+                "id": "locus.school",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "locus.school"
+                }
+              },
+              "targetRef": {
+                "kind": "locus",
+                "id": "locus.park",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "locus.park"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "alla-demonstrative",
+      "group": "relations",
+      "rule": "Resolve declared endpoints for demonstrative.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXVIII", "XXIX", "127"]},
+      "context": "The signer identifies the grandfather’s farm as the place where the family lives.",
+      "rationale": "The farm resolves ALLÁ. The source endpoint is an authoring anchor for the signer and has no trajectory meaning.",
+      "draft": {
+        "loci": [
+          {
+            "id": "locus.signer",
+            "positionM": [0, 0.35, 0.1]
+          },
+          {
+            "id": "locus.farm",
+            "positionM": [0.25, 0.4, 0.1]
+          }
+        ],
+        "relations": [
+          {
+            "id": "relation.demonstrative",
+            "kind": "demonstrative",
+            "sourceRef": {
+              "kind": "locus",
+              "id": "locus.signer"
+            },
+            "targetRef": {
+              "kind": "locus",
+              "id": "locus.farm"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "relations": [
+            {
+              "id": "relation.demonstrative",
+              "kind": "demonstrative",
+              "sourceRef": {
+                "kind": "locus",
+                "id": "locus.signer",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "locus.signer"
+                }
+              },
+              "targetRef": {
+                "kind": "locus",
+                "id": "locus.farm",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "locus.farm"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ayudar-agreement",
+      "group": "relations",
+      "rule": "Resolve declared endpoints for agreement.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXII"]},
+      "context": "Ana and Luis are established in the discourse. Ana helps Luis.",
+      "rationale": "AYUDAR can identify its subject and object. The draft records the helper and recipient and preserves the opaque agreement reference.",
+      "draft": {
+        "loci": [
+          {
+            "id": "locus.ana",
+            "positionM": [-0.2, 0.35, 0.1]
+          },
+          {
+            "id": "locus.luis",
+            "positionM": [0.25, 0.4, 0.1]
+          }
+        ],
+        "entities": [
+          {
+            "id": "entity.ana",
+            "roleRef": "role.helper",
+            "locusRef": "locus.ana",
+            "objectFrameRef": "object"
+          },
+          {
+            "id": "entity.luis",
+            "roleRef": "role.recipient",
+            "locusRef": "locus.luis",
+            "objectFrameRef": "object"
+          }
+        ],
+        "relations": [
+          {
+            "id": "relation.agreement",
+            "kind": "agreement",
+            "sourceRef": {
+              "kind": "entity",
+              "id": "entity.ana"
+            },
+            "targetRef": {
+              "kind": "entity",
+              "id": "entity.luis"
+            },
+            "agreementRef": {
+              "id": "agreement.ayudar-participants"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "relations": [
+            {
+              "id": "relation.agreement",
+              "kind": "agreement",
+              "sourceRef": {
+                "kind": "entity",
+                "id": "entity.ana",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.ana"
+                }
+              },
+              "targetRef": {
+                "kind": "entity",
+                "id": "entity.luis",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.luis"
+                }
+              },
+              "agreementRef": {
+                "id": "agreement.ayudar-participants",
+                "resolutionStatus": "opaque-unverified"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "caminar-undeclared-target",
+      "group": "relations",
+      "rule": "A direction endpoint must resolve to a declared locus.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXV"]},
+      "context": "A child walks from the school toward the park.",
+      "rationale": "The park is the intended destination. The draft omits its referenced locus ID.",
+      "draft": {
+        "loci": [
+          {
+            "id": "locus.school",
+            "positionM": [-0.2, 0.35, 0.1]
+          },
+          {
+            "id": "locus.park",
+            "positionM": [0.25, 0.4, 0.1]
+          }
+        ],
+        "entities": [
+          {
+            "id": "entity.child",
+            "roleRef": "role.mover",
+            "locusRef": "locus.school",
+            "objectFrameRef": "object"
+          }
+        ],
+        "relations": [
+          {
+            "id": "relation.direction",
+            "kind": "direction",
+            "sourceRef": {
+              "kind": "locus",
+              "id": "locus.school"
+            },
+            "targetRef": {
+              "kind": "locus",
+              "id": "locus.undeclared-park"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "reject",
+        "error": {
+          "code": "SPATIAL.UNKNOWN_REFERENCE",
+          "details": {
+            "field": "targetRef",
+            "id": "locus.undeclared-park",
+            "kind": "locus"
+          }
+        }
+      }
+    },
+    {
+      "id": "alla-agreement-metadata",
+      "group": "relations",
+      "rule": "Agreement metadata is reserved for agreement relations.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXVIII", "XXIX", "127"]},
+      "context": "The signer identifies the grandfather’s farm as the place where the family lives.",
+      "rationale": "The expression identifies a place. Agreement metadata conflicts with this draft relation kind.",
+      "draft": {
+        "loci": [
+          {
+            "id": "locus.signer",
+            "positionM": [0, 0.35, 0.1]
+          },
+          {
+            "id": "locus.farm",
+            "positionM": [0.25, 0.4, 0.1]
+          }
+        ],
+        "relations": [
+          {
+            "id": "relation.demonstrative",
+            "kind": "demonstrative",
+            "sourceRef": {
+              "kind": "locus",
+              "id": "locus.signer"
+            },
+            "targetRef": {
+              "kind": "locus",
+              "id": "locus.farm"
+            },
+            "agreementRef": {
+              "id": "agreement.unsupported"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "reject",
+        "error": {"code": "SCHEMA.INVALID_SPATIAL_INTENT_V2", "schemaIssue": {"instancePath": "/relations/0", "keyword": "not"}}
+      }
+    },
+    {
+      "id": "ayudar-missing-agreement-reference",
+      "group": "relations",
+      "rule": "An agreement relation requires an agreement reference.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXII"]},
+      "context": "Ana and Luis are established in the discourse. Ana helps Luis.",
+      "rationale": "The two participant references resolve. The draft omits the required agreement metadata.",
+      "draft": {
+        "loci": [
+          {
+            "id": "locus.ana",
+            "positionM": [-0.2, 0.35, 0.1]
+          },
+          {
+            "id": "locus.luis",
+            "positionM": [0.25, 0.4, 0.1]
+          }
+        ],
+        "entities": [
+          {
+            "id": "entity.ana",
+            "roleRef": "role.helper",
+            "locusRef": "locus.ana",
+            "objectFrameRef": "object"
+          },
+          {
+            "id": "entity.luis",
+            "roleRef": "role.recipient",
+            "locusRef": "locus.luis",
+            "objectFrameRef": "object"
+          }
+        ],
+        "relations": [
+          {
+            "id": "relation.agreement",
+            "kind": "agreement",
+            "sourceRef": {
+              "kind": "entity",
+              "id": "entity.ana"
+            },
+            "targetRef": {
+              "kind": "entity",
+              "id": "entity.luis"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "reject",
+        "error": {
+          "code": "SCHEMA.INVALID_SPATIAL_INTENT_V2",
+          "schemaIssue": {"instancePath": "/relations/0", "keyword": "required", "params": {"missingProperty": "agreementRef"}}
+        }
+      }
+    },
+    {
+      "id": "walk-biped",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLV", "XLVII"]},
+      "context": "A child moves on two legs.",
+      "rationale": "The handshape represents a biped depicted in locomotion in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.child",
+            "roleRef": "role.mover",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "walk-biped",
+            "handshapeClass": "handshape.v-fingers-down",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.child",
+              "role": "mover",
+              "referentClass": "referent.biped-in-locomotion"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "walk-biped",
+              "handshapeClass": "handshape.v-fingers-down",
+              "sourceHandshapeNotation": "V with fingers down",
+              "role": "mover",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.child",
+                "role": "mover",
+                "referentClass": "referent.biped-in-locomotion",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.child"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "walk-multiple-limbs",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLVII"]},
+      "context": "A spider moves on more than two limbs.",
+      "rationale": "The handshape represents a referent traveling on more than two limbs in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.spider",
+            "roleRef": "role.mover",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "walk-multiple-limbs",
+            "handshapeClass": "handshape.5o-active",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.spider",
+              "role": "mover",
+              "referentClass": "referent.more-than-two-limbs"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "walk-multiple-limbs",
+              "handshapeClass": "handshape.5o-active",
+              "sourceHandshapeNotation": "active 5o (also printed 5º in this passage)",
+              "role": "mover",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.spider",
+                "role": "mover",
+                "referentClass": "referent.more-than-two-limbs",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.spider"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "collide-biped",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLVI"]},
+      "context": "A walking person moves into the impact.",
+      "rationale": "The handshape represents the person moving into the impact in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.walker",
+            "roleRef": "role.colliding-entity",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "collide-biped",
+            "handshapeClass": "handshape.v-fingers-down",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.walker",
+              "role": "colliding-entity",
+              "referentClass": "referent.person-moving-into-impact"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "collide-biped",
+              "handshapeClass": "handshape.v-fingers-down",
+              "sourceHandshapeNotation": "active V with fingers down",
+              "role": "colliding-entity",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.walker",
+                "role": "colliding-entity",
+                "referentClass": "referent.person-moving-into-impact",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.walker"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "collide-vehicle",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLVI"]},
+      "context": "A moving car runs into an obstacle.",
+      "rationale": "The handshape represents the moving vehicle in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.car",
+            "roleRef": "role.colliding-entity",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "collide-vehicle",
+            "handshapeClass": "handshape.b-little-finger-edge-down",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.car",
+              "role": "colliding-entity",
+              "referentClass": "referent.moving-vehicle"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "collide-vehicle",
+              "handshapeClass": "handshape.b-little-finger-edge-down",
+              "sourceHandshapeNotation": "active B with little-finger edge down",
+              "role": "colliding-entity",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.car",
+                "role": "colliding-entity",
+                "referentClass": "referent.moving-vehicle",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.car"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "collide-two-wheeled-vehicle",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLVI"]},
+      "context": "A moving two-wheeled vehicle hits an obstacle.",
+      "rationale": "The handshape represents the moving two-wheeled vehicle in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.bicycle",
+            "roleRef": "role.colliding-entity",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "collide-two-wheeled-vehicle",
+            "handshapeClass": "handshape.b-palm-down",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.bicycle",
+              "role": "colliding-entity",
+              "referentClass": "referent.moving-two-wheeled-vehicle"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "collide-two-wheeled-vehicle",
+              "handshapeClass": "handshape.b-palm-down",
+              "sourceHandshapeNotation": "active B with palm down",
+              "role": "colliding-entity",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.bicycle",
+                "role": "colliding-entity",
+                "referentClass": "referent.moving-two-wheeled-vehicle",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.bicycle"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "give-cylindrical-object",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLV"]},
+      "context": "A person hands a cylindrical drinking glass to someone else.",
+      "rationale": "The handshape represents the cylindrical object being given in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.glass",
+            "roleRef": "role.transferred-object",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "give-cylindrical-object",
+            "handshapeClass": "handshape.bc",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.glass",
+              "role": "transferred-object",
+              "referentClass": "referent.cylindrical-object"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "give-cylindrical-object",
+              "handshapeClass": "handshape.bc",
+              "sourceHandshapeNotation": "Bc",
+              "role": "transferred-object",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.glass",
+                "role": "transferred-object",
+                "referentClass": "referent.cylindrical-object",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.glass"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "give-tiny-or-thin-object",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLV"]},
+      "context": "A person gives another person a needle.",
+      "rationale": "The handshape represents the tiny or thin item being given in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.needle",
+            "roleRef": "role.transferred-object",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "give-tiny-or-thin-object",
+            "handshapeClass": "handshape.o-slash-notation",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.needle",
+              "role": "transferred-object",
+              "referentClass": "referent.tiny-or-thin-object"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "give-tiny-or-thin-object",
+              "handshapeClass": "handshape.o-slash-notation",
+              "sourceHandshapeNotation": "Ø",
+              "role": "transferred-object",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.needle",
+                "role": "transferred-object",
+                "referentClass": "referent.tiny-or-thin-object",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.needle"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cut-with-scissors",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLV", "XLVII"]},
+      "context": "A person cuts material with scissors.",
+      "rationale": "The handshape represents scissors in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.scissors",
+            "roleRef": "role.instrument",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "cut-with-scissors",
+            "handshapeClass": "handshape.v",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.scissors",
+              "role": "instrument",
+              "referentClass": "referent.scissors"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "cut-with-scissors",
+              "handshapeClass": "handshape.v",
+              "sourceHandshapeNotation": "V closing as the hand advances",
+              "role": "instrument",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.scissors",
+                "role": "instrument",
+                "referentClass": "referent.scissors",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.scissors"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cut-with-knife-blade",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLVII"]},
+      "context": "A person cuts with a knife depicted through its blade.",
+      "rationale": "The handshape represents the knife represented through its blade in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.knife",
+            "roleRef": "role.instrument",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "cut-with-knife-blade",
+            "handshapeClass": "handshape.b-little-finger-edge-toward-material",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.knife",
+              "role": "instrument",
+              "referentClass": "referent.knife-blade"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "cut-with-knife-blade",
+              "handshapeClass": "handshape.b-little-finger-edge-toward-material",
+              "sourceHandshapeNotation": "active B with the little-finger edge toward the material",
+              "role": "instrument",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.knife",
+                "role": "instrument",
+                "referentClass": "referent.knife-blade",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.knife"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cut-with-knife-grip",
+      "group": "classifiers",
+      "rule": "Resolve the documented handshape, role and referent for this construction.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLVII"]},
+      "context": "A person cuts while the handshape depicts a knife grip.",
+      "rationale": "The handshape represents the knife being held in the declared role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.gripped-knife",
+            "roleRef": "role.handled-object",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "cut-with-knife-grip",
+            "handshapeClass": "handshape.a-grip",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.gripped-knife",
+              "role": "handled-object",
+              "referentClass": "referent.knife-grip"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "classifierAnnotations": [
+            {
+              "constructionId": "cut-with-knife-grip",
+              "handshapeClass": "handshape.a-grip",
+              "sourceHandshapeNotation": "active A depicting the grasp",
+              "role": "handled-object",
+              "contextStatus": "unreviewed",
+              "entityRef": {
+                "kind": "entity",
+                "id": "entity.gripped-knife",
+                "role": "handled-object",
+                "referentClass": "referent.knife-grip",
+                "resolutionStatus": "resolved-within-draft",
+                "record": {
+                  "id": "entity.gripped-knife"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "walk-biped-wrong-handshape",
+      "group": "classifiers",
+      "rule": "Reject an incompatible classifier handshapeClass.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLV", "XLVII"]},
+      "context": "A child moves on two legs.",
+      "rationale": "The draft uses the multiple-limb handshape for the biped row.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.child",
+            "roleRef": "role.mover",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "walk-biped",
+            "handshapeClass": "handshape.5o-active",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.child",
+              "role": "mover",
+              "referentClass": "referent.biped-in-locomotion"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "reject",
+        "error": {"code": "SPATIAL.CLASSIFIER_HANDSHAPE_MISMATCH", "details": {"actual": "handshape.5o-active"}}
+      }
+    },
+    {
+      "id": "give-glass-as-recipient",
+      "group": "classifiers",
+      "rule": "Reject an incompatible classifier role.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLV"]},
+      "context": "A person hands a cylindrical drinking glass to someone else.",
+      "rationale": "The handshape depicts the glass being given. The draft assigns the recipient role.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.glass",
+            "roleRef": "role.transferred-object",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "give-cylindrical-object",
+            "handshapeClass": "handshape.bc",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.glass",
+              "role": "recipient",
+              "referentClass": "referent.cylindrical-object"
+            }
+          }
+        ]
+      },
+      "expected": {"outcome": "reject", "error": {"code": "SPATIAL.CLASSIFIER_ROLE_MISMATCH", "details": {"actual": "recipient"}}}
+    },
+    {
+      "id": "bicycle-classified-as-car",
+      "group": "classifiers",
+      "rule": "Reject an incompatible classifier referentClass.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLVI"]},
+      "context": "A moving two-wheeled vehicle hits an obstacle.",
+      "rationale": "The two-wheeled construction requires its declared referent class.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.bicycle",
+            "roleRef": "role.colliding-entity",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "collide-two-wheeled-vehicle",
+            "handshapeClass": "handshape.b-palm-down",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.bicycle",
+              "role": "colliding-entity",
+              "referentClass": "referent.moving-vehicle"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "reject",
+        "error": {"code": "SPATIAL.CLASSIFIER_REFERENT_MISMATCH", "details": {"actual": "referent.moving-vehicle"}}
+      }
+    },
+    {
+      "id": "scissors-undeclared-instrument",
+      "group": "classifiers",
+      "rule": "Reject an incompatible classifier id.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLV", "XLVII"]},
+      "context": "A person cuts material with scissors.",
+      "rationale": "The instrument reference must resolve to the scissors declared for the draft.",
+      "draft": {
+        "entities": [
+          {
+            "id": "entity.scissors",
+            "roleRef": "role.instrument",
+            "locusRef": "locus.context",
+            "objectFrameRef": "object"
+          }
+        ],
+        "classifierAnnotations": [
+          {
+            "id": "annotation.classifier",
+            "inventoryRevision": 1,
+            "constructionId": "cut-with-scissors",
+            "handshapeClass": "handshape.v",
+            "entityRef": {
+              "kind": "entity",
+              "id": "entity.unknown-scissors",
+              "role": "instrument",
+              "referentClass": "referent.scissors"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "reject",
+        "error": {"code": "SPATIAL.UNKNOWN_CLASSIFIER_ENTITY", "details": {"entityId": "entity.unknown-scissors"}}
+      }
+    },
+    {
+      "id": "size.grande-person-height",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXV", "XXXVI"]},
+      "context": "A person’s exceptional height is described.",
+      "rationale": "Characterizes person height through a sign specific endpoint.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "size.grande-person-height",
+            "sourceGloss": "GRANDE"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "size",
+              "operation": "relative-spatial-extent",
+              "semanticEffect": "characterizes-person-height-through-a-sign-specific-endpoint",
+              "qualitativeParameters": {"endpoint": "interpreted-against-the-unmarked-form"},
+              "variantId": "size.grande-person-height",
+              "sourceGloss": "GRANDE",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "large", "result": "a person’s height"}
+      }
+    },
+    {
+      "id": "size.pequeno-person-height",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXVI"]},
+      "context": "A person’s exceptionally short stature is described.",
+      "rationale": "Characterizes exceptionally small person height through a sign specific endpoint.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "size.pequeno-person-height",
+            "sourceGloss": "PEQUEÑO"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "size",
+              "operation": "relative-spatial-extent",
+              "semanticEffect": "characterizes-exceptionally-small-person-height-through-a-sign-specific-endpoint",
+              "qualitativeParameters": {"endpoint": "below-the-unmarked-endpoint"},
+              "variantId": "size.pequeno-person-height",
+              "sourceGloss": "PEQUEÑO",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "small", "result": "an exceptionally short person"}
+      }
+    },
+    {
+      "id": "size.libro-exceptional-dimensions",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXVI"]},
+      "context": "A signer describes a book much larger than usual.",
+      "rationale": "Describes an exceptionally large book.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "size.libro-exceptional-dimensions",
+            "sourceGloss": "LIBRO"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "size",
+              "operation": "relative-spatial-extent",
+              "semanticEffect": "describes-an-exceptionally-large-book",
+              "qualitativeParameters": {"arc": "full-arm-extent-instead-of-the-unmarked-shorter-arc"},
+              "variantId": "size.libro-exceptional-dimensions",
+              "sourceGloss": "LIBRO",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "book", "result": "an unusually large book"}
+      }
+    },
+    {
+      "id": "manner.venir-rapid-arrival",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXVII", "XXXVIII"]},
+      "context": "A signer describes someone coming quickly.",
+      "rationale": "Coming quickly.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "manner.venir-rapid-arrival",
+            "sourceGloss": "VENIR"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "manner",
+              "operation": "relative-articulation-speed",
+              "semanticEffect": "coming-quickly",
+              "qualitativeParameters": {"speed": "faster-than-the-unmarked-form"},
+              "variantId": "manner.venir-rapid-arrival",
+              "sourceGloss": "VENIR",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "come", "result": "come quickly"}
+      }
+    },
+    {
+      "id": "manner.senar-slow-signing",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXVII", "XXXVIII"]},
+      "context": "A signer describes someone signing slowly.",
+      "rationale": "Signing slowly.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "manner.senar-slow-signing",
+            "sourceGloss": "SEÑAR"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "manner",
+              "operation": "relative-articulation-speed",
+              "semanticEffect": "signing-slowly",
+              "qualitativeParameters": {"speed": "slower-than-the-unmarked-form"},
+              "variantId": "manner.senar-slow-signing",
+              "sourceGloss": "SEÑAR",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "sign", "result": "sign slowly"}
+      }
+    },
+    {
+      "id": "aspect.durative.caminar-slow",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLIII"]},
+      "context": "A walk is described as continuing over time.",
+      "rationale": "Durative or continuative action.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "aspect.durative.caminar-slow",
+            "sourceGloss": "CAMINAR"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "aspect",
+              "operation": "relative-articulation-speed",
+              "semanticEffect": "durative-or-continuative-action",
+              "qualitativeParameters": {"speed": "very-slow", "repetition": "none-required"},
+              "variantId": "aspect.durative.caminar-slow",
+              "sourceGloss": "CAMINAR",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "walk", "result": "keep walking over time"}
+      }
+    },
+    {
+      "id": "number.unit-sign-finger-incorporation",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXVIII", "XXXIX"]},
+      "context": "The AÑO construction incorporates a numeral for years.",
+      "rationale": "Introduces numeral information for the listed unit signs.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "number.unit-sign-finger-incorporation",
+            "sourceGloss": "MIL"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "number",
+              "operation": "change-active-hand-finger-count",
+              "semanticEffect": "introduces-numeral-information-for-the-listed-unit-signs",
+              "qualitativeParameters": {"fingerCount": "source-described-numeral-incorporation"},
+              "variantId": "number.unit-sign-finger-incorporation",
+              "sourceGloss": "MIL",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "year", "result": "a specified number of years"}
+      }
+    },
+    {
+      "id": "number.plural.spatial-repetition",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXVIII", "XXXIX"]},
+      "context": "ÁRBOL is repeated at distinct loci to describe several trees.",
+      "rationale": "Plural reference for the listed signs.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "number.plural.spatial-repetition",
+            "sourceGloss": "ÁRBOL"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "number",
+              "operation": "repeat-form-at-distinct-spatial-points",
+              "semanticEffect": "plural-reference-for-the-listed-signs",
+              "qualitativeParameters": {"plurality": "more-than-one", "exactCount": "not-encoded-by-this-entry"},
+              "variantId": "number.plural.spatial-repetition",
+              "sourceGloss": "ÁRBOL",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "tree", "result": "several trees"}
+      }
+    },
+    {
+      "id": "number.plural.sentarse-correlated-arcs",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXIX"]},
+      "context": "Multiple people are seated. The hand draws several arcs.",
+      "rationale": "Pluralizes the seated participants.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "number.plural.sentarse-correlated-arcs",
+            "sourceGloss": "SENTARSE"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "number",
+              "operation": "repeat-arcs-across-distinct-contact-points",
+              "semanticEffect": "pluralizes-the-seated-participants",
+              "qualitativeParameters": {"arcCount": "correlates-with-but-is-not-equal-to-participant-count"},
+              "variantId": "number.plural.sentarse-correlated-arcs",
+              "sourceGloss": "SENTARSE",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "sit", "result": "several people sit"}
+      }
+    },
+    {
+      "id": "number.plural.nino-horizontal-extension",
+      "group": "modulation",
+      "rule": "Preserve the intended change of meaning and its qualitative operation in the draft trace.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXIX"]},
+      "context": "A signer refers to multiple children by continuing the movement horizontally.",
+      "rationale": "Plural reference to children.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "number.plural.nino-horizontal-extension",
+            "sourceGloss": "NIÑO"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "accept",
+        "trace": {
+          "modulationAnnotations": [
+            {
+              "domain": "number",
+              "operation": "extend-form-horizontally",
+              "semanticEffect": "plural-reference-to-children",
+              "qualitativeParameters": {"extension": "continues-horizontally-past-the-unmarked-endpoint"},
+              "variantId": "number.plural.nino-horizontal-extension",
+              "sourceGloss": "NIÑO",
+              "signScopeStatus": "matches-source-listed-sign-scope",
+              "contextStatus": "unreviewed",
+              "interpretationStatus": "source-documented-pattern-not-instance-validated"
+            }
+          ]
+        },
+        "meaning": {"effect": "modify", "base": "child", "result": "children"}
+      }
+    },
+    {
+      "id": "venir-unmodified-baseline",
+      "group": "modulation",
+      "rule": "Preserve the unmodified base meaning when no variant is declared.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXVII", "XXXVIII"]},
+      "context": "A signer describes someone coming. The manner is unspecified.",
+      "rationale": "The unmarked form supplies the comparison for rapid VENIR. The draft specifies no speed or added manner.",
+      "draft": {},
+      "expected": {
+        "outcome": "accept",
+        "trace": {"relations": []},
+        "absent": ["modulationAnnotations"],
+        "meaning": {"effect": "preserve", "base": "come", "result": "come"}
+      }
+    },
+    {
+      "id": "venir-variant-on-senar",
+      "group": "modulation",
+      "rule": "A sign-specific manner variant requires a source-listed gloss.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXVII", "XXXVIII"]},
+      "context": "A signer describes someone coming quickly.",
+      "rationale": "The dictionary describes faster VENIR and slower SEÑAR as distinct readings.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "manner.venir-rapid-arrival",
+            "sourceGloss": "SEÑAR"
+          }
+        ]
+      },
+      "expected": {"outcome": "reject", "error": {"code": "SPATIAL.MODULATION_GLOSS_MISMATCH", "details": {"actual": "SEÑAR"}}}
+    },
+    {
+      "id": "caminar-standalone-frequency",
+      "group": "modulation",
+      "rule": "A standalone frequency variant has no documentary inventory entry.",
+      "source": {"documentId": "dblsc", "printedPages": ["XLIII"]},
+      "context": "A walk is described as continuing over time.",
+      "rationale": "The source describes repetition qualitatively under aspect and supplies no event-rate parameter.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "frequency.events-per-second",
+            "sourceGloss": "CAMINAR"
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "reject",
+        "error": {"code": "SPATIAL.UNKNOWN_MODULATION_VARIANT", "details": {"variantId": "frequency.events-per-second"}}
+      }
+    },
+    {
+      "id": "sentarse-exact-participant-count",
+      "group": "modulation",
+      "rule": "A SENTARSE arc count cannot be encoded as an exact participant count.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXIX"]},
+      "context": "Multiple people are seated. The hand draws several arcs.",
+      "rationale": "The source states that arc counts do not correspond one-to-one to seated people.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "number.plural.sentarse-correlated-arcs",
+            "sourceGloss": "SENTARSE",
+            "participantCount": 3
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "reject",
+        "error": {
+          "code": "SCHEMA.INVALID_SPATIAL_INTENT_V2",
+          "schemaIssue": {
+            "instancePath": "/modulationAnnotations/0",
+            "keyword": "additionalProperties",
+            "params": {"additionalProperty": "participantCount"}
+          }
+        }
+      }
+    },
+    {
+      "id": "libro-unreviewed-amplitude",
+      "group": "modulation",
+      "rule": "A size annotation cannot set an unreviewed numeric amplitude.",
+      "source": {"documentId": "dblsc", "printedPages": ["XXXVI"]},
+      "context": "A signer describes a book much larger than usual.",
+      "rationale": "The source describes a larger arc relative to the usual form and provides no absolute distance.",
+      "draft": {
+        "modulationAnnotations": [
+          {
+            "id": "annotation.modulation",
+            "inventoryRevision": 1,
+            "variantId": "size.libro-exceptional-dimensions",
+            "sourceGloss": "LIBRO",
+            "amplitudeM": 0.5
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "reject",
+        "error": {
+          "code": "SCHEMA.INVALID_SPATIAL_INTENT_V2",
+          "schemaIssue": {
+            "instancePath": "/modulationAnnotations/0",
+            "keyword": "additionalProperties",
+            "params": {"additionalProperty": "amplitudeM"}
+          }
+        }
+      }
+    }
+  ]
+}

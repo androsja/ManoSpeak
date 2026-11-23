@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/nonmanual-rig-channel-profile-v1.schema.json",
+  "title": "Vozual non-manual rig channel profile v1",
+  "description": "Reviewed structural bindings from abstract non-manual channels to rig controls.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "profileId", "revision", "controls", "channels"],
+  "properties": {
+    "schema": {"const": "vozual.nonmanual-rig-channel-profile"},
+    "schemaVersion": {"const": 1},
+    "profileId": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 1},
+    "controls": {"type": "array", "items": {"$ref": "#/$defs/control"}},
+    "channels": {"type": "object", "propertyNames": {"enum": [
+      "eyelids.leftClosure", "eyelids.rightClosure", "eyelids.squint",
+      "brows.leftInnerLift", "brows.leftInnerLower", "brows.rightInnerLift", "brows.rightInnerLower",
+      "nose.wrinkle", "cheeks.leftRaise", "cheeks.rightRaise", "cheeks.puff",
+      "jaw.open", "jaw.forward", "jaw.left", "jaw.right", "tongue.protrude",
+      "lips.opening", "lips.pucker", "lips.width", "mouthCorners.left", "mouthCorners.right", "mouthing.lexeme",
+      "gaze.target", "head.pitch", "head.yaw", "head.roll",
+      "shoulders.leftElevation", "shoulders.rightElevation", "shoulders.centerElevation",
+      "torso.pitch", "torso.yaw", "torso.roll"
+    ]}, "additionalProperties": {"$ref": "#/$defs/binding"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._:-]*$"},
+    "control": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {"id": {"$ref": "#/$defs/id"}, "type": {"enum": ["bone", "morphTarget"]}}
+    },
+    "binding": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["status", "reason"], "properties": {"status": {"const": "unsupported"}, "reason": {"type": "string", "minLength": 1}}},
+        {"type": "object", "additionalProperties": false, "required": ["status", "controlId", "reviewerId", "reviewEvidenceRef"], "properties": {"status": {"const": "supported"}, "controlId": {"$ref": "#/$defs/id"}, "reviewerId": {"$ref": "#/$defs/id"}, "reviewEvidenceRef": {"$ref": "#/$defs/id"}}}
+      ]
+    }
+  }
+}

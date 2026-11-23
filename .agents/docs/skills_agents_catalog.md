@@ -9,8 +9,8 @@ This catalog records all configured agent personas and DWP-related skills availa
 - [mobile-developer.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/.agents/agents/mobile-developer.md): UI creation, Camera interfaces, and Local TTS.
 - [qa-engineer.md](file:///Users/jflorezgaleano/Documents/JulianFlorez/TraductorSeñas/.agents/agents/qa-engineer.md): Performance profiling and mock tests assertion.
 
-## Installed Skills
-- **deepworkplan:** The core Deep Work Plan planning engine (routes to create, execute, refine, resume, status, and verify).
+## Project-local Skills
+- [deepworkplan](../skills/deepworkplan/SKILL.md): The Codex Deep Work Plan workflow for create, execute, refine, resume, status, and verify operations.
 
 ## Reusable Patterns Identified in PLAN_vozual_model_inference_integration
 

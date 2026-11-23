@@ -1,0 +1,452 @@
+{
+  "bindings": {
+    "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a",
+    "coordinateCalibrationSha256": "1a6cf3a8d9bd779e0b4e91cbbd20205fe92bc9df70443181dca32e11f09c0ab1",
+    "endpointPoseEvidenceSha256": "8fa25424a4b7e7a2ea594dc07f31502c643a55e7d4ea3ab7c28d2b2f9de7f4d4",
+    "profileSha256": "c97937e3642cfae25dbbbb91fdd4ed62228ecc17d062a6c13443c556097ced54",
+    "sourcePoseEvidenceSha256": "33988e842cb0f1e9a6d21c84246272e5c3bcde81283a351bc28084404a5ba35f"
+  },
+  "blenderVersion": "5.2.3 LTS",
+  "bodySurfaceMask": "NUG_Base_Body triangles whose vertices are all dominant-weighted to DEF-spine.003-.006 or DEF-breast.L/R; NUG_Skin_Leg material excluded",
+  "endpointIds": [
+    "hand.index.tip.left",
+    "hand.index.tip.right"
+  ],
+  "frameId": "body",
+  "limits": [
+    "Nearest point and unsigned distance are not surface contact or penetration depth",
+    "Scoped overlap counts apply only to recorded evaluated mesh, retained torso mask and shared-vertex exclusions",
+    "Finite poses do not establish continuous paths, arbitrary poses, or general collision coverage",
+    "No anatomical, safety, or approval conclusion"
+  ],
+  "measurements": [
+    {
+      "bodyTriangleCount": 9933,
+      "endpointReplayErrorsM": {
+        "hand.index.tip.left": 9.025233852411858e-08,
+        "hand.index.tip.right": 1.6885707596919786e-07
+      },
+      "handToTorsoSurface": {
+        "left": {
+          "handTriangleCount": 3451,
+          "minHandVertexToTorsoTriangleM": 0.4496524930000305,
+          "nearestHandVertexId": 7049,
+          "nearestTorsoTriangleIndex": 7439,
+          "overlapCountExcludingSharedVertices": 0,
+          "overlapCountWithAllNonHandTriangles": 0,
+          "overlapCountsByHandRegion": {},
+          "overlapCountsByNonHandDominantGroups": {},
+          "overlapCountsByTorsoGroups": {},
+          "overlapTrianglePairsFarthestAnchor": [],
+          "overlapTrianglePairsNearestAnchor": [],
+          "torsoTriangleCount": 9933
+        },
+        "right": {
+          "handTriangleCount": 3452,
+          "minHandVertexToTorsoTriangleM": 0.4496501088142395,
+          "nearestHandVertexId": 10704,
+          "nearestTorsoTriangleIndex": 8217,
+          "overlapCountExcludingSharedVertices": 0,
+          "overlapCountWithAllNonHandTriangles": 0,
+          "overlapCountsByHandRegion": {},
+          "overlapCountsByNonHandDominantGroups": {},
+          "overlapCountsByTorsoGroups": {},
+          "overlapTrianglePairsFarthestAnchor": [],
+          "overlapTrianglePairsNearestAnchor": [],
+          "torsoTriangleCount": 9933
+        }
+      },
+      "indexTips": [
+        {
+          "anchorId": "hand.index.tip.left",
+          "endpointBodyM": [
+            0.699592054,
+            -0.325334758,
+            -0.018379051
+          ],
+          "nearestSurfaceNormalBody": [
+            0.7925606113858521,
+            -0.5904690967872739,
+            0.15229579899460077
+          ],
+          "nearestSurfacePointBodyM": [
+            0.147468656,
+            -0.084240027,
+            -0.014439579
+          ],
+          "triangleIndex": 7439,
+          "unsignedDistanceM": 0.6024802327156067
+        },
+        {
+          "anchorId": "hand.index.tip.right",
+          "endpointBodyM": [
+            -0.712823987,
+            -0.307601333,
+            -0.002632119
+          ],
+          "nearestSurfaceNormalBody": [
+            -0.7998791236677789,
+            -0.5997765081410762,
+            -0.02148220269009471
+          ],
+          "nearestSurfacePointBodyM": [
+            -0.147920415,
+            -0.080113031,
+            -0.010956257
+          ],
+          "triangleIndex": 8217,
+          "unsignedDistanceM": 0.6090453863143921
+        }
+      ],
+      "maskFaceCount": 9933,
+      "poseCommandsWxyz": {},
+      "poseId": "neutral-rest",
+      "scopedHandBodyOverlapCounts": {
+        "left-otherBody": 0,
+        "left-right": 0,
+        "right-otherBody": 0
+      }
+    },
+    {
+      "bodyTriangleCount": 9933,
+      "endpointReplayErrorsM": {
+        "hand.index.tip.left": 1.2281680752645683e-07,
+        "hand.index.tip.right": 2.4027162205283916e-07
+      },
+      "handToTorsoSurface": {
+        "left": {
+          "handTriangleCount": 3451,
+          "minHandVertexToTorsoTriangleM": 0.18213121592998505,
+          "nearestHandVertexId": 14220,
+          "nearestTorsoTriangleIndex": 7325,
+          "overlapCountExcludingSharedVertices": 0,
+          "overlapCountWithAllNonHandTriangles": 0,
+          "overlapCountsByHandRegion": {},
+          "overlapCountsByNonHandDominantGroups": {},
+          "overlapCountsByTorsoGroups": {},
+          "overlapTrianglePairsFarthestAnchor": [],
+          "overlapTrianglePairsNearestAnchor": [],
+          "torsoTriangleCount": 9933
+        },
+        "right": {
+          "handTriangleCount": 3452,
+          "minHandVertexToTorsoTriangleM": 0.18579110503196716,
+          "nearestHandVertexId": 14552,
+          "nearestTorsoTriangleIndex": 8073,
+          "overlapCountExcludingSharedVertices": 0,
+          "overlapCountWithAllNonHandTriangles": 0,
+          "overlapCountsByHandRegion": {},
+          "overlapCountsByNonHandDominantGroups": {},
+          "overlapCountsByTorsoGroups": {},
+          "overlapTrianglePairsFarthestAnchor": [],
+          "overlapTrianglePairsNearestAnchor": [],
+          "torsoTriangleCount": 9933
+        }
+      },
+      "indexTips": [
+        {
+          "anchorId": "hand.index.tip.left",
+          "endpointBodyM": [
+            0.00479986,
+            -0.20000048,
+            0.380000323
+          ],
+          "nearestSurfaceNormalBody": [
+            -0.11805193079635501,
+            -0.44642411556560546,
+            0.8870001188479364
+          ],
+          "nearestSurfacePointBodyM": [
+            0.040612634,
+            -0.147926152,
+            0.152400687
+          ],
+          "triangleIndex": 7147,
+          "unsignedDistanceM": 0.23621150851249695
+        },
+        {
+          "anchorId": "hand.index.tip.right",
+          "endpointBodyM": [
+            -0.004799695,
+            -0.200000301,
+            0.379999578
+          ],
+          "nearestSurfaceNormalBody": [
+            0.05084738973528147,
+            -0.37807556451298296,
+            0.9243772905319929
+          ],
+          "nearestSurfacePointBodyM": [
+            -0.041959811,
+            -0.144856751,
+            0.154307112
+          ],
+          "triangleIndex": 8074,
+          "unsignedDistanceM": 0.2352844625711441
+        }
+      ],
+      "maskFaceCount": 9933,
+      "poseCommandsWxyz": {
+        "DEF-f_middle.01.L": [
+          0.9476507306098938,
+          0.3193087875843048,
+          -2.29133743090415e-08,
+          2.9341546081695924e-08
+        ],
+        "DEF-f_middle.01.R": [
+          0.9476507306098938,
+          0.3193087875843048,
+          5.401416558470373e-08,
+          -2.0165495939750144e-08
+        ],
+        "DEF-f_middle.02.L": [
+          0.9004470705986023,
+          0.4349655508995056,
+          -5.742045172674182e-10,
+          -1.0139555861599092e-10
+        ],
+        "DEF-f_middle.02.R": [
+          0.9004470705986023,
+          0.4349656105041504,
+          -4.715943746624873e-10,
+          -6.751766923329683e-10
+        ],
+        "DEF-f_middle.03.L": [
+          0.9476507306098938,
+          0.3193087875843048,
+          2.4851284918803174e-10,
+          -8.277611235341098e-11
+        ],
+        "DEF-f_middle.03.R": [
+          0.9476507306098938,
+          0.3193087875843048,
+          1.931753507156131e-10,
+          3.9582334632193295e-10
+        ],
+        "DEF-f_pinky.01.L": [
+          0.9476507306098938,
+          0.3193087875843048,
+          0.0,
+          0.0
+        ],
+        "DEF-f_pinky.01.R": [
+          0.9476507306098938,
+          0.3193087875843048,
+          -7.645559740865338e-09,
+          -1.904478352798833e-08
+        ],
+        "DEF-f_pinky.02.L": [
+          0.9004470705986023,
+          0.4349655508995056,
+          0.0,
+          0.0
+        ],
+        "DEF-f_pinky.02.R": [
+          0.9004470705986023,
+          0.4349656105041504,
+          0.0,
+          0.0
+        ],
+        "DEF-f_pinky.03.L": [
+          0.9476507306098938,
+          0.3193087875843048,
+          3.5860328040371314e-09,
+          -1.0240363002012032e-09
+        ],
+        "DEF-f_pinky.03.R": [
+          0.9476507306098938,
+          0.3193087875843048,
+          -4.556391930421455e-10,
+          -4.268937647822213e-09
+        ],
+        "DEF-f_ring.01.L": [
+          0.9476507306098938,
+          0.3193088173866272,
+          -3.4168202489581745e-08,
+          -7.159727033467789e-09
+        ],
+        "DEF-f_ring.01.R": [
+          0.9476507306098938,
+          0.3193087875843048,
+          -1.0184585619299469e-07,
+          7.36275254098473e-08
+        ],
+        "DEF-f_ring.02.L": [
+          0.9004470705986023,
+          0.4349656105041504,
+          0.0,
+          0.0
+        ],
+        "DEF-f_ring.02.R": [
+          0.9004470705986023,
+          0.4349655508995056,
+          8.196181511266332e-10,
+          -4.444029588768217e-10
+        ],
+        "DEF-f_ring.03.L": [
+          0.9476507306098938,
+          0.3193087875843048,
+          -8.034163889725221e-10,
+          -8.3490675484299e-10
+        ],
+        "DEF-f_ring.03.R": [
+          0.9476507306098938,
+          0.3193087875843048,
+          3.598088493816931e-10,
+          9.767014974570998e-10
+        ],
+        "DEF-forearm.L": [
+          0.8814614415168762,
+          0.3153892457485199,
+          -1.267879667921079e-07,
+          -0.351504385471344
+        ],
+        "DEF-forearm.R": [
+          0.8741627335548401,
+          0.32952481508255005,
+          -1.8750830577118904e-07,
+          0.35672527551651
+        ],
+        "DEF-hand.L": [
+          0.8980589509010315,
+          0.31608152389526367,
+          0.07389460504055023,
+          -0.29685384035110474
+        ],
+        "DEF-hand.R": [
+          0.9016368985176086,
+          0.3278025984764099,
+          -0.06674282252788544,
+          0.2741200923919678
+        ],
+        "DEF-upper_arm.L": [
+          0.8704476356506348,
+          0.48920321464538574,
+          -5.146388275534264e-07,
+          -0.054782796651124954
+        ],
+        "DEF-upper_arm.R": [
+          0.8771755695343018,
+          0.47702062129974365,
+          3.6417299043023377e-07,
+          0.05490364506840706
+        ]
+      },
+      "poseId": "bilateral-index-approach",
+      "scopedHandBodyOverlapCounts": {
+        "left-otherBody": 0,
+        "left-right": 0,
+        "right-otherBody": 0
+      }
+    },
+    {
+      "bodyTriangleCount": 9933,
+      "endpointReplayErrorsM": {
+        "hand.index.tip.left": 9.025233852411858e-08,
+        "hand.index.tip.right": 1.995842695731407e-07
+      },
+      "handToTorsoSurface": {
+        "left": {
+          "handTriangleCount": 3451,
+          "minHandVertexToTorsoTriangleM": 0.4496524930000305,
+          "nearestHandVertexId": 7049,
+          "nearestTorsoTriangleIndex": 7439,
+          "overlapCountExcludingSharedVertices": 0,
+          "overlapCountWithAllNonHandTriangles": 0,
+          "overlapCountsByHandRegion": {},
+          "overlapCountsByNonHandDominantGroups": {},
+          "overlapCountsByTorsoGroups": {},
+          "overlapTrianglePairsFarthestAnchor": [],
+          "overlapTrianglePairsNearestAnchor": [],
+          "torsoTriangleCount": 9933
+        },
+        "right": {
+          "handTriangleCount": 3452,
+          "minHandVertexToTorsoTriangleM": 0.4496501088142395,
+          "nearestHandVertexId": 10704,
+          "nearestTorsoTriangleIndex": 8217,
+          "overlapCountExcludingSharedVertices": 0,
+          "overlapCountWithAllNonHandTriangles": 0,
+          "overlapCountsByHandRegion": {},
+          "overlapCountsByNonHandDominantGroups": {},
+          "overlapCountsByTorsoGroups": {},
+          "overlapTrianglePairsFarthestAnchor": [],
+          "overlapTrianglePairsNearestAnchor": [],
+          "torsoTriangleCount": 9933
+        }
+      },
+      "indexTips": [
+        {
+          "anchorId": "hand.index.tip.left",
+          "endpointBodyM": [
+            0.699592054,
+            -0.325334758,
+            -0.018379051
+          ],
+          "nearestSurfaceNormalBody": [
+            0.7925606113858521,
+            -0.5904690967872739,
+            0.15229579899460077
+          ],
+          "nearestSurfacePointBodyM": [
+            0.147468656,
+            -0.084240027,
+            -0.014439579
+          ],
+          "triangleIndex": 7439,
+          "unsignedDistanceM": 0.6024802327156067
+        },
+        {
+          "anchorId": "hand.index.tip.right",
+          "endpointBodyM": [
+            -0.712586284,
+            -0.307180613,
+            -0.00674031
+          ],
+          "nearestSurfaceNormalBody": [
+            -0.7998791236677789,
+            -0.5997765081410762,
+            -0.02148220269009471
+          ],
+          "nearestSurfacePointBodyM": [
+            -0.147920415,
+            -0.080113031,
+            -0.010956257
+          ],
+          "triangleIndex": 8217,
+          "unsignedDistanceM": 0.6086255311965942
+        }
+      ],
+      "maskFaceCount": 9933,
+      "poseCommandsWxyz": {
+        "DEF-f_index.03.R": [
+          0.9961946980917455,
+          0.0,
+          0.0,
+          0.08715574274765817
+        ],
+        "DEF-f_middle.03.R": [
+          0.9961946980917455,
+          0.0,
+          0.0,
+          -0.08715574274765817
+        ]
+      },
+      "poseId": "right-index-middle-overlap",
+      "scopedHandBodyOverlapCounts": {
+        "left-otherBody": 0,
+        "left-right": 0,
+        "right-otherBody": 0
+      }
+    }
+  ],
+  "meshMapping": "evaluated mesh must match source vertex/polygon counts and each polygon vertex tuple/material index; triangle indices refer to retained evaluated loop-triangle mask",
+  "poseIds": [
+    "neutral-rest",
+    "bilateral-index-approach",
+    "right-index-middle-overlap"
+  ],
+  "rotationConvention": "rest-relative-local-quaternion-wxyz",
+  "schema": "vozual.task7.multi-pose-body-surface-measurements",
+  "schemaVersion": 1
+}

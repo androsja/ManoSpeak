@@ -25,7 +25,10 @@ mobile/assets/images/vozual/app-store-connect/
 
 # Deep Work Plan databases and logs
 .dwp/
-.agents/skills/
+.agents/skills/*
+!.agents/skills/deepworkplan/
+.agents/skills/deepworkplan/*
+!.agents/skills/deepworkplan/SKILL.md
 
 # Ephemeral scratch directory contents
 tmp/*

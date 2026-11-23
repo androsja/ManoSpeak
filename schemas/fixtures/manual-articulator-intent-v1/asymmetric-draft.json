@@ -1,0 +1,32 @@
+{
+  "schema": "vozual.manual-articulator-intent",
+  "schemaVersion": 1,
+  "kind": "independent-hand-authoring",
+  "id": "fixture.asymmetric-hands",
+  "revision": 1,
+  "rigBinding": {
+    "profileId": "vozual-rig-1",
+    "profileRevision": 8,
+    "profileSha256": "c97937e3642cfae25dbbbb91fdd4ed62228ecc17d062a6c13443c556097ced54",
+    "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a"
+  },
+  "durationMs": 1200,
+  "hands": {
+    "left": {
+      "role": "non-dominant-active",
+      "events": [
+        {"id": "left-shape", "channel": "handshape", "fromMs": 0, "toMs": 1200, "intentRef": "fixture.left-shape"}
+      ]
+    },
+    "right": {
+      "role": "dominant",
+      "events": [
+        {"id": "right-trajectory", "channel": "trajectory", "fromMs": 100, "toMs": 900, "intentRef": "fixture.right-trajectory"},
+        {"id": "right-shape", "channel": "handshape", "fromMs": 0, "toMs": 1200, "intentRef": "fixture.right-shape"}
+      ]
+    }
+  },
+  "requiredRigCapabilities": ["manual.independent-hands", "manual.handshape-references", "manual.trajectory-references"],
+  "execution": "authoring-only-not-executable",
+  "review": {"status": "needs_review", "reviewerId": null, "reviewedAt": null}
+}

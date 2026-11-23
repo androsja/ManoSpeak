@@ -4,7 +4,8 @@ This directory contains the custom persona guides, command scripts, and catalog 
 
 ## Contents
 - **`agents/`:** Custom developer, researcher, and architect personas.
-- **`commands/`:** Thin alias delegators mapping `/dwp-*` calls to the globally installed `deepworkplan` skill.
+- **`commands/`:** Thin alias delegators mapping `/dwp-*` calls to the project-local Codex skill at `skills/deepworkplan/SKILL.md`.
+- **`skills/deepworkplan/`:** Versioned Deep Work Plan workflows shared by the command aliases.
 - **`docs/`:** Master references for active commands and personas.
 - **`settings.json`:** Global project parameters and execution policies.
 

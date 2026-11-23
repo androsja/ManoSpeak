@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/spatial-grammar-intent-v1.schema.json",
+  "title": "Vozual spatial grammar intent v1",
+  "description": "Profile-bound authoring-only named loci and entity/object frame references; no motion execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "id", "revision", "profileBinding", "coordinateFrameRef", "loci", "entities", "execution"],
+  "properties": {
+    "schema": {"const": "vozual.spatial-grammar-intent"},
+    "schemaVersion": {"const": 1},
+    "id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 1},
+    "profileBinding": {"$ref": "#/$defs/profileBinding"},
+    "coordinateFrameRef": {"$ref": "#/$defs/id"},
+    "loci": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/locus"}},
+    "entities": {"type": "array", "items": {"$ref": "#/$defs/entity"}},
+    "execution": {"const": "authoring-only-not-executable"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "profileBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "revision", "sha256", "candidateSha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "candidateSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "vector3m": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+    "locus": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "positionM"],
+      "properties": {"id": {"$ref": "#/$defs/id"}, "positionM": {"$ref": "#/$defs/vector3m"}}
+    },
+    "entity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "roleRef", "locusRef", "objectFrameRef"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "roleRef": {"$ref": "#/$defs/id"},
+        "locusRef": {"$ref": "#/$defs/id"},
+        "objectFrameRef": {"$ref": "#/$defs/id"}
+      }
+    }
+  }
+}

@@ -17,6 +17,11 @@ import bpy
 from mathutils import Matrix
 from mathutils.kdtree import KDTree
 
+TOOL_DIRECTORY = str(Path(__file__).resolve().parent)
+if TOOL_DIRECTORY not in sys.path:
+    sys.path.insert(0, TOOL_DIRECTORY)
+from rig_material_filter import retained_vertices_for_materials
+
 
 SAMPLE_LIMIT = 30000
 MAX_SURFACE_ERROR_M = 0.015
@@ -41,6 +46,7 @@ EXCLUDED_SOURCE_MESHES = {
     "NUG_Base_EyeONUGlusion",
     "NUG_Base_TearLine",
 }
+EXCLUDED_MATERIAL_NAMES = frozenset({"NUG_Skin_Leg", "DWP_SOURCE_SCOPE_EXCLUDED_NUG_Skin_Leg"})
 
 
 def inputs() -> tuple[Path, Path]:
@@ -63,24 +69,57 @@ def skinned_meshes(objects: list[bpy.types.Object], armature: bpy.types.Object) 
     ]
 
 
-def evaluated_points(objects: list[bpy.types.Object], limit: int = SAMPLE_LIMIT) -> list[tuple[float, float, float]]:
+def evaluated_points(
+    objects: list[bpy.types.Object], limit: int = SAMPLE_LIMIT
+) -> tuple[list[tuple[float, float, float]], list[dict[str, object]]]:
     depsgraph = bpy.context.evaluated_depsgraph_get()
     samples: list[tuple[float, float, float]] = []
+    filter_audits: list[dict[str, object]] = []
     for obj in objects:
         evaluated = obj.evaluated_get(depsgraph)
         mesh = evaluated.to_mesh()
         try:
-            stride = max(1, math.ceil(len(mesh.vertices) / max(1, limit // max(1, len(objects)))))
-            samples.extend(
-                tuple(evaluated.matrix_world @ mesh.vertices[index].co)
-                for index in range(0, len(mesh.vertices), stride)
+            object_slot_names = tuple(
+                slot.material.name if slot.material is not None else None
+                for slot in evaluated.material_slots
             )
+            mesh_material_names = tuple(
+                material.name if material is not None else None
+                for material in mesh.materials
+            )
+            filtered = retained_vertices_for_materials(
+                mesh.polygons,
+                object_slot_names,
+                mesh_material_names,
+                len(mesh.vertices),
+                EXCLUDED_MATERIAL_NAMES,
+            )
+            retained_ids = filtered.retained_vertex_ids
+            if retained_ids:
+                per_mesh_limit = max(1, limit // max(1, len(objects)))
+                stride = max(1, math.ceil(len(retained_ids) / per_mesh_limit))
+                sampled_ids = retained_ids[::stride]
+                samples.extend(
+                    tuple(evaluated.matrix_world @ mesh.vertices[index].co)
+                    for index in sampled_ids
+                )
+            else:
+                sampled_ids = ()
+            filter_audits.append({
+                "mesh": obj.name,
+                "retainedFaces": filtered.retained_face_count,
+                "excludedFaces": filtered.excluded_face_count,
+                "retainedVertexIds": len(retained_ids),
+                "excludedOnlyVertexIds": filtered.excluded_only_vertex_count,
+                "sampledRetainedVertexIds": len(sampled_ids),
+                "excludedMaterials": sorted(EXCLUDED_MATERIAL_NAMES),
+            })
         finally:
             evaluated.to_mesh_clear()
     if len(samples) > limit:
         stride = math.ceil(len(samples) / limit)
         samples = samples[::stride][:limit]
-    return samples
+    return samples, filter_audits
 
 
 def symmetric_surface_error(
@@ -132,6 +171,15 @@ def main() -> None:
         obj for obj in skinned_meshes(source_objects, source_armature)
         if obj.name not in EXCLUDED_SOURCE_MESHES and not obj.name.startswith("WGT-")
     ]
+    # Keep the source and imported candidate material names distinguishable.
+    # Otherwise Blender appends `.001` to the candidate material on import and
+    # the exact excluded material identity becomes ambiguous. This is an
+    # in-memory name-only change; the source file is never saved.
+    renamed_source_materials = []
+    for material in bpy.data.materials:
+        if material.name == "NUG_Skin_Leg":
+            material.name = "DWP_SOURCE_SCOPE_EXCLUDED_NUG_Skin_Leg"
+            renamed_source_materials.append(material.name)
     source_rest = {
         bone.name: source_armature.matrix_world @ bone.matrix_local
         for bone in source_armature.data.bones
@@ -146,6 +194,10 @@ def main() -> None:
     if len(candidate_armatures) != 1:
         raise RuntimeError(f"Expected one candidate armature, found {len(candidate_armatures)}")
     candidate_armature = candidate_armatures[0]
+    candidate_leg_materials = [material.name for material in bpy.data.materials
+                               if material.name == "NUG_Skin_Leg"]
+    if not candidate_leg_materials:
+        raise RuntimeError("Candidate did not preserve the exact NUG_Skin_Leg material name")
     candidate_meshes = skinned_meshes(imported, candidate_armature)
     if not candidate_meshes:
         raise RuntimeError("Candidate armature has no skinned character meshes")
@@ -158,6 +210,8 @@ def main() -> None:
     }
 
     print(f"Skinned meshes: source={len(source_meshes)}, candidate={len(candidate_meshes)}")
+    print(f"In-memory source material aliases excluded: {renamed_source_materials}")
+    print(f"Candidate excluded material names: {candidate_leg_materials}")
     print(f"Source meshes: {', '.join(sorted(obj.name for obj in source_meshes))}")
     print(f"Candidate meshes: {', '.join(sorted(obj.name for obj in candidate_meshes))}")
     candidate_by_name = {obj.name.removesuffix(".001"): obj for obj in candidate_meshes}
@@ -175,15 +229,31 @@ def main() -> None:
             candidate_mesh = candidate_by_name.get(source_mesh.name)
             if candidate_mesh is None:
                 raise RuntimeError(f"Candidate is missing skinned mesh {source_mesh.name}")
+            source_points, source_audit = evaluated_points([source_mesh])
+            candidate_points, candidate_audit = evaluated_points([candidate_mesh])
+            if not source_points and not candidate_points:
+                print(
+                    f"  {source_mesh.name}: SKIP; source and candidate contain only excluded materials "
+                    f"(source={source_audit[0]} candidate={candidate_audit[0]})"
+                )
+                continue
+            if not source_points or not candidate_points:
+                raise RuntimeError(
+                    f"In-scope geometry mismatch for {source_mesh.name}: "
+                    f"source_points={len(source_points)} candidate_points={len(candidate_points)}"
+                )
             mesh_median, mesh_p95, mesh_maximum = symmetric_surface_error(
-                evaluated_points([source_mesh]),
-                evaluated_points([candidate_mesh]),
+                source_points,
+                candidate_points,
             )
+            print(f"    scope-filter source={source_audit[0]} candidate={candidate_audit[0]}")
             print(
                 f"  {source_mesh.name}: median={mesh_median:.6f} "
                 f"p95={mesh_p95:.6f} max={mesh_maximum:.6f}"
             )
             errors.append((mesh_maximum, source_mesh.name))
+        if not errors:
+            raise RuntimeError(f"No corresponding in-scope skinned meshes for pose {pose_name}")
         maximum, mesh_name = max(errors)
         print(
             f"{pose_name}: PASS {len(errors)} corresponding skinned meshes; "

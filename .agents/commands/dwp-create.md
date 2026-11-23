@@ -1,13 +1,7 @@
 ---
-description: Create a deep work plan (single-step refined draft → final plan) (provided by the installed `deepworkplan` skill)
+description: Create a deep work plan with a refined draft and final plan.
 ---
 
-# /dwp-create — provided by the `deepworkplan` skill
+# /dwp-create
 
-> Thin alias. The flow lives in the installed `deepworkplan` skill — this file only routes to it, so there is a single source of truth and no drift.
-
-## What to do
-
-Route this invocation to the **create** sub-skill of the installed `deepworkplan` skill and follow it: read `/Users/jflorezgaleano/.gemini/skills/deepworkplan/create/SKILL.md` and execute its flow. Plan and draft outputs land in this repo's gitignored `.dwp/` (`.dwp/plans/`, `.dwp/drafts/`) — never the legacy path.
-
-> Other agents: invoke the skill's `deepworkplan-create` sub-skill directly (`/deepworkplan-create` in Claude Code, `#deepworkplan-create` elsewhere). This `dwp-create` file is the shorter, conventional alias.
+Follow the **Create** section in `.agents/skills/deepworkplan/SKILL.md`.

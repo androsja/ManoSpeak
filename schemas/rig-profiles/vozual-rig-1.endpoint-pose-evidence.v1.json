@@ -1,0 +1,254 @@
+{
+  "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a",
+  "coordinateCalibrationSha256": "1a6cf3a8d9bd779e0b4e91cbbd20205fe92bc9df70443181dca32e11f09c0ab1",
+  "crossChecks": [
+    {
+      "anchorId": "hand.index.tip.left",
+      "errorM": 2.6708634670408616e-07,
+      "poseId": "neutral-rest"
+    },
+    {
+      "anchorId": "hand.index.tip.right",
+      "errorM": 2.466727121684606e-07,
+      "poseId": "neutral-rest"
+    },
+    {
+      "anchorId": "hand.index.tip.left",
+      "errorM": 1.228168075264568e-07,
+      "poseId": "bilateral-index-approach"
+    },
+    {
+      "anchorId": "hand.index.tip.right",
+      "errorM": 2.4027162205283916e-07,
+      "poseId": "bilateral-index-approach"
+    },
+    {
+      "anchorId": "hand.index.tip.right",
+      "errorM": 2.466727121684606e-07,
+      "poseId": "neutral-rest"
+    },
+    {
+      "anchorId": "hand.middle.tip.right",
+      "errorM": 1.445201494653162e-07,
+      "poseId": "neutral-rest"
+    },
+    {
+      "anchorId": "hand.index.tip.right",
+      "errorM": 3.074579970668634e-07,
+      "poseId": "right-index-middle-overlap"
+    },
+    {
+      "anchorId": "hand.middle.tip.right",
+      "errorM": 1.7096054114990661e-07,
+      "poseId": "right-index-middle-overlap"
+    }
+  ],
+  "endpointBoneMap": {
+    "hand.index.tip.left": "DEF-f_index.03.L",
+    "hand.index.tip.right": "DEF-f_index.03.R",
+    "hand.middle.tip.left": "DEF-f_middle.03.L",
+    "hand.middle.tip.right": "DEF-f_middle.03.R",
+    "hand.palm.left": "DEF-hand.L",
+    "hand.palm.right": "DEF-hand.R",
+    "hand.pinky.tip.left": "DEF-f_pinky.03.L",
+    "hand.pinky.tip.right": "DEF-f_pinky.03.R",
+    "hand.ring.tip.left": "DEF-f_ring.03.L",
+    "hand.ring.tip.right": "DEF-f_ring.03.R",
+    "hand.thumb.tip.left": "DEF-thumb.03.L",
+    "hand.thumb.tip.right": "DEF-thumb.03.R"
+  },
+  "maximumCrossCheckErrorM": 3.074579970668634e-07,
+  "measurementMethod": "Blender 5.2.3 imported GLB armature pose forward kinematics from declared rest anchor offsets",
+  "poses": {
+    "bilateral-index-approach": {
+      "hand.index.tip.left": [
+        0.0047998856753110886,
+        -0.20000046491622925,
+        0.38000020384788513
+      ],
+      "hand.index.tip.right": [
+        -0.00479969521984458,
+        -0.20000018179416656,
+        0.3799997866153717
+      ],
+      "hand.middle.tip.left": [
+        0.07349340617656708,
+        -0.23365764319896698,
+        0.3213704824447632
+      ],
+      "hand.middle.tip.right": [
+        -0.07476256042718887,
+        -0.23462410271167755,
+        0.3223784863948822
+      ],
+      "hand.palm.left": [
+        0.17175215482711792,
+        -0.20000040531158447,
+        0.37999972701072693
+      ],
+      "hand.palm.right": [
+        -0.17285947501659393,
+        -0.1999998837709427,
+        0.37999972701072693
+      ],
+      "hand.pinky.tip.left": [
+        0.08467672020196915,
+        -0.25055670738220215,
+        0.35057079792022705
+      ],
+      "hand.pinky.tip.right": [
+        -0.08582741767168045,
+        -0.2508997917175293,
+        0.3520667254924774
+      ],
+      "hand.ring.tip.left": [
+        0.07704724371433258,
+        -0.24471351504325867,
+        0.3295007050037384
+      ],
+      "hand.ring.tip.right": [
+        -0.07826381921768188,
+        -0.2455059289932251,
+        0.3307986259460449
+      ],
+      "hand.thumb.tip.left": [
+        0.05935588851571083,
+        -0.14818401634693146,
+        0.35250067710876465
+      ],
+      "hand.thumb.tip.right": [
+        -0.06033977493643761,
+        -0.1486448496580124,
+        0.3514231741428375
+      ]
+    },
+    "neutral-rest": {
+      "hand.index.tip.left": [
+        0.6995920538902283,
+        -0.3253348469734192,
+        -0.01837906613945961
+      ],
+      "hand.index.tip.right": [
+        -0.7128241062164307,
+        -0.3076012134552002,
+        -0.0026321159675717354
+      ],
+      "hand.middle.tip.left": [
+        0.7074757814407349,
+        -0.32753145694732666,
+        -0.033970557153224945
+      ],
+      "hand.middle.tip.right": [
+        -0.7202031016349792,
+        -0.30883005261421204,
+        -0.01793317124247551
+      ],
+      "hand.palm.left": [
+        0.5576378107070923,
+        -0.239577054977417,
+        -0.03755362331867218
+      ],
+      "hand.palm.right": [
+        -0.5678285360336304,
+        -0.22557835280895233,
+        -0.024828022345900536
+      ],
+      "hand.pinky.tip.left": [
+        0.6697049140930176,
+        -0.31213921308517456,
+        -0.062299422919750214
+      ],
+      "hand.pinky.tip.right": [
+        -0.6827338337898254,
+        -0.29439184069633484,
+        -0.04712826758623123
+      ],
+      "hand.ring.tip.left": [
+        0.6963623762130737,
+        -0.3227267563343048,
+        -0.049985744059085846
+      ],
+      "hand.ring.tip.right": [
+        -0.7093603014945984,
+        -0.3042870759963989,
+        -0.03419829159975052
+      ],
+      "hand.thumb.tip.left": [
+        0.6438307166099548,
+        -0.29989346861839294,
+        0.03320501372218132
+      ],
+      "hand.thumb.tip.right": [
+        -0.6544403433799744,
+        -0.2833652198314667,
+        0.047792285680770874
+      ]
+    },
+    "right-index-middle-overlap": {
+      "hand.index.tip.left": [
+        0.6995920538902283,
+        -0.3253348469734192,
+        -0.01837906613945961
+      ],
+      "hand.index.tip.right": [
+        -0.7125864624977112,
+        -0.3071805238723755,
+        -0.00674030464142561
+      ],
+      "hand.middle.tip.left": [
+        0.7074757814407349,
+        -0.32753145694732666,
+        -0.033970557153224945
+      ],
+      "hand.middle.tip.right": [
+        -0.7197146415710449,
+        -0.3088943362236023,
+        -0.013471265323460102
+      ],
+      "hand.palm.left": [
+        0.5576378107070923,
+        -0.239577054977417,
+        -0.03755362331867218
+      ],
+      "hand.palm.right": [
+        -0.5678285360336304,
+        -0.22557835280895233,
+        -0.024828022345900536
+      ],
+      "hand.pinky.tip.left": [
+        0.6697049140930176,
+        -0.31213921308517456,
+        -0.062299422919750214
+      ],
+      "hand.pinky.tip.right": [
+        -0.6827338337898254,
+        -0.29439184069633484,
+        -0.04712826758623123
+      ],
+      "hand.ring.tip.left": [
+        0.6963623762130737,
+        -0.3227267563343048,
+        -0.049985744059085846
+      ],
+      "hand.ring.tip.right": [
+        -0.7093603014945984,
+        -0.3042870759963989,
+        -0.03419829159975052
+      ],
+      "hand.thumb.tip.left": [
+        0.6438307166099548,
+        -0.29989346861839294,
+        0.03320501372218132
+      ],
+      "hand.thumb.tip.right": [
+        -0.6544403433799744,
+        -0.2833652198314667,
+        0.047792285680770874
+      ]
+    }
+  },
+  "profileSha256": "c97937e3642cfae25dbbbb91fdd4ed62228ecc17d062a6c13443c556097ced54",
+  "schema": "vozual.rig-calibrated-endpoint-pose-measurements",
+  "schemaVersion": 1,
+  "sourcePoseEvidenceSha256": "33988e842cb0f1e9a6d21c84246272e5c3bcde81283a351bc28084404a5ba35f"
+}

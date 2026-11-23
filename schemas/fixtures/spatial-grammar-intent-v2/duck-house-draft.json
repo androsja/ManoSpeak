@@ -1,0 +1,43 @@
+{
+  "schema": "vozual.spatial-grammar-intent",
+  "schemaVersion": 2,
+  "id": "fixture.spatial-duck-house-draft",
+  "revision": 1,
+  "coordinateFrameRef": "body",
+  "loci": [
+    {"id": "locus.house", "positionM": [-0.2, 0.35, 0.1]},
+    {"id": "locus.orchard", "positionM": [0.25, 0.4, -0.05]}
+  ],
+  "entities": [
+    {"id": "entity.duck", "roleRef": "role.animal", "locusRef": "locus.house", "objectFrameRef": "object"},
+    {"id": "entity.apple", "roleRef": "role.object", "locusRef": "locus.orchard", "objectFrameRef": "object"}
+  ],
+  "relations": [
+    {
+      "id": "relation.duck-house",
+      "kind": "direction",
+      "sourceRef": {"kind": "entity", "id": "entity.duck"},
+      "targetRef": {"kind": "locus", "id": "locus.house"}
+    },
+    {
+      "id": "relation.apple-orchard-demonstrative",
+      "kind": "demonstrative",
+      "sourceRef": {"kind": "entity", "id": "entity.apple"},
+      "targetRef": {"kind": "locus", "id": "locus.orchard"}
+    },
+    {
+      "id": "relation.duck-apple-agreement-draft",
+      "kind": "agreement",
+      "sourceRef": {"kind": "entity", "id": "entity.duck"},
+      "targetRef": {"kind": "entity", "id": "entity.apple"},
+      "agreementRef": {"id": "agreement.example-pending"}
+    }
+  ],
+  "execution": "authoring-only-not-executable",
+  "profileBinding": {
+    "id": "vozual-rig-1",
+    "revision": 8,
+    "sha256": "c97937e3642cfae25dbbbb91fdd4ed62228ecc17d062a6c13443c556097ced54",
+    "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a"
+  }
+}

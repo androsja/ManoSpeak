@@ -1,0 +1,37 @@
+{
+  "source": {
+    "schema": "vozual.motion-source",
+    "schemaVersion": 4,
+    "purpose": "rig-conformance",
+    "id": "fixed-point-contact",
+    "revision": 1,
+    "linguisticIntent": {"requiredRigCapabilities": []},
+    "temporalGraph": {"nodes": []},
+    "constraints": {
+      "pointContacts": [
+        {
+          "id": "index-target",
+          "anchorId": "hand.index.tip.left",
+          "target": {"frameId": "body", "positionM": [0.687379484, -0.343728036, -0.019328501]},
+          "samples": [{"timeMs": 0, "poseId": "left-index-curl-v1"}]
+        }
+      ]
+    },
+    "rigRealizationOverrides": {},
+    "provenanceAndReview": {"technicalConformanceOnly": true}
+  },
+  "expected": {
+    "source": "Blender 5.2.3 LTS measurements of the exact rev8 candidate",
+    "thresholdM": 0.01,
+    "poses": {
+      "left-index-curl-v1": {
+        "bodyPositionM": [0.682379484, -0.343728036, -0.019328501],
+        "distanceM": 0.005
+      },
+      "neutral-rest": {
+        "bodyPositionM": [0.699591875, -0.325334996, -0.018379197],
+        "distanceM": 0.022098588019665338
+      }
+    }
+  }
+}

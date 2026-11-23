@@ -88,4 +88,16 @@ describe('v4 rig compile binding', () => {
     expect(() => assertV4CompiledRigBinding({...artifact(binding), conformanceDiagnostics: undefined}, binding))
       .toThrow(expect.objectContaining({code: 'COMPATIBILITY.RIG_PROFILE'}));
   });
+
+  it.each(['anatomical.degreesOfFreedom', 'anatomical.jointLimits', 'manual.thumbJoints', 'manual.thumb.flexion', 'sign.future-placeholder'])
+  ('rejects capabilities without reviewed admission even when the rehashed profile claims them: %s', capability => {
+    const {candidateBytes, profile, mechanicalObservation} = fixture();
+    profile.capabilities[capability] = 'structurally_verified';
+    profile.sha256 = profileSha256(profile);
+    expect(() => bindRigForV4Compilation(profile, candidateBytes, [capability], mechanicalObservation))
+      .toThrow(expect.objectContaining({
+        code: 'COMPILER.UNSUPPORTED_REQUIRED_CAPABILITY',
+        details: expect.objectContaining({capability, profileId: profile.id, profileRevision: profile.revision}),
+      }));
+  });
 });

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/nonmanual-intent-channel-bindings-v1.schema.json",
+  "title": "Vozual non-manual semantic intent channel bindings v1",
+  "description": "Binds documented abstract non-manual intent references to semantic DSL channels, before any articulator or rig mapping.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "execution", "channels", "bindings"],
+  "properties": {
+    "schema": {"const": "vozual.nonmanual-intent-channel-bindings"},
+    "schemaVersion": {"const": 1},
+    "execution": {"const": "authoring-only-not-executable"},
+    "channels": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/channel"}},
+    "bindings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/binding"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+    "channel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "abstractRole"],
+      "properties": {
+        "id": {"enum": ["nonmanual.intent.question", "nonmanual.intent.polarity", "nonmanual.intent.affect", "nonmanual.intent.perspective"]},
+        "abstractRole": {"enum": ["grammatical-question", "grammatical-polarity", "affective-intent", "discourse-perspective"]}
+      }
+    },
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["intentRef", "channelId"],
+      "properties": {"intentRef": {"$ref": "#/$defs/id"}, "channelId": {"$ref": "#/$defs/channel/properties/id"}}
+    }
+  }
+}

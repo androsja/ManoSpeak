@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/nonmanual-rig-channel-profile-v2.schema.json",
+  "title": "Vozual non-manual rig channel profile v2",
+  "description": "Authoring-only non-manual channel decisions bound to an exact rig profile and candidate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "profileId", "revision", "sha256", "rigProfile", "controls", "channels"],
+  "properties": {
+    "schema": {"const": "vozual.nonmanual-rig-channel-profile"},
+    "schemaVersion": {"const": 2},
+    "profileId": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 1},
+    "sha256": {"$ref": "#/$defs/sha256"},
+    "rigProfile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "revision", "sha256", "candidateSha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "candidateSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "controls": {"type": "array", "items": {"$ref": "#/$defs/control"}},
+    "channels": {
+      "type": "object",
+      "propertyNames": {"enum": [
+        "eyelids.leftClosure", "eyelids.rightClosure", "eyelids.squint",
+        "brows.leftInnerLift", "brows.leftInnerLower", "brows.rightInnerLift", "brows.rightInnerLower",
+        "nose.wrinkle", "cheeks.leftRaise", "cheeks.rightRaise", "cheeks.puff",
+        "jaw.open", "jaw.forward", "jaw.left", "jaw.right", "tongue.protrude",
+        "lips.opening", "lips.pucker", "lips.width", "mouthCorners.left", "mouthCorners.right", "mouthing.lexeme",
+        "gaze.target", "head.pitch", "head.yaw", "head.roll",
+        "shoulders.leftElevation", "shoulders.rightElevation", "shoulders.centerElevation",
+        "torso.pitch", "torso.yaw", "torso.roll"
+      ]},
+      "additionalProperties": {"$ref": "#/$defs/binding"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._:-]*$"},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "control": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {"id": {"$ref": "#/$defs/id"}, "type": {"enum": ["bone", "morphTarget"]}}
+    },
+    "binding": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["status", "reason"], "properties": {"status": {"const": "unsupported"}, "reason": {"type": "string", "minLength": 1}}},
+        {"type": "object", "additionalProperties": false, "required": ["status", "controlIds", "reviewerId", "reviewEvidenceRef"], "properties": {"status": {"const": "supported"}, "controlIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}, "reviewerId": {"$ref": "#/$defs/id"}, "reviewEvidenceRef": {"$ref": "#/$defs/id"}}}
+      ]
+    }
+  }
+}

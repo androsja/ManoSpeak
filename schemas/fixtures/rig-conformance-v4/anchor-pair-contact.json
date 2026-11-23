@@ -1,0 +1,43 @@
+{
+  "source": {
+    "schema": "vozual.motion-source",
+    "schemaVersion": 4,
+    "purpose": "rig-conformance",
+    "id": "anchor-pair-contact",
+    "revision": 1,
+    "linguisticIntent": {"requiredRigCapabilities": []},
+    "temporalGraph": {"nodes": []},
+    "constraints": {
+      "anchorPairContacts": [
+        {
+          "id": "index-tip-pair",
+          "anchorIds": ["hand.index.tip.left", "hand.index.tip.right"],
+          "frameId": "body",
+          "samples": [{"timeMs": 0, "poseId": "bilateral-index-approach"}]
+        }
+      ]
+    },
+    "rigRealizationOverrides": {},
+    "provenanceAndReview": {"technicalConformanceOnly": true}
+  },
+  "blenderMeasurements": {
+    "thresholdM": 0.01,
+    "bilateralApproach": {
+      "positionM": [[0.00479986, -0.20000048, 0.380000323], [-0.004799695, -0.200000301, 0.379999578]],
+      "distanceM": 0.00959955503057777,
+      "overlapCount": 0
+    },
+    "bilateralRest": {
+      "poseId": "neutral-rest",
+      "distanceM": 1.4126148401734038,
+      "error": "KINEMATIC.POINT_CONTACT_OUTSIDE_TOLERANCE"
+    },
+    "rightIndexMiddleOverlap": {
+      "anchorIds": ["hand.index.tip.right", "hand.middle.tip.right"],
+      "poseId": "right-index-middle-overlap",
+      "distanceM": 0.00995286557714207,
+      "overlapCounts": {"right-index:right-middle": 58},
+      "error": "KINEMATIC.ANCHOR_PAIR_SCOPED_OVERLAP"
+    }
+  }
+}

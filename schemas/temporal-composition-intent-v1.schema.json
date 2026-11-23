@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/temporal-composition-intent-v1.schema.json",
+  "title": "Vozual temporal composition intent v1",
+  "description": "Non-executable sequencing of opaque authoring references across independent tracks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "id", "revision", "durationMs", "tracks", "execution"],
+  "properties": {
+    "schema": {"const": "vozual.temporal-composition-intent"},
+    "schemaVersion": {"const": 1},
+    "id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 1},
+    "durationMs": {"type": "integer", "minimum": 1},
+    "tracks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/track"}},
+    "execution": {"const": "authoring-only-not-executable"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+    "track": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "channel", "startMs", "segments"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "channel": {"enum": ["manual.left", "manual.right", "nonmanual"]},
+        "startMs": {"type": "integer", "minimum": 0},
+        "segments": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/segment"}}
+      }
+    },
+    "segment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "phase", "durationMs", "intentRef"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "phase": {"enum": ["preparation", "stroke", "hold", "retraction"]},
+        "durationMs": {"type": "integer", "minimum": 1},
+        "intentRef": {"$ref": "#/$defs/id"},
+        "phaseRef": {"$ref": "#/$defs/id"},
+        "timingProfile": {"enum": ["linear", "ease-in", "ease-out", "ease-in-out"]},
+        "repeatCount": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "contour": {"$ref": "#/$defs/contour"},
+        "repeatedMovement": {"$ref": "#/$defs/repeatedMovement"}
+      }
+    },
+    "vector3": {
+      "type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3
+    },
+    "contour": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "coordinateFrameRef", "unit", "plane", "direction", "parameters"],
+      "properties": {
+        "kind": {"enum": ["line", "arc", "circle", "ellipse", "spiral", "zigzag", "seven-shape", "spline"]},
+        "coordinateFrameRef": {"$ref": "#/$defs/id"},
+        "unit": {"const": "m"},
+        "plane": {"enum": ["xy", "xz", "yz"]},
+        "direction": {"enum": ["forward", "reverse"]},
+        "parameters": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["start", "end"], "properties": {"start": {"$ref": "#/$defs/vector3"}, "end": {"$ref": "#/$defs/vector3"}}},
+            {"type": "object", "additionalProperties": false, "required": ["center", "radiusM", "startAngleRad", "sweepRad"], "properties": {"center": {"$ref": "#/$defs/vector3"}, "radiusM": {"type": "number", "exclusiveMinimum": 0}, "startAngleRad": {"type": "number", "minimum": -6.283185307179586, "maximum": 6.283185307179586}, "sweepRad": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 6.283185307179586}}},
+            {"type": "object", "additionalProperties": false, "required": ["center", "radiusM", "startAngleRad"], "properties": {"center": {"$ref": "#/$defs/vector3"}, "radiusM": {"type": "number", "exclusiveMinimum": 0}, "startAngleRad": {"type": "number", "minimum": -6.283185307179586, "maximum": 6.283185307179586}}},
+            {"type": "object", "additionalProperties": false, "required": ["center", "majorRadiusM", "minorRadiusM", "startAngleRad"], "properties": {"center": {"$ref": "#/$defs/vector3"}, "majorRadiusM": {"type": "number", "exclusiveMinimum": 0}, "minorRadiusM": {"type": "number", "exclusiveMinimum": 0}, "startAngleRad": {"type": "number", "minimum": -6.283185307179586, "maximum": 6.283185307179586}}},
+            {"type": "object", "additionalProperties": false, "required": ["center", "startRadiusM", "endRadiusM", "turns", "startAngleRad"], "properties": {"center": {"$ref": "#/$defs/vector3"}, "startRadiusM": {"type": "number", "minimum": 0}, "endRadiusM": {"type": "number", "minimum": 0}, "turns": {"type": "number", "exclusiveMinimum": 0, "maximum": 16}, "startAngleRad": {"type": "number", "minimum": -6.283185307179586, "maximum": 6.283185307179586}}},
+            {"type": "object", "additionalProperties": false, "required": ["start", "end", "amplitudeM", "cycles"], "properties": {"start": {"$ref": "#/$defs/vector3"}, "end": {"$ref": "#/$defs/vector3"}, "amplitudeM": {"type": "number", "exclusiveMinimum": 0}, "cycles": {"type": "integer", "minimum": 1, "maximum": 1000}}},
+            {"type": "object", "additionalProperties": false, "required": ["points"], "properties": {"points": {"type": "array", "items": {"$ref": "#/$defs/vector3"}, "minItems": 7, "maxItems": 7}}},
+            {"type": "object", "additionalProperties": false, "required": ["controlPoints"], "properties": {"controlPoints": {"type": "array", "items": {"$ref": "#/$defs/vector3"}, "minItems": 4, "maxItems": 127}}}
+          ]
+        }
+      }
+    },
+    "repeatedMovement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "amplitudeM", "rateHz"],
+      "properties": {
+        "kind": {"enum": ["oscillation", "vibration", "brush"]},
+        "amplitudeM": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "rateHz": {"type": "number", "exclusiveMinimum": 0, "maximum": 100},
+        "accent": {"type": "number", "minimum": 0, "maximum": 1},
+        "phaseOffsetRad": {"type": "number", "minimum": 0, "exclusiveMaximum": 6.283185307179586},
+        "maxAccelerationMPerS2": {"type": "number", "minimum": 0, "maximum": 100},
+        "maxJerkMPerS3": {"type": "number", "minimum": 0, "maximum": 1000}
+      }
+    }
+  }
+}

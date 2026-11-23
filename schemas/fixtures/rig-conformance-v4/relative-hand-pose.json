@@ -1,0 +1,34 @@
+{
+  "source": {
+    "schema": "vozual.motion-source",
+    "schemaVersion": 4,
+    "purpose": "rig-conformance",
+    "id": "calibrated-relative-hand-pose",
+    "revision": 1,
+    "linguisticIntent": {"requiredRigCapabilities": []},
+    "temporalGraph": {"nodes": []},
+    "constraints": {
+      "relativeHandPoses": [
+        {
+          "id": "neutral-palm-relation",
+          "anchorIds": ["hand.palm.left", "hand.palm.right"],
+          "frameId": "first-anchor",
+          "targetRelativePositionM": [-0.147575914, -0.966277463, -0.558177311],
+          "targetRelativeOrientationWxyz": [0.493161509, -0.858529712, 0.140107791, 0.009395003],
+          "positionToleranceM": 0.001,
+          "orientationToleranceDeg": 0.5,
+          "samples": [{"timeMs": 0, "poseId": "neutral-rest"}]
+        }
+      ]
+    },
+    "rigRealizationOverrides": {},
+    "provenanceAndReview": {"technicalConformanceOnly": true}
+  },
+  "calibration": {
+    "source": "rig coordinate calibration and bound rev8 candidate",
+    "coordinateFrame": "first-anchor",
+    "poseId": "neutral-rest",
+    "positionToleranceM": 0.001,
+    "orientationToleranceDeg": 0.5
+  }
+}

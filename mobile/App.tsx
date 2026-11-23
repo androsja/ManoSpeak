@@ -88,7 +88,8 @@ function AppContent() {
             total + status.pendingSigns.filter(sign => sign.motionFormat === 'legacy-json-v2').length
           ), 0);
           setAvailableSignChangeCount(pendingJsonCount);
-        } catch {
+        } catch (error) {
+          console.warn('[Sign release] Failed to check for published JSON updates.', error);
           const [installed, phrases] = await Promise.all([
             installedSignsForSelectedLanguage(),
             installedPhrasesForSelectedLanguage(),

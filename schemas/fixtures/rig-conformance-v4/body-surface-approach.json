@@ -1,0 +1,43 @@
+{
+  "expected": {
+    "approachNormalDot": 0.9245632510397207,
+    "contactToleranceM": 0.01,
+    "distanceM": 0.009000099264085293,
+    "poseId": "left-index-torso-normal-approach-z"
+  },
+  "source": {
+    "constraints": {
+      "bodySurfaceApproaches": [
+        {
+          "anchorId": "hand.index.tip.left",
+          "frameId": "body",
+          "id": "left-index-torso-approach",
+          "maxDistanceM": 0.01,
+          "minApproachNormalDot": 0.9,
+          "samples": [
+            {
+              "poseId": "left-index-torso-normal-approach-z",
+              "timeMs": 0
+            }
+          ],
+          "surfaceId": "torso-dominant-v1"
+        }
+      ]
+    },
+    "id": "task7-index-torso-surface-approach",
+    "linguisticIntent": {
+      "requiredRigCapabilities": []
+    },
+    "provenanceAndReview": {
+      "technicalConformanceOnly": true
+    },
+    "purpose": "rig-conformance",
+    "revision": 1,
+    "rigRealizationOverrides": {},
+    "schema": "vozual.motion-source",
+    "schemaVersion": 4,
+    "temporalGraph": {
+      "nodes": []
+    }
+  }
+}

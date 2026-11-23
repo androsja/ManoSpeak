@@ -1,0 +1,172 @@
+{
+  "candidateSha256": "748ed69abc902b01c694bfe685d0403baf0e4d1299abae5d07431bc5fc3de26a",
+  "collision": {
+    "handToAllNonHandOverlapCount": 0,
+    "handToTorsoOverlapCountExcludingSharedVertices": 0,
+    "sameHandOverlapCounts": {
+      "left": {
+        "left-index": {},
+        "left-middle": {},
+        "left-pinky": {},
+        "left-ring": {},
+        "left-thumb": {}
+      }
+    },
+    "scopedHandBodyOverlapCounts": {
+      "left-otherBody": 0,
+      "left-right": 0,
+      "right-otherBody": 0
+    }
+  },
+  "coordinateCalibrationSha256": "1a6cf3a8d9bd779e0b4e91cbbd20205fe92bc9df70443181dca32e11f09c0ab1",
+  "frameId": "body",
+  "limits": [
+    "Exploratory pose; no anatomical range or sign validity is inferred",
+    "Torso is approximated by triangles whose every vertex has a listed torso-dominant bone group; mixed seams are excluded",
+    "Unsigned nearest distance plus the scoped triangle overlap check does not measure pressure or guarantee no penetration outside this torso mask",
+    "No solver, continuous collision domain, or runtime activation"
+  ],
+  "measurementSource": {
+    "artifact": "task7_body_surface_contact/index-body-contact-pose.json",
+    "artifactSha256": "c86eab327f3d01ac8e795088fb5b96bdce6fb28e920bdc8801cacb38fc12ef0d",
+    "blenderVersion": "5.2.3 LTS",
+    "byteIdenticalRepeat": true,
+    "repeatArtifactSha256": "c86eab327f3d01ac8e795088fb5b96bdce6fb28e920bdc8801cacb38fc12ef0d"
+  },
+  "pose": {
+    "approachNormalDot": 0.9245632510397207,
+    "id": "left-index-torso-normal-approach-z",
+    "replay": {
+      "errors": {
+        "anchorPositionM": 2.3383430878036045e-07,
+        "gapM": 8.475035429000854e-08,
+        "surfacePointM": 4.712160915387242e-08
+      },
+      "handToTorsoOverlapCount": 0,
+      "matchesWithin1Micrometer": true,
+      "scopedCollisionCounts": {
+        "left-otherBody": 0,
+        "left-right": 0,
+        "right-otherBody": 0
+      }
+    },
+    "rootAnchor": {
+      "id": "hand.index.segment.01.left",
+      "pointBodyM": [
+        0.053023882,
+        -0.152031913,
+        0.240656525
+      ]
+    },
+    "rootToTipDirectionBody": [
+      0.12654749886132777,
+      -0.08438917365856469,
+      -0.9883644147776067
+    ],
+    "rotationCommandsWxyz": {
+      "DEF-f_middle.01.L": [
+        0.9476507306098938,
+        0.3193087875843048,
+        0.0,
+        0.0
+      ],
+      "DEF-f_middle.02.L": [
+        0.9004470705986023,
+        0.4349655508995056,
+        0.0,
+        0.0
+      ],
+      "DEF-f_middle.03.L": [
+        0.9476507306098938,
+        0.3193087875843048,
+        0.0,
+        0.0
+      ],
+      "DEF-f_pinky.01.L": [
+        0.9476507306098938,
+        0.3193087875843048,
+        0.0,
+        0.0
+      ],
+      "DEF-f_pinky.02.L": [
+        0.9004470705986023,
+        0.4349655508995056,
+        0.0,
+        0.0
+      ],
+      "DEF-f_pinky.03.L": [
+        0.9476507306098938,
+        0.3193087875843048,
+        0.0,
+        0.0
+      ],
+      "DEF-f_ring.01.L": [
+        0.9476507306098938,
+        0.3193087875843048,
+        0.0,
+        0.0
+      ],
+      "DEF-f_ring.02.L": [
+        0.9004470705986023,
+        0.4349655508995056,
+        0.0,
+        0.0
+      ],
+      "DEF-f_ring.03.L": [
+        0.9476507306098938,
+        0.3193087875843048,
+        0.0,
+        0.0
+      ],
+      "DEF-forearm.L": [
+        0.7348400950431824,
+        -0.007998723536729813,
+        1.3244134322576429e-07,
+        -0.6781932711601257
+      ],
+      "DEF-hand.L": [
+        0.6436946988105774,
+        0.03752506524324417,
+        0.17228038609027863,
+        -0.7446936368942261
+      ],
+      "DEF-upper_arm.L": [
+        0.6732044219970703,
+        0.7364067435264587,
+        -5.766963795394986e-07,
+        0.06708871573209763
+      ]
+    },
+    "rotationConvention": "WXYZ",
+    "tipAnchor": {
+      "id": "hand.index.tip.left",
+      "pointBodyM": [
+        0.06347546,
+        -0.159001634,
+        0.159027368
+      ]
+    }
+  },
+  "profileSha256": "c97937e3642cfae25dbbbb91fdd4ed62228ecc17d062a6c13443c556097ced54",
+  "schema": "vozual.rig-body-surface-approach-evidence",
+  "schemaVersion": 1,
+  "scope": "one measured static left index approach pose against the torso-dominant surface mask",
+  "surface": {
+    "distanceM": 0.009000099264085293,
+    "id": "torso-dominant-v1",
+    "mask": "NUG_Base_Body triangles whose vertices are all dominant-weighted to DEF-spine.003-.006 or DEF-breast.L/R; NUG_Skin_Leg material excluded",
+    "pointBodyM": [
+      0.062539175,
+      -0.156807512,
+      0.15034917
+    ],
+    "source": "NUG_Base_Body evaluated mesh",
+    "triangleCount": 9933,
+    "triangleIndex": 7326,
+    "triangleNormalBody": [
+      0.03600193909369409,
+      -0.26746652368456125,
+      0.962894324271474
+    ]
+  }
+}

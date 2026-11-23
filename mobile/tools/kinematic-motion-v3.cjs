@@ -200,7 +200,21 @@ function validateKinematicMotionV3(motion, profile) {
   }
 
   validateIntervals(realization.nonManuals, durationMs, '$.kinematicRealization.nonManuals', allIds);
-  const nonManualIds = new Set(realization.nonManuals.map(value => value.id));
+  const tracks = realization.nonManualTracks ?? [];
+  if (tracks.length && realization.nonManuals.length) {
+    fail('KINEMATIC.NON_MANUAL_CONFLICT', '$.kinematicRealization', 'legacy nonmanual intervals and channel tracks cannot be combined');
+  }
+  validateIntervals(tracks, durationMs, '$.kinematicRealization.nonManualTracks', allIds);
+  for (const channel of ['headRotationDeg', 'gazeDirection', 'browRaise', 'smile', 'mouthOpening', 'mouthPucker']) {
+    const ordered = tracks.filter(track => track.channel === channel)
+      .sort((a, b) => a.fromMs - b.fromMs || a.toMs - b.toMs);
+    for (let index = 1; index < ordered.length; index += 1) {
+      if (ordered[index].fromMs < ordered[index - 1].toMs) {
+        fail('KINEMATIC.NON_MANUAL_OVERLAP', '$.kinematicRealization.nonManualTracks', 'tracks on the same channel cannot overlap');
+      }
+    }
+  }
+  const nonManualIds = new Set([...realization.nonManuals, ...tracks].map(value => value.id));
   for (const [index, phase] of motion.linguisticIntent.phases.entries()) {
     for (const nonManualId of phase.nonManualIds) {
       if (!nonManualIds.has(nonManualId)) fail('KINEMATIC.NON_MANUAL_REFERENCE', `$.linguisticIntent.phases[${index}].nonManualIds`, `unknown non-manual ${nonManualId}`);

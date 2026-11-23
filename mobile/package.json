@@ -10,6 +10,8 @@
     "build:avatar-runtime": "bash tools/build-avatar-runtime.sh",
     "build:published-signs": "node tools/build-published-signs.js",
     "generate:number-motion-drafts": "node tools/generate-lsc-number-motion-drafts.cjs",
+    "creator:json": "node tools/vozual-json-creator.cjs",
+    "pose:reference": "VOZUAL_CREATOR_PORT=4175 node tools/vozual-json-creator.cjs --hand-pose-reference",
     "status:published-signs": "node tools/firebase-sign-status.js",
     "publish:approved-signs": "node tools/publish-approved-signs.js",
     "verify:published-signs": "node tools/verify-published-signs.js",

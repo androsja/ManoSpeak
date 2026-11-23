@@ -1,0 +1,73 @@
+{
+  "source": {
+    "constraints": {
+      "bodySurfaceProximities": [
+        {
+          "id": "measured-left-torso-distance",
+          "anchorId": "hand.index.tip.left",
+          "surfaceId": "torso-dominant-v1",
+          "frameId": "body",
+          "minDistanceM": 0.23,
+          "maxDistanceM": 0.61,
+          "samples": [
+            {
+              "timeMs": 0,
+              "poseId": "neutral-rest"
+            },
+            {
+              "timeMs": 100,
+              "poseId": "bilateral-index-approach"
+            },
+            {
+              "timeMs": 200,
+              "poseId": "right-index-middle-overlap"
+            }
+          ]
+        },
+        {
+          "id": "measured-right-torso-distance",
+          "anchorId": "hand.index.tip.right",
+          "surfaceId": "torso-dominant-v1",
+          "frameId": "body",
+          "minDistanceM": 0.23,
+          "maxDistanceM": 0.61,
+          "samples": [
+            {
+              "timeMs": 0,
+              "poseId": "neutral-rest"
+            },
+            {
+              "timeMs": 100,
+              "poseId": "bilateral-index-approach"
+            },
+            {
+              "timeMs": 200,
+              "poseId": "right-index-middle-overlap"
+            }
+          ]
+        }
+      ]
+    },
+    "id": "measured-bilateral-index-torso-proximity",
+    "linguisticIntent": {
+      "requiredRigCapabilities": []
+    },
+    "provenanceAndReview": {
+      "technicalConformanceOnly": true
+    },
+    "purpose": "rig-conformance",
+    "revision": 1,
+    "rigRealizationOverrides": {},
+    "schema": "vozual.motion-source",
+    "schemaVersion": 4,
+    "temporalGraph": {
+      "nodes": []
+    }
+  },
+  "expected": {
+    "scope": "measured-discrete-index-to-torso-unsigned-distance",
+    "frames": 0,
+    "samplesPerConstraint": 3,
+    "collisionEvaluation": "not-performed"
+  }
+}

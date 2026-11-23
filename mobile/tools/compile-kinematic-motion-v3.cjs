@@ -181,7 +181,19 @@ function applyTrajectories(hands, trajectories, timeMs) {
   return hands;
 }
 
-function nonManualAt(nonManuals, timeMs) {
+function nonManualAt(nonManuals, timeMs, tracks, durationMs) {
+  if (tracks && tracks.length) {
+    const result = {
+      id: 'channels', headRotationDeg: [0, 0, 0], gazeDirection: [0, 0, 1],
+      browRaise: 0, smile: 0, mouthOpening: 0, mouthPucker: 0,
+    };
+    for (const track of tracks) {
+      if (track.fromMs <= timeMs && (timeMs < track.toMs || (timeMs === durationMs && track.toMs === durationMs))) {
+        result[track.channel] = Array.isArray(track.value) ? [...track.value] : track.value;
+      }
+    }
+    return result;
+  }
   const active = nonManuals.find(record => record.fromMs <= timeMs && timeMs <= record.toMs);
   return active ? {
     id: active.id,
@@ -214,7 +226,7 @@ function compileKinematicMotionV3(motion, profile, options = {}) {
   const frames = sampledTimes(realization.durationMs, sampleRateHz).map(timeMs => {
     const pose = interpolateKeyframes(realization.keyframes, realization.transitions, timeMs);
     const hands = applyTrajectories(pose.hands, realization.trajectories, timeMs);
-    return {timeMs, hands, nonManual: nonManualAt(realization.nonManuals, timeMs)};
+    return {timeMs, hands, nonManual: nonManualAt(realization.nonManuals, timeMs, realization.nonManualTracks, realization.durationMs)};
   });
   const sourceSha256 = sha256(canonicalJson(motion));
   const plan = {

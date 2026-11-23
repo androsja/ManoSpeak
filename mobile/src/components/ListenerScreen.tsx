@@ -1775,6 +1775,28 @@ export function ListenerScreen({
           </View>
           <Text style={styles.signUpdateAction}>{t('listener.download')}</Text>
         </Pressable>}
+        {__DEV__ && <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reproducir la seña DIEZ de prueba temporal"
+          disabled={!avatarReady || playingSign || phraseFinalizing}
+          onPress={() => {
+            const playDiez = () => {
+              recognizedWords.current = [];
+              signQueue.current = [];
+              setPlannedLsc('DIEZ · PRUEBA TEMPORAL');
+              setErrorMessage('');
+              startSign('DIEZ', false);
+            };
+            if (listening) {
+              stopListening().then(playDiez).catch(() => undefined);
+            } else {
+              playDiez();
+            }
+          }}
+          style={[styles.adiosPreviewButton, (!avatarReady || playingSign || phraseFinalizing) && styles.adiosPreviewButtonDisabled]}
+        >
+          <Text style={styles.adiosPreviewButtonText}>PROBAR DIEZ · TEMPORAL</Text>
+        </Pressable>}
         {availableListeningModes.length > 1 && <View style={styles.listeningModeControl}>
           {availableListeningModes.map(mode => {
             const selected = listeningMode === mode;

@@ -28,7 +28,12 @@ from PIL import Image, ImageTk
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from src.authoring_pipeline import generate_preview
+    from src.authoring_pipeline import (
+        build_phrase_scoped_spatial_draft,
+        generate_preview,
+        save_phrase_scoped_spatial_draft,
+        validate_spatial_authoring_draft,
+    )
     from src.linguistic_catalog import (
         editor_metadata,
         find_entry,
@@ -67,7 +72,12 @@ if __package__ in (None, ""):
         write_landmark_skeleton_preview,
     )
 else:
-    from .authoring_pipeline import generate_preview
+    from .authoring_pipeline import (
+        build_phrase_scoped_spatial_draft,
+        generate_preview,
+        save_phrase_scoped_spatial_draft,
+        validate_spatial_authoring_draft,
+    )
     from .linguistic_catalog import (
         editor_metadata,
         find_entry,
@@ -3477,13 +3487,132 @@ class SignAuthoringEditor:
             font=("Arial", 10, "bold"),
         )
 
+        def validate_spatial_phrase_draft() -> None:
+            selected = phrase_tree.selection()
+            if not selected:
+                messagebox.showinfo(
+                    "Borrador espacial",
+                    "Selecciona primero la frase que estás preparando.",
+                    parent=dialog,
+                )
+                return
+            phrase = phrase_rows[selected[0]]
+            draft_name = filedialog.askopenfilename(
+                title="Selecciona el borrador espacial JSON",
+                initialdir=str(REPO_ROOT),
+                filetypes=(("Archivos JSON", "*.json"), ("Todos los archivos", "*")),
+                parent=dialog,
+            )
+            if not draft_name:
+                return
+            temporal_path: Path | None = None
+            if messagebox.askyesno(
+                "Timeline temporal",
+                "¿Este borrador contiene referencias a tiempos o segmentos?",
+                parent=dialog,
+            ):
+                temporal_name = filedialog.askopenfilename(
+                    title="Selecciona el borrador de tiempos",
+                    initialdir=str(REPO_ROOT),
+                    filetypes=(("Archivos JSON", "*.json"), ("Todos los archivos", "*")),
+                    parent=dialog,
+                )
+                if not temporal_name:
+                    return
+                temporal_path = Path(temporal_name)
+
+            try:
+                result = validate_spatial_authoring_draft(
+                    Path(draft_name), temporal_path
+                )
+            except (FileNotFoundError, RuntimeError, OSError, ValueError) as error:
+                messagebox.showerror(
+                    "Borrador espacial rechazado",
+                    f"La frase seleccionada es: {phrase.spoken_text}\n\n"
+                    f"El borrador no pasó la validación:\n{error}\n\n"
+                    "No se creó ningún resultado ejecutable.",
+                    parent=dialog,
+                )
+                return
+
+            trace = result.trace
+            relations = trace.get("relations")
+            relation_count = len(relations) if isinstance(relations, list) else 0
+            phrase_draft = build_phrase_scoped_spatial_draft(
+                phrase.spoken_text,
+                phrase.required_glosses,
+                trace,
+            )
+            phrase_ref = phrase_draft["phraseRef"]
+            assert isinstance(phrase_ref, dict)
+            saved_path: Path | None = None
+            if messagebox.askyesno(
+                "Guardar borrador de esta frase",
+                "¿Quieres guardar el resultado en un archivo de borrador ligado "
+                "solo a esta frase? No se añadirá al catálogo ni se compartirá "
+                "con otras frases.",
+                parent=dialog,
+            ):
+                destination_name = filedialog.asksaveasfilename(
+                    title="Guardar borrador espacial de la frase",
+                    initialdir=str(REPO_ROOT),
+                    initialfile=f"{phrase_ref['id']}.json",
+                    defaultextension=".json",
+                    filetypes=(("Archivos JSON", "*.json"),),
+                    parent=dialog,
+                )
+                if destination_name:
+                    try:
+                        saved_path = save_phrase_scoped_spatial_draft(
+                            Path(destination_name), phrase_draft
+                        )
+                    except (OSError, ValueError) as error:
+                        messagebox.showerror(
+                            "No se guardó el borrador",
+                            str(error),
+                            parent=dialog,
+                        )
+                        return
+            messagebox.showinfo(
+                "Borrador espacial válido",
+                f"Frase seleccionada: {phrase.spoken_text}\n"
+                f"Vínculo exacto: {phrase_ref['id']} · "
+                f"{str(phrase_ref['sha256'])[:12]}…\n"
+                f"Relaciones revisadas por estructura: {relation_count}\n"
+                f"Resultado: {trace['execution']}\n"
+                f"Revisión lingüística: {trace['linguisticReviewStatus']}\n\n"
+                + (
+                    f"Borrador guardado en: {saved_path}\n\n"
+                    if saved_path is not None
+                    else "No se guardó el borrador.\n\n"
+                )
+                + "La herramienta solo comprobó referencias y perfil. El borrador "
+                "queda ligado a una frase exacta, no se añade al catálogo y no "
+                "se puede reproducir.",
+                parent=dialog,
+            )
+
+        spatial_validation_button = tk.Button(
+            panel,
+            text="VALIDAR BORRADOR ESPACIAL · NO EJECUTABLE",
+            command=validate_spatial_phrase_draft,
+            bg="#26384e",
+            fg="#f5f8fc",
+            activebackground="#344b65",
+            activeforeground="#f5f8fc",
+            relief="flat",
+            font=("Arial", 9, "bold"),
+        )
+
         def show_active_tab(_event: tk.Event[tk.Misc] | None = None) -> None:
             if notebook.index(notebook.select()) == 0:
                 phrase_button.pack_forget()
+                spatial_validation_button.pack_forget()
                 word_button.pack(fill="x", pady=(10, 0), ipady=6)
             else:
                 word_button.pack_forget()
                 phrase_button.pack(fill="x", pady=(10, 0), ipady=6)
+                spatial_validation_button.pack(fill="x", pady=(6, 0), ipady=6)
 
         notebook.bind("<<NotebookTabChanged>>", show_active_tab)
 

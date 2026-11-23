@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vozual.app/schemas/nonmanual-channel-intent-v1.schema.json",
+  "title": "Vozual non-manual channel intent v1",
+  "description": "Abstract, non-executable non-manual cues composed across independent channels.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "id", "revision", "durationMs", "tracks", "execution"],
+  "properties": {
+    "schema": {"const": "vozual.nonmanual-channel-intent"},
+    "schemaVersion": {"const": 1},
+    "id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 1},
+    "durationMs": {"type": "integer", "minimum": 1},
+    "tracks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/track"}},
+    "execution": {"const": "authoring-only-not-executable"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+    "channel": {"enum": [
+      "eyelids.leftClosure", "eyelids.rightClosure", "eyelids.squint",
+      "brows.leftInnerLift", "brows.leftInnerLower", "brows.rightInnerLift", "brows.rightInnerLower",
+      "nose.wrinkle", "cheeks.leftRaise", "cheeks.rightRaise", "cheeks.puff",
+      "jaw.open", "jaw.forward", "jaw.left", "jaw.right", "tongue.protrude",
+      "lips.opening", "lips.pucker", "lips.width", "mouthCorners.left", "mouthCorners.right", "mouthing.lexeme",
+      "gaze.target", "head.pitch", "head.yaw", "head.roll",
+      "shoulders.leftElevation", "shoulders.rightElevation", "shoulders.centerElevation",
+      "torso.pitch", "torso.yaw", "torso.roll"
+    ]},
+    "track": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "channel", "fromMs", "toMs", "intentRef", "composition"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "channel": {"$ref": "#/$defs/channel"},
+        "fromMs": {"type": "integer", "minimum": 0},
+        "toMs": {"type": "integer", "minimum": 1},
+        "intentRef": {"$ref": "#/$defs/id"},
+        "composition": {"const": "exclusive-per-channel"}
+      }
+    }
+  }
+}

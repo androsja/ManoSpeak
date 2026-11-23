@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "isolatedModules": false,
+    "types": ["node"]
+  },
+  "include": [
+    "./v4-compiler-pipeline.d.ts",
+    "./__tests__/v4-compiler-pipeline.types.ts"
+  ],
+  "exclude": []
+}

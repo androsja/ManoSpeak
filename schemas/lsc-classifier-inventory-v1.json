@@ -1,0 +1,95 @@
+{
+  "id": "vozual.lsc-classifier-inventory",
+  "revision": 1,
+  "status": "documentary-definition-verified",
+  "execution": "authoring-only-not-executable",
+  "source": {
+    "title": "Diccionario básico de la lengua de señas colombiana",
+    "section": "2.e",
+    "printedPages": ["XLV", "XLVI", "XLVII"],
+    "documentUrl": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf",
+    "pdfSha256": "3229f40b115cca1457aefa0b554ec3655b7cdad25a27bd33c6d4fe7564b33f42"
+  },
+  "constructions": [
+    {
+      "id": "walk-biped",
+      "handshapeClass": "handshape.v-fingers-down",
+      "sourceHandshapeNotation": "V with fingers down",
+      "representedReferent": "a biped depicted in locomotion",
+      "referentClass": "referent.biped-in-locomotion",
+      "role": "mover"
+    },
+    {
+      "id": "walk-multiple-limbs",
+      "handshapeClass": "handshape.5o-active",
+      "sourceHandshapeNotation": "active 5o (also printed 5º in this passage)",
+      "representedReferent": "a referent traveling on more than two limbs",
+      "referentClass": "referent.more-than-two-limbs",
+      "role": "mover"
+    },
+    {
+      "id": "collide-biped",
+      "handshapeClass": "handshape.v-fingers-down",
+      "sourceHandshapeNotation": "active V with fingers down",
+      "representedReferent": "the person moving into the impact",
+      "referentClass": "referent.person-moving-into-impact",
+      "role": "colliding-entity"
+    },
+    {
+      "id": "collide-vehicle",
+      "handshapeClass": "handshape.b-little-finger-edge-down",
+      "sourceHandshapeNotation": "active B with little-finger edge down",
+      "representedReferent": "the moving vehicle",
+      "referentClass": "referent.moving-vehicle",
+      "role": "colliding-entity"
+    },
+    {
+      "id": "collide-two-wheeled-vehicle",
+      "handshapeClass": "handshape.b-palm-down",
+      "sourceHandshapeNotation": "active B with palm down",
+      "representedReferent": "the moving two-wheeled vehicle",
+      "referentClass": "referent.moving-two-wheeled-vehicle",
+      "role": "colliding-entity"
+    },
+    {
+      "id": "give-cylindrical-object",
+      "handshapeClass": "handshape.bc",
+      "sourceHandshapeNotation": "Bc",
+      "representedReferent": "the cylindrical object being given",
+      "referentClass": "referent.cylindrical-object",
+      "role": "transferred-object"
+    },
+    {
+      "id": "give-tiny-or-thin-object",
+      "handshapeClass": "handshape.o-slash-notation",
+      "sourceHandshapeNotation": "Ø",
+      "representedReferent": "the tiny or thin item being given",
+      "referentClass": "referent.tiny-or-thin-object",
+      "role": "transferred-object"
+    },
+    {
+      "id": "cut-with-scissors",
+      "handshapeClass": "handshape.v",
+      "sourceHandshapeNotation": "V closing as the hand advances",
+      "representedReferent": "scissors",
+      "referentClass": "referent.scissors",
+      "role": "instrument"
+    },
+    {
+      "id": "cut-with-knife-blade",
+      "handshapeClass": "handshape.b-little-finger-edge-toward-material",
+      "sourceHandshapeNotation": "active B with the little-finger edge toward the material",
+      "representedReferent": "the knife represented through its blade",
+      "referentClass": "referent.knife-blade",
+      "role": "instrument"
+    },
+    {
+      "id": "cut-with-knife-grip",
+      "handshapeClass": "handshape.a-grip",
+      "sourceHandshapeNotation": "active A depicting the grasp",
+      "representedReferent": "the knife being held",
+      "referentClass": "referent.knife-grip",
+      "role": "handled-object"
+    }
+  ]
+}

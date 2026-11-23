@@ -344,6 +344,61 @@ function movementTargets(movement) {
   return movement.fingers ?? (movement.finger ? [movement.finger] : []);
 }
 
+function mirrorPointAcrossAvatarCenter(point) {
+  return point.every(value => value === 0)
+    ? [...point]
+    : roundPoint([1 - point[0], point[1], point[2]]);
+}
+
+function mirrorPoseForRightHand(pose) {
+  return {
+    ...pose,
+    ...(pose.elbowRotation !== undefined ? {elbowRotation: -pose.elbowRotation} : {}),
+    ...(pose.horizontalOffset !== undefined ? {horizontalOffset: -pose.horizontalOffset} : {}),
+    ...(pose.wristYaw !== undefined ? {wristYaw: -pose.wristYaw} : {}),
+    ...(pose.wristRoll !== undefined ? {wristRoll: -pose.wristRoll} : {}),
+  };
+}
+
+function mirrorMotionToRightHand(motion) {
+  const frames = motion.frames.map(frame => {
+    const bodyHands = frame.bodyHands.map(point => [...point]);
+    const source = frame.bodyHands;
+    [[11, 12], [13, 14], [15, 16]].forEach(([leftIndex, rightIndex]) => {
+      bodyHands[leftIndex] = mirrorPointAcrossAvatarCenter(source[rightIndex]);
+      bodyHands[rightIndex] = mirrorPointAcrossAvatarCenter(source[leftIndex]);
+    });
+    for (let index = 0; index < 21; index += 1) {
+      bodyHands[33 + index] = [0, 0, 0];
+      bodyHands[54 + index] = mirrorPointAcrossAvatarCenter(source[33 + index]);
+    }
+    return {...frame, bodyHands};
+  });
+
+  const profile = {...motion.avatarProfile, activeHand: 'right'};
+  const leftToRightKeys = [
+    ['rigLeftHandShape', 'rigRightHandShape'],
+    ['rigLeftFingerStates', 'rigRightFingerStates'],
+    ['rigLeftFingerSplayDegrees', 'rigRightFingerSplayDegrees'],
+    ['rigLeftPalmAxialRollDegrees', 'rigRightPalmAxialRollDegrees'],
+    ['rigLeftForearmAxialRollDegrees', 'rigRightForearmAxialRollDegrees'],
+  ];
+  leftToRightKeys.forEach(([leftKey, rightKey]) => {
+    if (profile[leftKey] === undefined) return;
+    const value = profile[leftKey];
+    profile[rightKey] = leftKey.endsWith('AxialRollDegrees') ? -value : value;
+    delete profile[leftKey];
+  });
+  if (Array.isArray(profile.rigHandKeyframes)) {
+    profile.rigHandKeyframes = profile.rigHandKeyframes.map(keyframe => {
+      const {left, right, ...timing} = keyframe;
+      const pose = left ?? right;
+      return {...timing, right: mirrorPoseForRightHand(pose)};
+    });
+  }
+  return {...motion, avatarProfile: profile, frames};
+}
+
 function motionFor(sign, defaultSource, options = {}) {
   const lateralFingerSpread = sign.lateralFingerSpread ?? 1;
   const palmRootScale = sign.palmRootScale ?? 1;
@@ -381,10 +436,11 @@ function motionFor(sign, defaultSource, options = {}) {
     );
   });
   const source = sign.source ?? defaultSource;
+  const activeHand = options.activeHand === 'right' ? 'right' : 'left';
   const movementPresentationNote = sign.movement?.type === 'arm-translation-repetitions'
     ? `The active hand moves side to side ${sign.movement.repetitions} times${sign.movement.translateElbow === false ? ' with the elbow held in place' : ''}; the path and timing are authored for this avatar prototype and are not source timing evidence.`
     : sign.movement?.type === 'wrist-rotation-repetitions'
-      ? `The active wrist rotates ${sign.movement.repetitions} times in place around the forearm axis, with the elbow and wrist centers held fixed; the angle and timing are authored for this avatar prototype and are not source timing evidence.`
+      ? `The hand rises into its authored pose before the active wrist rotates ${sign.movement.repetitions} times around the forearm axis; avatar angles and timing are authored for this prototype and are not source timing evidence.`
     : sign.movement
       ? (() => {
         const targets = movementTargets(sign.movement);
@@ -400,7 +456,7 @@ function motionFor(sign, defaultSource, options = {}) {
         return `The ${targetPhrase} ${verb} and flex down ${sign.movement.repetitions} times, returning toward extension between flexions; the timing is authored for this avatar prototype and is not source timing evidence.${spacingNote}`;
       })()
       : undefined;
-  return {
+  const motion = {
     version: 2,
     fps: 30,
     layout: 'pose33_left21_right21_face468',
@@ -421,6 +477,9 @@ function motionFor(sign, defaultSource, options = {}) {
       ...(sign.rigLeftForearmAxialRollDegrees !== undefined ? {
         rigLeftForearmAxialRollDegrees: sign.rigLeftForearmAxialRollDegrees,
       } : {}),
+      ...(Array.isArray(sign.rigHandKeyframes) && sign.rigHandKeyframes.length > 0 ? {
+        rigHandKeyframes: sign.rigHandKeyframes,
+      } : {}),
     },
     semantic: {
       schema: options.generic ? 'vozual.sign-motion-draft' : 'vozual.number-motion-draft',
@@ -440,7 +499,7 @@ function motionFor(sign, defaultSource, options = {}) {
       } : {}),
       locationPresentationNote: sign.locationPresentationNote ?? (options.generic
         ? 'The active hand location is generated from the coordinates selected in VOZUAL Creator; the placement is a constructed avatar draft, not regional performance evidence.'
-        : 'The active hand is placed high beside the avatar face and offset to its screen-right side, not centered in front of the face; this is a constructed avatar placement, not regional performance evidence.'),
+        : `The active ${activeHand} hand is placed high beside the avatar face on its screen-${activeHand === 'left' ? 'right' : 'left'} side; this is a constructed avatar placement, not regional performance evidence.`),
       realizationNote: options.generic
         ? 'Constructed avatar draft from local authoring inputs; not a recorded regional performance.'
         : sign.movement
@@ -466,6 +525,14 @@ function motionFor(sign, defaultSource, options = {}) {
               : 'Hand configurations follow the cited dictionary; avatar movement and regional realization are not professionally validated.',
         },
   };
+  const output = activeHand === 'right' ? mirrorMotionToRightHand(motion) : motion;
+  if (sign.fingerSpatialOffsets) {
+    const spatialKey = activeHand === 'right'
+      ? 'rigRightFingerSpatialOffsets'
+      : 'rigLeftFingerSpatialOffsets';
+    output.avatarProfile[spatialKey] = sign.fingerSpatialOffsets;
+  }
+  return output;
 }
 
 function main() {
@@ -485,7 +552,7 @@ function main() {
   };
 
   authoringCatalog.entries.forEach(sign => {
-    const motion = motionFor(sign, authoringCatalog.source);
+    const motion = motionFor(sign, authoringCatalog.source, {activeHand: authoringCatalog.activeHand});
     const fileName = `${sign.gloss.toLocaleLowerCase('es-CO')}.motion.json`;
     const filePath = path.join(OUTPUT_DIR, fileName);
     const content = `${JSON.stringify(motion)}\n`;
