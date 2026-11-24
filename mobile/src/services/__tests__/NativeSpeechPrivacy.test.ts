@@ -6,20 +6,22 @@ function mobileSource(relativePath: string): string {
 }
 
 describe('native speech privacy contract', () => {
-  it('uses an on-device Android recognizer without a network fallback', () => {
+  it('uses the local Sherpa recognizer and Silero VAD without a network fallback', () => {
     const source = mobileSource(
       'android/app/src/main/java/com/androsja/vozual/VoiceListeningService.kt',
     );
 
-    expect(source).toContain('SpeechRecognizer.isOnDeviceRecognitionAvailable(this)');
-    expect(source).toContain('SpeechRecognizer.createOnDeviceSpeechRecognizer(this)');
-    expect(source).toContain('putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)');
-    expect(source).toContain('listOf("es-CO", "es-US", "es-ES")');
-    expect(source).not.toContain('SpeechRecognizer.createSpeechRecognizer(this)');
-    expect(source).not.toContain('putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)');
+    expect(source).toContain('OfflineRecognizer(');
+    expect(source).toContain('OfflineNemoEncDecCtcModelConfig');
+    expect(source).toContain('SileroVadModelConfig(');
+    expect(source).toContain('AudioRecord(');
+    expect(source).toContain('MediaRecorder.AudioSource.VOICE_RECOGNITION');
+    expect(source).toContain('provider = "cpu"');
+    expect(source).toContain('El reconocimiento se realiza localmente en este teléfono.');
+    expect(source).not.toMatch(/SpeechRecognizer|RecognizerIntent|OkHttpClient|HttpURLConnection/);
   });
 
-  it('never resurrects an Android microphone session without another user action', () => {
+  it('does not restart microphone capture after the service is stopped or removed', () => {
     const source = mobileSource(
       'android/app/src/main/java/com/androsja/vozual/VoiceListeningService.kt',
     );
@@ -27,39 +29,40 @@ describe('native speech privacy contract', () => {
     expect(source).toContain('return START_NOT_STICKY');
     expect(source).not.toContain('return START_STICKY');
     expect(source).toContain('override fun onTaskRemoved(rootIntent: Intent?)');
-    expect(source).toContain('ERROR_INSUFFICIENT_PERMISSIONS');
-    expect(source).toContain('ERROR_MICROPHONE_PERMISSION_DENIED');
+    expect(source).toContain('stopSelf()');
+    expect(source).toContain('stopRequested.set(true)');
     expect(source).toContain('ContextCompat.checkSelfPermission');
+    expect(source).toContain('ERROR_MICROPHONE_PERMISSION_DENIED');
   });
 
-  it('recovers an Android recognition cycle that stops delivering callbacks', () => {
+  it('releases the microphone, VAD, and recognizer when its local capture loop ends', () => {
     const source = mobileSource(
       'android/app/src/main/java/com/androsja/vozual/VoiceListeningService.kt',
     );
 
-    expect(source).toContain('private var recognitionWatchdog: Runnable? = null');
-    expect(source).toContain('reason = "missing-result-after-end-of-speech"');
-    expect(source).toContain('TERMINAL_CALLBACK_TIMEOUT_MILLIS = 4_000L');
-    expect(source).toContain('RECOGNITION_STALL_TIMEOUT_MILLIS = 20_000L');
-    expect(source).toContain('recreate = true');
-    expect(source).toContain('cancelRecognitionWatchdog()');
+    expect(source).toContain('private fun runCaptureLoop()');
+    expect(source).toContain('audioRecord?.release()');
+    expect(source).toContain('recognizer?.release()');
+    expect(source).toContain('vad?.release()');
+    expect(source).toContain('sendSpeechEvent(EVENT_ERROR');
   });
 
-  it('rejects a missing local recognizer before starting a foreground service', () => {
+  it('rejects a missing Sherpa model before starting a foreground service', () => {
     const moduleSource = mobileSource(
       'android/app/src/main/java/com/androsja/vozual/PictureInPictureModule.kt',
     );
-    const availabilityCheck = moduleSource.indexOf('if (!hasOnDeviceSpeechRecognizer())');
+    const modelCheck = moduleSource.indexOf('if (!hasLocalSherpaModel())');
     const foregroundStart = moduleSource.indexOf(
       'ContextCompat.startForegroundService',
       moduleSource.indexOf('fun startListeningService'),
     );
 
-    expect(moduleSource).toContain('SpeechRecognizer.isOnDeviceRecognitionAvailable');
+    expect(moduleSource).toContain('VoiceListeningService.hasModelFiles(reactApplicationContext)');
     expect(moduleSource).toContain('VoiceListeningService.isActive()');
-    expect(moduleSource).toContain('Settings.ACTION_VOICE_INPUT_SETTINGS');
-    expect(availabilityCheck).toBeGreaterThan(-1);
-    expect(foregroundStart).toBeGreaterThan(availabilityCheck);
+    expect(moduleSource).toContain('El modelo de reconocimiento local de VOZUAL no está instalado');
+    expect(modelCheck).toBeGreaterThan(-1);
+    expect(foregroundStart).toBeGreaterThan(modelCheck);
+    expect(moduleSource).not.toContain('SpeechRecognizer');
   });
 
   it('exposes user-visible Android controls for an active microphone service', () => {
@@ -88,20 +91,18 @@ describe('native speech privacy contract', () => {
     expect(source).toContain('segment.confidence');
   });
 
-  it('forwards native confidence and keeps a low-confidence final result pending review', () => {
+  it('sends local speech segments to installed-sign matching without cloud transcription', () => {
     const androidService = mobileSource(
       'android/app/src/main/java/com/androsja/vozual/VoiceListeningService.kt',
     );
-    const androidModule = mobileSource(
-      'android/app/src/main/java/com/androsja/vozual/PictureInPictureModule.kt',
-    );
     const listenerSource = mobileSource('src/components/ListenerScreen.tsx');
 
-    expect(androidService).toContain('SpeechRecognizer.CONFIDENCE_SCORES');
-    expect(androidModule).toContain('putArray("confidence"');
-    expect(listenerSource).toContain('MIN_FINAL_SPEECH_CONFIDENCE = 0.55');
-    expect(listenerSource).toContain('lowConfidenceFinal');
-    expect(listenerSource).toContain('setTranscriptConfirmationVisible(true)');
+    expect(androidService).toContain('sendSpeechEvent(EVENT_PARTIAL_RESULTS, arrayListOf(joined))');
+    expect(androidService).toContain('sendSpeechEvent(EVENT_RESULTS, arrayListOf(phrase))');
+    expect(listenerSource).toContain('extractKnownSpeechWords(bestText, knownWords)');
+    expect(listenerSource).toContain('androidDirectSignVocabulary(installedSigns)');
+    expect(listenerSource).toContain('newlyMatchedOccurrences: newWords.length');
+    expect(listenerSource).not.toContain('SpeechRecognizer.CONFIDENCE_SCORES');
   });
 
   it('does not fall back to the third-party iOS recognizer', () => {

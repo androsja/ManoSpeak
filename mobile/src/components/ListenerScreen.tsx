@@ -11,6 +11,7 @@ import {
   Pressable,
   PermissionsAndroid,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -24,6 +25,7 @@ import {
   mergeSpeechSegments,
   resolvePictureInPictureTransition,
   selectKnownSpeechAlternative,
+  standaloneSpeechMatches,
   shouldDeferSpeechMatch,
   normalizeSpeech,
 } from '../services/VoiceCommandService';
@@ -97,8 +99,9 @@ type PipSpeechEvent = SpeechEvent & {
 const OFFLINE_SPEECH_ERRORS = new Set([
   'offline_speech_unavailable',
   'offline_es_co_unavailable',
+  'sherpa_model_missing',
 ]);
-const OFFLINE_SPEECH_MESSAGE = 'El reconocimiento local de español (Colombia) no está disponible. Descarga el idioma en los ajustes del teléfono y vuelve a intentarlo.';
+const OFFLINE_SPEECH_MESSAGE = 'El modelo de reconocimiento local de VOZUAL no está instalado. Descarga el paquete de voz sin conexión y vuelve a intentarlo.';
 const MICROPHONE_PERMISSION_ERROR = 'microphone_permission_denied';
 function speechDebug(event: string, details?: unknown): void {
   if (__DEV__) console.info(`[VozualSpeech] ${event}`, details ?? '');
@@ -199,7 +202,6 @@ export function ListenerScreen({
   const playingRef = useRef(false);
   const phraseInProgressRef = useRef(false);
   const lastStartedSignRef = useRef<KnownWord | undefined>(undefined);
-  const androidRecognizedWordsRef = useRef<KnownWord[]>([]);
   const pictureInPictureModeRef = useRef(false);
   const nativePictureInPictureEventRef = useRef(false);
   const usageRemainderMillisRef = useRef(0);
@@ -234,6 +236,7 @@ export function ListenerScreen({
   const [microphonePermissionBlocked, setMicrophonePermissionBlocked] = useState(false);
   const [notificationPermissionBlocked, setNotificationPermissionBlocked] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [licensesVisible, setLicensesVisible] = useState(false);
   const [accountActionPending, setAccountActionPending] = useState(false);
   const [accountActionError, setAccountActionError] = useState('');
   const [phraseSuggestionIndex, setPhraseSuggestionIndex] = useState(0);
@@ -769,17 +772,13 @@ export function ListenerScreen({
     if (Platform.OS === 'android') {
       if (bestText) setTranscript(bestText);
       const recognizedSigns = bestText ? extractKnownSpeechWords(bestText, knownWords) : [];
-      const previousRecognizedWords = androidRecognizedWordsRef.current;
-      const {newWords, nextRecognizedWords} = advanceIncrementalSpeechMatches(
-        previousRecognizedWords,
+      // Sherpa continuous mode emits each VAD segment as its own final result.
+      // It does not send cumulative final results, so deduplicating against
+      // the preceding segment incorrectly drops different following signs.
+      const {newWords} = standaloneSpeechMatches(
         recognizedSigns,
         isFinal,
       );
-      if (recognizedSigns.length > 0 || isFinal) {
-        // Keep the final result until the next recognizer start so a duplicate
-        // native callback cannot replay it; each new utterance resets below.
-        androidRecognizedWordsRef.current = isFinal ? recognizedSigns : nextRecognizedWords;
-      }
       speechDebug('android-direct-sign-match-check', {
         final: isFinal,
         matchedOccurrences: recognizedSigns.length,
@@ -1538,7 +1537,6 @@ export function ListenerScreen({
           recognitionReadyRef.current = true;
           setRecognitionReady(true);
           recognizedWords.current = [];
-          androidRecognizedWordsRef.current = [];
           setMicrophonePermissionBlocked(false);
           setErrorMessage('');
           return;
@@ -1874,13 +1872,30 @@ export function ListenerScreen({
           </Text>
         </Pressable>}
         {Platform.OS === 'android' && androidAutoSignsAvailable ? (
-          <Text style={styles.status} accessibilityLiveRegion="polite">
-            {starting || microphonePreparing
-              ? 'Activando el micrófono…'
+          <View
+            style={styles.liveListeningStatus}
+            accessibilityLabel={starting || microphonePreparing
+              ? t('listener.preparingMicrophone')
               : listening
                 ? t('listener.liveListening')
                 : t('listener.liveIdle')}
-          </Text>
+            accessibilityLiveRegion="polite"
+          >
+            <View
+              style={[
+                styles.liveListeningIndicator,
+                listening && styles.liveListeningIndicatorActive,
+                !listening && !starting && !microphonePreparing && styles.liveListeningIndicatorIdle,
+              ]}
+            />
+            <Text style={styles.liveListeningText}>
+              {starting || microphonePreparing
+                ? t('listener.preparingMicrophone')
+                : listening
+                  ? t('listener.liveListening')
+                  : t('listener.liveIdle')}
+            </Text>
+          </View>
         ) : Platform.OS === 'android' ? (
           <Text style={styles.status}>
             {t('listener.liveRequiresDownload')}
@@ -1906,7 +1921,7 @@ export function ListenerScreen({
           <View style={styles.detectedWordsCard}>
             <Text
               accessibilityLiveRegion="polite"
-              numberOfLines={1}
+              numberOfLines={3}
               ellipsizeMode="tail"
               style={styles.detectedWordsText}
             >
@@ -2291,9 +2306,66 @@ export function ListenerScreen({
                 <Text style={styles.settingsPolicyLink}>{t('settings.deleteData')}</Text>
               </Pressable>
             </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.openSourceLicenses')}
+              onPress={() => setLicensesVisible(true)}
+              style={styles.settingsLicensesButton}
+            >
+              <Text style={styles.settingsPolicyLink}>{t('settings.openSourceLicenses')}</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={licensesVisible}
+        onRequestClose={() => setLicensesVisible(false)}
+      >
+        <View style={styles.settingsOverlay}>
+          <View style={styles.licensesSheet}>
+            <View style={styles.settingsHeader}>
+              <View>
+                <Text style={styles.settingsTitle}>{t('settings.openSourceLicenses')}</Text>
+                <Text style={styles.settingsSubtitle}>{t('settings.openSourceLicensesSubtitle')}</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.closeLicenses')}
+                onPress={() => setLicensesVisible(false)}
+                style={styles.settingsCloseButton}
+              >
+                <Text style={styles.settingsCloseText}>×</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.licensesContent}>
+              <Text style={styles.licenseName}>NVIDIA FastConformer Spanish ASR model</Text>
+              <Text style={styles.licenseDetail}>{t('settings.licenseNvidia')}</Text>
+              <Pressable accessibilityRole="link" onPress={() => Linking.openURL('https://huggingface.co/nvidia/stt_es_fastconformer_hybrid_large_pc').catch(() => undefined)}>
+                <Text style={styles.licenseLink}>{t('settings.licenseModelSource')}</Text>
+              </Pressable>
+              <Pressable accessibilityRole="link" onPress={() => Linking.openURL('https://creativecommons.org/licenses/by/4.0/').catch(() => undefined)}>
+                <Text style={styles.licenseLink}>Creative Commons Attribution 4.0 (CC BY 4.0)</Text>
+              </Pressable>
+
+              <View style={styles.settingsDivider} />
+              <Text style={styles.licenseName}>Sherpa‑ONNX</Text>
+              <Text style={styles.licenseDetail}>{t('settings.licenseSherpa')}</Text>
+              <Pressable accessibilityRole="link" onPress={() => Linking.openURL('https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE').catch(() => undefined)}>
+                <Text style={styles.licenseLink}>Apache License 2.0</Text>
+              </Pressable>
+
+              <View style={styles.settingsDivider} />
+              <Text style={styles.licenseName}>Silero VAD</Text>
+              <Text style={styles.licenseDetail}>{t('settings.licenseSilero')}</Text>
+              <Pressable accessibilityRole="link" onPress={() => Linking.openURL('https://github.com/snakers4/silero-vad/blob/master/LICENSE').catch(() => undefined)}>
+                <Text style={styles.licenseLink}>MIT License</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       {billingSandboxEnabled && (
         <BillingSandboxSheet
           visible={billingSandboxVisible}
@@ -2365,8 +2437,13 @@ const styles = StyleSheet.create({
   floatingButtonText: { color: '#16D9D1', fontWeight: '800', letterSpacing: 0.4 },
   floatingButtonTextDisabled: { color: '#7C899A' },
   status: { color: '#16D9D1', textAlign: 'center', fontSize: 11, fontWeight: '700', marginTop: 12 },
-  detectedWordsCard: { height: 24, marginTop: 5, paddingHorizontal: 8, borderRadius: 8, backgroundColor: '#102337', justifyContent: 'center', flexShrink: 0 },
-  detectedWordsText: { color: '#D8E1EC', fontSize: 10, lineHeight: 13, textAlign: 'center' },
+  liveListeningStatus: { minHeight: 24, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  liveListeningIndicator: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#E4A83A' },
+  liveListeningIndicatorActive: { backgroundColor: '#16D9D1', shadowColor: '#16D9D1', shadowOpacity: 0.8, shadowRadius: 6, elevation: 3 },
+  liveListeningIndicatorIdle: { backgroundColor: '#7F91A6' },
+  liveListeningText: { color: '#D8E1EC', textAlign: 'center', fontSize: 12, fontWeight: '800' },
+  detectedWordsCard: { minHeight: 56, marginTop: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#102337', justifyContent: 'center', flexShrink: 0 },
+  detectedWordsText: { color: '#D8E1EC', fontSize: 12, lineHeight: 16, textAlign: 'center' },
   microphoneProgress: { height: 32, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   microphoneProgressText: { color: '#16D9D1', fontSize: 11, fontWeight: '800', letterSpacing: 0.25 },
   recognizedCard: { minHeight: 58, marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#102337', justifyContent: 'center' },
@@ -2451,4 +2528,10 @@ const styles = StyleSheet.create({
   settingsAccountLink: {color: '#69DDD9', fontSize: 9, fontWeight: '900', textAlign: 'center', marginTop: 8},
   settingsPolicyLinks: {flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 15},
   settingsPolicyLink: {color: '#A9B8C9', fontSize: 9, fontWeight: '800', textDecorationLine: 'underline'},
+  settingsLicensesButton: {alignItems: 'center', marginTop: 15},
+  licensesSheet: {maxHeight: '78%', margin: 16, padding: 20, borderRadius: 22, backgroundColor: '#102337', borderWidth: 1, borderColor: '#31506A'},
+  licensesContent: {paddingBottom: 8},
+  licenseName: {color: '#EAF2FA', fontSize: 13, fontWeight: '800', marginTop: 8},
+  licenseDetail: {color: '#A9B8C9', fontSize: 11, lineHeight: 17, marginTop: 6},
+  licenseLink: {color: '#69DDD9', fontSize: 11, lineHeight: 17, textDecorationLine: 'underline', marginTop: 5},
 });

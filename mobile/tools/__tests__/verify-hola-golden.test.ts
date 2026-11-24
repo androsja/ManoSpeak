@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import {parseJsonMotionDocument} from '../../src/services/JsonMotionLoader';
 
 const {
   HOLA_GOLDEN,
@@ -18,16 +19,38 @@ describe('verify-hola-golden', () => {
       byteLength: HOLA_GOLDEN.byteLength,
       sha256: HOLA_GOLDEN.sha256,
       fps: 30,
-      frameCount: 36,
+      frameCount: 73,
       layout: 'pose33_left21_right21_face468',
-      activeHand: 'left',
+      activeHand: 'right',
       contact: {
-        anchor: 'forehead',
-        startFrame: 0,
-        endFrame: 12,
+        anchor: 'temple',
+        startFrame: 16,
+        endFrame: 19,
         palm: 'camera',
       },
     });
+  });
+
+  it('raises the right fingertips diagonally, releases before descending and returns to rest', () => {
+    const motion = parseJsonMotionDocument(JSON.parse(fs.readFileSync(assetPath, 'utf8')));
+    const {frames, avatarProfile} = motion;
+    expect(avatarProfile).toMatchObject({
+      rigArmDepthSpace: 'shoulder-relative',
+      rigContactUseAvatarAnchor: true,
+      rigContactLandmark: 8,
+      rigContactSnap: 1,
+    });
+    const wrist = 54; // Pose (33) and left hand (21) precede the right hand.
+    const contact = frames[16].bodyHands;
+    const indexTip = contact[wrist + 8];
+    expect(indexTip[0]).toBeGreaterThan(contact[wrist][0]);
+    expect(indexTip[1]).toBeLessThan(contact[wrist][1]);
+    const release = frames[28].bodyHands[wrist];
+    expect(release[0]).toBeLessThan(contact[wrist][0]);
+    expect(release[1]).toBeLessThan(contact[wrist][1]);
+    expect(release[2]).toBeLessThan(contact[wrist][2]);
+    expect(frames[39].bodyHands[wrist][1]).toBeGreaterThan(contact[wrist][1]);
+    expect(frames.at(-1)?.bodyHands).toEqual(frames[0].bodyHands);
   });
 
   it('fails when a byte changes even if the JSON contract remains valid', () => {

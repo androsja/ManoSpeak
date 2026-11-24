@@ -46,7 +46,15 @@ TraductorSeñas/ (Vozual root)
 4. **Gitignored Areas:** Never commit to or track files inside `.dwp/` or `tmp/` folders. These are runtime/scratch workspaces.
 5. **No Placeholders:** Never write `<your code here>` or `TODO: add tests`. Propose stub implementations or ask the user directly if requirements are unclear.
 
-## 4. Quick Commands
+## 4. Motion Formats and Firebase Publication
+
+- New and updated sign motions use authored JSON and are published through the immutable `signJsonReleases/{releaseId}` Firebase release plus its active pointer. Do not publish new work through the legacy per-sign compact/Base64 route.
+- Existing legacy assets remain readable for compatibility. Preserve that reader, but do not treat legacy assets as the source format for new signs.
+- A local JSON file, including a generated number-motion draft, is not available to users until it has passed the approved-sign workflow and is included in an explicitly published JSON release. A release must include the intended playable signs and their reviewed speech aliases.
+- Voice playback is limited to signs in the user's installed library. When a recognized word does not animate, check the active Firebase JSON release manifest and the device's installed-sign list before diagnosing speech recognition.
+- `motionFormat: "legacy-json-v2"` names the JSON document schema accepted by the runtime; it does not mean that the sign was fetched through the legacy Firebase publication route.
+
+## 5. Quick Commands
 
 ### Mobile Module (`mobile/`)
 | Purpose | Command | Notes |

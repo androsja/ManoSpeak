@@ -36,18 +36,20 @@ describe('Listener speech confirmation contract', () => {
     expect(listenerScreenSource).not.toMatch(/togglePlaybackPause/);
   });
 
-  it('plays each newly recognized repeated Android sign without replaying duplicate partials', () => {
-    expect(listenerScreenSource).toMatch(/androidRecognizedWordsRef/);
+  it('plays each independent Android continuous result instead of treating it as cumulative', () => {
+    expect(listenerScreenSource).toMatch(/standaloneSpeechMatches\(/);
+    expect(listenerScreenSource).toMatch(/Sherpa continuous mode emits each VAD segment as its own final result/);
     expect(listenerScreenSource).toMatch(/advanceIncrementalSpeechMatches\(/);
     expect(listenerScreenSource).toMatch(/signQueue\.current\.push\(\.\.\.newWords\.map\(word => word\.toUpperCase\(\)\)\)/);
     expect(listenerScreenSource).toMatch(/androidDirectSignVocabulary\(installedSigns\)/);
-    expect(listenerScreenSource).toMatch(/isFinal \? recognizedSigns : nextRecognizedWords/);
+    expect(listenerScreenSource).not.toMatch(/androidRecognizedWordsRef/);
     expect(listenerScreenSource).toMatch(/normalizeSpeech\(nextWord\)[\s\S]*?normalizeSpeech\(lastStartedSignRef\.current/);
   });
 
-  it('keeps detected words in a fixed-height single-line strip', () => {
-    expect(listenerScreenSource).toMatch(/numberOfLines=\{1\}/);
-    expect(listenerScreenSource).toMatch(/detectedWordsCard: \{ height: 24/);
-    expect(listenerScreenSource).toMatch(/detectedWordsText: \{[^}]*fontSize: 10/);
+  it('keeps detected words visible across three lines', () => {
+    expect(listenerScreenSource).toMatch(/numberOfLines=\{3\}/);
+    expect(listenerScreenSource).toMatch(/detectedWordsCard: \{ minHeight: 56/);
+    expect(listenerScreenSource).toMatch(/liveListeningIndicatorActive/);
+    expect(listenerScreenSource).toMatch(/detectedWordsText: \{[^}]*fontSize: 12/);
   });
 });

@@ -12,6 +12,7 @@ import {
   type CapturedFacePresentation,
 } from '../src/services/AvatarMotionPresentation';
 import {MotionPoint, SignMotion} from '../src/services/CompactSignMotion';
+import {parseJsonMotionDocument} from '../src/services/JsonMotionLoader';
 import {
   auditCapturedHandTracking,
   CapturedHandTrackingAudit,
@@ -281,7 +282,7 @@ function mergedProfile(
 
 function auditSign(
   gloss: string,
-  motion: LegacyMotionDocument,
+  motion: SignMotion & {avatarProfile?: AvatarProfile},
   profileOverride?: AvatarProfile,
 ): SignAudit {
   const findings = validateMotion(motion);
@@ -469,17 +470,45 @@ function main() {
     path.join(MOTION_DIRECTORY, 'published_signs.json'),
     'utf8',
   )) as {publishedGlosses?: string[]};
+  const linguisticCatalog = JSON.parse(fs.readFileSync(
+    path.join(ROOT, 'assets', 'data', 'lsc_linguistic_catalog.json'),
+    'utf8',
+  )) as {entries?: Array<{
+    gloss?: string;
+    motion?: {clip?: string};
+    spanish?: {lemmas?: string[]; synonyms?: string[]; forms?: Array<{text?: string}>};
+  }>} ;
   const overridesPath = path.join(MOTION_DIRECTORY, 'avatar_profile_overrides.json');
   const overrides = fs.existsSync(overridesPath)
     ? JSON.parse(fs.readFileSync(overridesPath, 'utf8')) as Record<string, AvatarProfile>
     : {};
   const glosses = catalog.publishedGlosses ?? [];
   const audits = glosses.map(gloss => {
-    const motionPath = path.join(MOTION_DIRECTORY, `${gloss.toLowerCase()}.motion.json`);
-    const motion = parseLegacyMotionDocument(
-      JSON.parse(fs.readFileSync(motionPath, 'utf8')),
-      motionPath,
-    );
+    const entry = linguisticCatalog.entries?.find(candidate => (
+      candidate.motion?.clip?.toLocaleUpperCase('es-CO') === gloss.toLocaleUpperCase('es-CO')
+    ));
+    const sourceNames = [
+      gloss,
+      entry?.gloss,
+      ...(entry?.spanish?.lemmas ?? []),
+      ...(entry?.spanish?.forms ?? []).map(form => form.text),
+    ].filter((name): name is string => Boolean(name?.trim()));
+    const sourcePaths = sourceNames.map(name => path.join(
+      MOTION_DIRECTORY,
+      `${name.toLocaleLowerCase('es-CO')}.motion.json`,
+    ));
+    sourcePaths.push(...sourceNames.map(name => path.join(
+      MOTION_DIRECTORY,
+      `${name.toLocaleLowerCase('es-CO')}.motion.v3.json`,
+    )));
+    const motionPath = sourcePaths.find(candidate => fs.existsSync(candidate));
+    if (!motionPath) throw new Error(`${gloss} has no editable JSON motion source.`);
+    const source = JSON.parse(fs.readFileSync(motionPath, 'utf8')) as {
+      semantic?: {schema?: string};
+    };
+    const motion = source.semantic?.schema === 'vozual.number-motion-draft'
+      ? parseJsonMotionDocument(source, motionPath)
+      : parseLegacyMotionDocument(source, motionPath);
     return auditSign(gloss, motion, overrides[gloss.toUpperCase()]);
   });
 

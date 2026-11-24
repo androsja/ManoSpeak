@@ -132,7 +132,7 @@ const esCO = {
   'listener.replayingPhrase': 'REPRODUCIENDO FRASE',
   'listener.continuousActive': 'ESCUCHA CONTINUA ACTIVA',
   'listener.detectedWords': 'Oído: {words}',
-  'listener.liveListening': 'Escuchando. Di una palabra de una seña descargada.',
+  'listener.liveListening': 'Escuchando ahora · di una palabra',
   'listener.liveIdle': 'Pulsa HABLAR para reactivar la escucha.',
   'listener.liveRequiresDownload': 'Descarga señas para activar la escucha.',
   'listener.lscEmpty': 'LSC: —',
@@ -205,6 +205,13 @@ const esCO = {
   'settings.webDeletionAction': 'SOLICITAR ELIMINACIÓN POR WEB',
   'settings.privacy': 'PRIVACIDAD',
   'settings.deleteData': 'ELIMINAR DATOS',
+  'settings.openSourceLicenses': 'LICENCIAS DE CÓDIGO ABIERTO',
+  'settings.openSourceLicensesSubtitle': 'Componentes de reconocimiento de voz local',
+  'settings.closeLicenses': 'Cerrar licencias de código abierto',
+  'settings.licenseModelSource': 'Ver ficha del modelo de NVIDIA',
+  'settings.licenseNvidia': 'Modelo de reconocimiento de voz en español de NVIDIA, convertido al formato ONNX para Sherpa‑ONNX. Uso bajo CC BY 4.0; se reconoce a NVIDIA como autor y se indica la conversión.',
+  'settings.licenseSherpa': 'Motor local de reconocimiento de voz. Licenciado bajo Apache 2.0.',
+  'settings.licenseSilero': 'Detector de actividad de voz incluido con el modelo Sherpa‑ONNX. Licenciado bajo MIT.',
 } as const;
 
 type TranslationKey = keyof typeof esCO;
@@ -325,7 +332,7 @@ const enUS: TranslationCatalog = {
   'listener.replayingPhrase': 'PLAYING PHRASE',
   'listener.continuousActive': 'CONTINUOUS LISTENING ACTIVE',
   'listener.detectedWords': 'Heard: {words}',
-  'listener.liveListening': 'Listening. Say a word for a downloaded sign.',
+  'listener.liveListening': 'Listening now · say a word',
   'listener.liveIdle': 'Tap SPEAK to resume listening.',
   'listener.liveRequiresDownload': 'Download signs to enable listening.',
   'listener.lscEmpty': 'LSC: —',
@@ -398,6 +405,13 @@ const enUS: TranslationCatalog = {
   'settings.webDeletionAction': 'REQUEST DELETION ON THE WEB',
   'settings.privacy': 'PRIVACY',
   'settings.deleteData': 'DELETE DATA',
+  'settings.openSourceLicenses': 'OPEN-SOURCE LICENSES',
+  'settings.openSourceLicensesSubtitle': 'On-device speech recognition components',
+  'settings.closeLicenses': 'Close open-source licenses',
+  'settings.licenseModelSource': 'View NVIDIA model card',
+  'settings.licenseNvidia': 'NVIDIA Spanish speech recognition model, converted to ONNX format for Sherpa‑ONNX. Used under CC BY 4.0; NVIDIA is credited as the author and the conversion is noted.',
+  'settings.licenseSherpa': 'On-device speech recognition engine. Licensed under Apache 2.0.',
+  'settings.licenseSilero': 'Voice activity detector included with the Sherpa‑ONNX model. Licensed under MIT.',
 };
 
 const catalogs: Record<AppLocale, TranslationCatalog> = { 'es-CO': esCO, 'en-US': enUS };

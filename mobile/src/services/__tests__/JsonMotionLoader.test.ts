@@ -69,7 +69,7 @@ describe('parseJsonMotionDocument', () => {
   ] as const)('reads the generated %s motion and its finger geometry', (gloss, fileName, states) => {
     const source = require(`../../../assets/motions/drafts/numbers/${fileName}.motion.json`) as unknown;
     const parsed = parseJsonMotionDocument(source, gloss);
-    const hand = parsed.frames[parsed.frames.length - 1].bodyHands.slice(33, 54);
+    const hand = parsed.frames[parsed.frames.length - 1].bodyHands.slice(54, 75);
     const chains = {
       thumb: [1, 2, 3, 4],
       index: [5, 6, 7, 8],
@@ -80,13 +80,13 @@ describe('parseJsonMotionDocument', () => {
 
     expect(parsed.frames).toHaveLength(36);
     expect(parsed.fps).toBe(30);
-    expect(parsed.avatarProfile?.rigLeftFingerStates).toEqual(states);
+    expect(parsed.avatarProfile?.rigRightFingerStates).toEqual(states);
     const expectedSplay = gloss === 'DOS' ? 28
       : gloss === 'TRES' ? 22
         : gloss === 'CUATRO' ? 16
           : gloss === 'CINCO' ? 20
             : undefined;
-    expect(parsed.avatarProfile?.rigLeftFingerSplayDegrees).toBe(expectedSplay);
+    expect(parsed.avatarProfile?.rigRightFingerSplayDegrees).toBe(expectedSplay);
     Object.entries(chains).forEach(([finger, chain]) => {
       const totalLength = chain.slice(1).reduce((sum, to, index) => (
         sum + Math.hypot(...hand[to].map((value, axis) => value - hand[chain[index]][axis]))

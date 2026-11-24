@@ -6,6 +6,7 @@ import {
   normalizeSpeech,
   resolvePictureInPictureTransition,
   selectKnownSpeechAlternative,
+  standaloneSpeechMatches,
   shouldDeferSpeechMatch,
   shouldDeferPartialSpeechMatch,
   speechContainsWord,
@@ -88,6 +89,30 @@ describe('advanceIncrementalSpeechMatches', () => {
       'ADIÓS',
       'ADIÓS',
     ]);
+  });
+});
+
+describe('standaloneSpeechMatches', () => {
+  it('plays each independent Android final result, including repeated signs', () => {
+    expect(standaloneSpeechMatches(['TRES'], true)).toEqual({
+      newWords: ['TRES'],
+      nextRecognizedWords: [],
+    });
+    expect(standaloneSpeechMatches(['CUATRO'], true)).toEqual({
+      newWords: ['CUATRO'],
+      nextRecognizedWords: [],
+    });
+    expect(standaloneSpeechMatches(['TRES'], true)).toEqual({
+      newWords: ['TRES'],
+      nextRecognizedWords: [],
+    });
+  });
+
+  it('does not enqueue a partial callback before its final segment result', () => {
+    expect(standaloneSpeechMatches(['TRES'], false)).toEqual({
+      newWords: [],
+      nextRecognizedWords: [],
+    });
   });
 });
 

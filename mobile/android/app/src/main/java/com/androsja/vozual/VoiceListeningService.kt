@@ -7,46 +7,43 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Build
-import android.os.Bundle
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.k2fsa.sherpa.onnx.FeatureConfig
+import com.k2fsa.sherpa.onnx.OfflineModelConfig
+import com.k2fsa.sherpa.onnx.OfflineNemoEncDecCtcModelConfig
+import com.k2fsa.sherpa.onnx.OfflineRecognizer
+import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.SileroVadModelConfig
+import com.k2fsa.sherpa.onnx.Vad
+import com.k2fsa.sherpa.onnx.VadModelConfig
+import java.io.File
+import java.io.FileOutputStream
 import java.lang.ref.WeakReference
+import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * Owns continuous speech recognition while VOZUAL is listening in Home or PiP.
- *
- * Each recognizer receives a unique session id. Android may deliver callbacks
- * after a recognizer has been destroyed, so callbacks from older sessions must
- * never restart or destroy the current recognizer.
- */
+/** Owns local Sherpa-ONNX ASR while VOZUAL listens in Home or PiP. */
 class VoiceListeningService : Service() {
 
-  private val handler = Handler(Looper.getMainLooper())
-  private var recognizer: SpeechRecognizer? = null
-  private var activeSessionId = 0L
-  private var recognitionInProgress = false
-  private var consecutiveErrors = 0
-  private var destroyed = false
-  private var scheduledRestart: Runnable? = null
-  private var recognitionWatchdog: Runnable? = null
-  private var lastPartialResults: ArrayList<String>? = null
-  private var lastPartialConfidenceScores: FloatArray? = null
-  private var speechStarted = false
-  private var hasReachedReadyState = false
-  private var recognitionLanguageIndex = 0
+  @Volatile private var destroyed = false
+  @Volatile private var hasReachedReadyState = false
+  @Volatile private var finishRequested = false
+  private val stopRequested = AtomicBoolean(false)
+  private var captureThread: Thread? = null
+  private var audioRecord: AudioRecord? = null
+  private var recognizer: OfflineRecognizer? = null
+  private var vad: Vad? = null
+  private val recognizedSegments = mutableListOf<String>()
 
   override fun onCreate() {
     super.onCreate()
     activeService = WeakReference(this)
-    Log.i(TAG, "Local speech service created")
     createNotificationChannel()
     val stopIntent = Intent(this, VoiceListeningService::class.java).apply {
       action = ACTION_STOP_LISTENING
@@ -65,479 +62,230 @@ class VoiceListeningService : Service() {
       .setPriority(NotificationCompat.PRIORITY_LOW)
       .setOngoing(true)
       .addAction(android.R.drawable.ic_media_pause, "Detener", stopPendingIntent)
-
     packageManager.getLaunchIntentForPackage(packageName)?.let { launchIntent ->
-      val contentIntent = PendingIntent.getActivity(
+      notification.setContentIntent(PendingIntent.getActivity(
         this,
         OPEN_APP_REQUEST_CODE,
         launchIntent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-      )
-      notification.setContentIntent(contentIntent)
+      ))
     }
     startForeground(NOTIFICATION_ID, notification.build())
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     if (intent?.action == ACTION_STOP_LISTENING) {
-      Log.i(TAG, "Speech service stopped from its notification")
       sendSpeechEvent(EVENT_STOPPED)
       stopSelf()
       return START_NOT_STICKY
     }
     if (!hasMicrophonePermission()) {
-      Log.w(TAG, "Speech service cannot start without microphone permission")
       sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
       stopSelf()
       return START_NOT_STICKY
     }
-    // Give Android time to release a previous on-device recognition session
-    // before the foreground service requests a new one.
-    if (recognizer == null && scheduledRestart == null) {
-      scheduleRecognition(delayMillis = INITIAL_HANDOFF_DELAY_MILLIS, recreate = true)
+    if (!hasModelFiles(this)) {
+      Log.w(TAG, "Sherpa Spanish model files are missing")
+      sendSpeechEvent(EVENT_ERROR, error = ERROR_MODEL_MISSING)
+      stopSelf()
+      return START_NOT_STICKY
     }
-    // Listening only exists after an explicit user action. Android must not
-    // resurrect the microphone if it kills this service or the user stops it.
+    if (captureThread == null) startSherpaCapture()
     return START_NOT_STICKY
   }
 
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onDestroy() {
-    Log.i(TAG, "PiP speech service destroyed")
     destroyed = true
+    stopRequested.set(true)
     hasReachedReadyState = false
-    scheduledRestart?.let(handler::removeCallbacks)
-    scheduledRestart = null
-    cancelRecognitionWatchdog()
-    releaseRecognizer()
+    try { audioRecord?.stop() } catch (_: Exception) { }
+    captureThread?.join(1000)
+    releaseSherpa()
     sendSpeechEvent(EVENT_END)
     if (activeService?.get() === this) activeService = null
     super.onDestroy()
   }
 
   override fun onTaskRemoved(rootIntent: Intent?) {
-    Log.i(TAG, "App task removed; stopping the active microphone session")
     sendSpeechEvent(EVENT_STOPPED)
     stopSelf()
     super.onTaskRemoved(rootIntent)
   }
 
-  private fun finishPhrase() {
-    handler.post {
-      if (destroyed || !recognitionInProgress) return@post
-      Log.i(TAG, "Finishing current phrase on explicit user request session=$activeSessionId")
-      try {
-        recognizer?.stopListening()
-      } catch (error: Exception) {
-        Log.e(TAG, "Unable to finish current phrase", error)
-        sendSpeechEvent(EVENT_ERROR, error = error.message ?: "No se pudo terminar la frase.")
-      }
-    }
+  private fun startSherpaCapture() {
+    captureThread = Thread({ runCaptureLoop() }, "VozualSherpaAudio").also { it.start() }
   }
 
-  private fun scheduleRecognition(delayMillis: Long, recreate: Boolean) {
-    if (destroyed) return
-    scheduledRestart?.let(handler::removeCallbacks)
-    val restart = Runnable {
-      scheduledRestart = null
-      if (destroyed) return@Runnable
-      if (!hasMicrophonePermission()) {
-        sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
-        stopSelf()
-        return@Runnable
-      }
-      if (recreate || recognizer == null) createRecognizer()
-      startCurrentRecognizer()
-    }
-    scheduledRestart = restart
-    handler.postDelayed(restart, delayMillis)
-  }
-
-  /**
-   * Android's recognizer occasionally emits onEndOfSpeech without following it
-   * with onResults/onError, or accepts a request that later stops producing
-   * callbacks. Recovering natively keeps the microphone session alive even
-   * when React Native is paused in Picture-in-Picture.
-   */
-  private fun armRecognitionWatchdog(
-    sessionId: Long,
-    delayMillis: Long,
-    reason: String,
-  ) {
-    cancelRecognitionWatchdog()
-    val watchdog = Runnable {
-      recognitionWatchdog = null
-      if (!isCurrentSession(sessionId) || !recognitionInProgress) return@Runnable
-      Log.w(TAG, "Recognition watchdog recovering session=$sessionId reason=$reason")
-      if (!lastPartialResults.isNullOrEmpty()) {
-        sendSpeechEvent(
-          EVENT_RESULTS,
-          lastPartialResults,
-          confidenceScores = lastPartialConfidenceScores,
-        )
-      }
-      lastPartialResults = null
-      lastPartialConfidenceScores = null
-      recognitionInProgress = false
-      hasReachedReadyState = false
-      sendSpeechEvent(EVENT_END)
-      scheduleRecognition(
-        delayMillis = WATCHDOG_RECOVERY_DELAY_MILLIS,
-        recreate = true,
-      )
-    }
-    recognitionWatchdog = watchdog
-    handler.postDelayed(watchdog, delayMillis)
-  }
-
-  private fun cancelRecognitionWatchdog() {
-    recognitionWatchdog?.let(handler::removeCallbacks)
-    recognitionWatchdog = null
-  }
-
-  private fun createRecognizer() {
-    releaseRecognizer()
-    if (
-      Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-      !SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
-    ) {
-      Log.w(TAG, "On-device speech recognition is unavailable")
-      sendSpeechEvent(EVENT_ERROR, error = ERROR_OFFLINE_UNAVAILABLE)
-      stopSelf()
-      return
-    }
-
-    val sessionId = ++activeSessionId
+  private fun runCaptureLoop() {
     try {
-      recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(this).also {
-        it.setRecognitionListener(createRecognitionListener(sessionId))
-      }
-      Log.i(TAG, "Created on-device recognizer session=$sessionId")
-    } catch (error: SecurityException) {
-      Log.e(TAG, "Microphone permission was revoked while creating recognition", error)
-      sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
-      stopSelf()
-    } catch (error: Exception) {
-      Log.e(TAG, "Unable to create on-device recognizer", error)
-      sendSpeechEvent(EVENT_ERROR, error = ERROR_OFFLINE_UNAVAILABLE)
-      stopSelf()
-    }
-  }
-
-  private fun startCurrentRecognizer() {
-    if (destroyed || recognitionInProgress) return
-    val current = recognizer ?: return
-    try {
-      recognitionInProgress = true
-      hasReachedReadyState = false
-      Log.i(
-        TAG,
-        "Starting service-owned recognition session=$activeSessionId " +
-          "language=${currentRecognitionLanguage()}",
+      val files = modelFiles(this)
+      copyVadAssetIfNeeded(files.vad)
+      val modelConfig = OfflineModelConfig(
+        nemo = OfflineNemoEncDecCtcModelConfig(model = files.model.absolutePath),
+        tokens = files.tokens.absolutePath,
+        numThreads = MODEL_THREADS,
+        provider = "cpu",
       )
-      armRecognitionWatchdog(
-        sessionId = activeSessionId,
-        delayMillis = RECOGNITION_READY_TIMEOUT_MILLIS,
-        reason = "ready-timeout",
-      )
-      current.startListening(createRecognitionIntent())
-    } catch (error: SecurityException) {
-      recognitionInProgress = false
-      Log.e(TAG, "Microphone permission was revoked while starting recognition", error)
-      sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
-      stopSelf()
-    } catch (error: Exception) {
-      recognitionInProgress = false
-      Log.e(TAG, "Unable to start service-owned recognition", error)
-      sendSpeechEvent(EVENT_ERROR, error = error.message ?: "No se pudo iniciar el micrófono.")
-      scheduleRecognition(delayMillis = 1800L, recreate = true)
-    }
-  }
-
-  private fun releaseRecognizer() {
-    // Invalidate the listener before cancel/destroy, because both calls may
-    // synchronously or asynchronously emit terminal callbacks.
-    activeSessionId += 1
-    recognitionInProgress = false
-    hasReachedReadyState = false
-    cancelRecognitionWatchdog()
-    val previous = recognizer
-    recognizer = null
-    try {
-      previous?.cancel()
-    } catch (_: Exception) {
-      // The recognizer may already have disconnected from its system service.
-    }
-    try {
-      previous?.destroy()
-    } catch (_: Exception) {
-      // Destruction is best-effort during Android service teardown.
-    }
-  }
-
-  private fun isCurrentSession(sessionId: Long): Boolean =
-    !destroyed && sessionId == activeSessionId
-
-  private fun createRecognitionListener(sessionId: Long): RecognitionListener =
-    object : RecognitionListener {
-      override fun onReadyForSpeech(params: Bundle?) {
-        if (!isCurrentSession(sessionId)) return
-        hasReachedReadyState = true
-        lastPartialResults = null
-        lastPartialConfidenceScores = null
-        speechStarted = false
-        Log.i(TAG, "Service-owned recognition is ready session=$sessionId")
-        sendSpeechEvent(EVENT_START)
-        armRecognitionWatchdog(
-          sessionId = sessionId,
-          delayMillis = RECOGNITION_STALL_TIMEOUT_MILLIS,
-          reason = "ready-without-terminal-callback",
-        )
-      }
-
-      override fun onBeginningOfSpeech() {
-        if (!isCurrentSession(sessionId)) return
-        speechStarted = true
-        Log.i(TAG, "Service-owned recognition detected speech session=$sessionId")
-        armRecognitionWatchdog(
-          sessionId = sessionId,
-          delayMillis = RECOGNITION_STALL_TIMEOUT_MILLIS,
-          reason = "speech-without-result",
-        )
-      }
-
-      override fun onRmsChanged(rmsdB: Float) = Unit
-
-      override fun onBufferReceived(buffer: ByteArray?) = Unit
-
-      override fun onEndOfSpeech() {
-        if (!isCurrentSession(sessionId)) return
-        hasReachedReadyState = false
-        sendSpeechEvent(EVENT_END)
-        // Results or an error always follow this callback. Restarting here can
-        // overlap the still-finishing request and produce ERROR_RECOGNIZER_BUSY.
-        // Some providers violate that contract, so recover if the terminal
-        // callback does not arrive within a short grace period.
-        armRecognitionWatchdog(
-          sessionId = sessionId,
-          delayMillis = TERMINAL_CALLBACK_TIMEOUT_MILLIS,
-          reason = "missing-result-after-end-of-speech",
-        )
-      }
-
-      override fun onError(error: Int) {
-        if (!isCurrentSession(sessionId)) {
-          Log.d(TAG, "Ignoring stale recognition error session=$sessionId code=$error")
-          return
-        }
-        cancelRecognitionWatchdog()
-        recognitionInProgress = false
-        hasReachedReadyState = false
-        if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
-          Log.w(TAG, "Microphone permission was revoked during recognition")
-          sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
-          stopSelf()
-          return
-        }
-        val normalSilence =
-          error == SpeechRecognizer.ERROR_NO_MATCH ||
-            error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
-        if (normalSilence) {
-          // A timeout without speech is expected while continuous listening
-          // is armed. It must not make a later genuine recovery slower.
-          consecutiveErrors = 0
-        } else {
-          consecutiveErrors += 1
-        }
-        Log.w(
-          TAG,
-          "Service-owned recognition error session=$sessionId code=$error speechStarted=$speechStarted",
-        )
-
-        if (
-          error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
-          error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE
-        ) {
-          lastPartialResults = null
-          lastPartialConfidenceScores = null
-          if (recognitionLanguageIndex < RECOGNITION_LANGUAGES.lastIndex) {
-            val unsupportedLanguage = currentRecognitionLanguage()
-            recognitionLanguageIndex += 1
-            Log.i(
-              TAG,
-              "Local language $unsupportedLanguage unavailable; retrying with " +
-                currentRecognitionLanguage(),
-            )
-            scheduleRecognition(delayMillis = 250L, recreate = false)
-            return
-          }
-          sendSpeechEvent(EVENT_ERROR, error = ERROR_OFFLINE_LANGUAGE_UNAVAILABLE)
-          stopSelf()
-          return
-        }
-
-        // Some recognizers emit useful partial text and then
-        // closes an otherwise valid phrase with ERROR_NO_MATCH. Confirm the
-        // last partial result before reporting the terminal error so the PiP
-        // avatar can still react to the spoken sign. The JS queue deduplicates
-        // this value when the same partial was already consumed.
-        if (
-          (error == SpeechRecognizer.ERROR_NO_MATCH ||
-            error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) &&
-          !lastPartialResults.isNullOrEmpty()
-        ) {
-          Log.i(TAG, "Promoting partial result after terminal error session=$sessionId")
-          sendSpeechEvent(
-            EVENT_RESULTS,
-            lastPartialResults,
-            confidenceScores = lastPartialConfidenceScores,
-          )
-        }
-        lastPartialResults = null
-        lastPartialConfidenceScores = null
-        sendSpeechEvent(EVENT_ERROR, error = error.toString())
-
-        val requiresRecreation =
-          error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
-            error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
-            error == SpeechRecognizer.ERROR_CLIENT
-        val baseDelay = when (error) {
-          SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 900L
-          SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> 1400L
-          SpeechRecognizer.ERROR_CLIENT -> 750L
-          // Silence is a normal terminal state of Android's phrase-based
-          // recognizer, not a fault. Restart it quickly and never accumulate
-          // a backoff just because the person has not spoken for a while.
-          SpeechRecognizer.ERROR_NO_MATCH,
-          SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> 180L
-          else -> 500L
-        }
-        val backoff = if (
-          normalSilence
-        ) {
-          0L
-        } else {
-          ((consecutiveErrors - 1).coerceAtMost(3) * 250L)
-        }
-        scheduleRecognition(baseDelay + backoff, recreate = requiresRecreation)
-      }
-
-      override fun onResults(results: Bundle?) {
-        if (!isCurrentSession(sessionId)) return
-        cancelRecognitionWatchdog()
-        recognitionInProgress = false
-        hasReachedReadyState = false
-        consecutiveErrors = 0
-        lastPartialResults = null
-        lastPartialConfidenceScores = null
-        val recognizedValues =
-          results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-        val confidenceScores = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
-        Log.i(TAG, "Service-owned recognition delivered results session=$sessionId")
-        sendSpeechEvent(
-          EVENT_RESULTS,
-          recognizedValues,
-          confidenceScores = confidenceScores,
-        )
-        // Reuse the healthy recognizer. Recreating it after every phrase can
-        // disconnect Google's speech service while the previous request closes.
-        scheduleRecognition(delayMillis = 180L, recreate = false)
-      }
-
-      override fun onPartialResults(partialResults: Bundle?) {
-        if (!isCurrentSession(sessionId)) return
-        lastPartialResults =
-          partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-        lastPartialConfidenceScores =
-          partialResults?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
-        Log.d(TAG, "Service-owned recognition delivered partial results session=$sessionId")
-        sendSpeechEvent(
-          EVENT_PARTIAL_RESULTS,
-          lastPartialResults,
-          confidenceScores = lastPartialConfidenceScores,
-        )
-        armRecognitionWatchdog(
-          sessionId = sessionId,
-          delayMillis = RECOGNITION_STALL_TIMEOUT_MILLIS,
-          reason = "partial-result-stalled",
-        )
-      }
-
-      override fun onEvent(eventType: Int, params: Bundle?) = Unit
-    }
-
-  private fun createRecognitionIntent(): Intent =
-    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-      putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-      putExtra(
-        RecognizerIntent.EXTRA_LANGUAGE,
-        currentRecognitionLanguage(),
-      )
-      putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-      putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-      putStringArrayListExtra(
-        RecognizerIntent.EXTRA_BIASING_STRINGS,
-        arrayListOf(
-          "adiós", "adios", "chao", "hasta luego",
-          "uno", "dos", "tres", "cuatro", "cinco",
+      recognizer = OfflineRecognizer(
+        null,
+        OfflineRecognizerConfig(
+          featConfig = FeatureConfig(sampleRate = SAMPLE_RATE, featureDim = 80, dither = 0.0f),
+          modelConfig = modelConfig,
         ),
       )
-      // These are hints (recognition providers can choose their own limits),
-      // but supported providers keep a listening session open long enough for
-      // natural pauses instead of reporting a timeout immediately.
-      putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
-      putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
-      // Defense in depth. The recognizer itself is created with the on-device
-      // factory; this intent also forbids a provider from preferring network.
-      putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-    }
+      vad = Vad(
+        null,
+        VadModelConfig(
+          sileroVadModelConfig = SileroVadModelConfig(
+            model = files.vad.absolutePath,
+            threshold = VAD_THRESHOLD,
+            minSilenceDuration = VAD_MIN_SILENCE_SECONDS,
+            minSpeechDuration = VAD_MIN_SPEECH_SECONDS,
+            maxSpeechDuration = VAD_MAX_SPEECH_SECONDS,
+          ),
+          sampleRate = SAMPLE_RATE,
+          numThreads = 1,
+          provider = "cpu",
+        ),
+      )
+      val bufferBytes = AudioRecord.getMinBufferSize(
+        SAMPLE_RATE,
+        AudioFormat.CHANNEL_IN_MONO,
+        AudioFormat.ENCODING_PCM_16BIT,
+      )
+      if (bufferBytes <= 0) throw IllegalStateException("No se pudo configurar el micrófono.")
+      val recorder = AudioRecord(
+        MediaRecorder.AudioSource.VOICE_RECOGNITION,
+        SAMPLE_RATE,
+        AudioFormat.CHANNEL_IN_MONO,
+        AudioFormat.ENCODING_PCM_16BIT,
+        maxOf(bufferBytes * 2, SAMPLE_RATE / 2),
+      )
+      if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+        recorder.release()
+        throw IllegalStateException("Android no pudo abrir el micrófono.")
+      }
+      audioRecord = recorder
+      recorder.startRecording()
+      hasReachedReadyState = true
+      sendSpeechEvent(EVENT_START)
+      Log.i(TAG, "Sherpa-ONNX local CTC recognizer started")
 
-  private fun currentRecognitionLanguage(): String =
-    RECOGNITION_LANGUAGES[recognitionLanguageIndex]
+      val pcm = ShortArray(1024)
+      while (!destroyed && !stopRequested.get()) {
+        val count = recorder.read(pcm, 0, pcm.size, AudioRecord.READ_BLOCKING)
+        if (count < 0) throw IllegalStateException("No se pudo leer el micrófono ($count).")
+        if (count > 0) {
+          val samples = FloatArray(count) { index -> pcm[index] / 32768.0f }
+          vad?.acceptWaveform(samples)
+          decodeAvailableSegments()
+        }
+        if (finishRequested) {
+          vad?.flush()
+          decodeAvailableSegments()
+          finishCurrentPhraseResult()
+          break
+        }
+      }
+    } catch (error: SecurityException) {
+      Log.e(TAG, "Microphone permission was revoked", error)
+      sendSpeechEvent(EVENT_ERROR, error = ERROR_MICROPHONE_PERMISSION_DENIED)
+    } catch (error: Exception) {
+      Log.e(TAG, "Sherpa speech recognition failed", error)
+      if (!destroyed && !stopRequested.get()) {
+        sendSpeechEvent(EVENT_ERROR, error = error.message ?: "No se pudo iniciar el reconocimiento local.")
+      }
+    } finally {
+      hasReachedReadyState = false
+      try { audioRecord?.stop() } catch (_: Exception) { }
+      audioRecord?.release()
+      audioRecord = null
+      releaseSherpa()
+      captureThread = null
+      if (finishRequested && !destroyed) sendSpeechEvent(EVENT_END)
+    }
+  }
+
+  private fun decodeAvailableSegments() {
+    val activeVad = vad ?: return
+    val activeRecognizer = recognizer ?: return
+    while (!activeVad.empty()) {
+      val samples = activeVad.front().samples
+      activeVad.pop()
+      if (samples.isEmpty()) continue
+      val stream = activeRecognizer.createStream()
+      try {
+        stream.acceptWaveform(samples, SAMPLE_RATE)
+        activeRecognizer.decode(stream)
+        val text = activeRecognizer.getResult(stream).text.trim()
+        if (text.isNotEmpty()) {
+          recognizedSegments.add(text)
+          val joined = recognizedSegments.joinToString(" ")
+          if (listeningMode == MODE_CONTINUOUS) {
+            sendSpeechEvent(EVENT_RESULTS, arrayListOf(text))
+            recognizedSegments.clear()
+          } else {
+            sendSpeechEvent(EVENT_PARTIAL_RESULTS, arrayListOf(joined))
+          }
+        }
+      } finally {
+        stream.release()
+      }
+    }
+  }
+
+  private fun finishCurrentPhraseResult() {
+    val phrase = recognizedSegments.joinToString(" ").trim()
+    if (phrase.isNotEmpty()) sendSpeechEvent(EVENT_RESULTS, arrayListOf(phrase))
+    recognizedSegments.clear()
+  }
+
+  private fun releaseSherpa() {
+    try { vad?.release() } catch (_: Exception) { }
+    vad = null
+    try { recognizer?.release() } catch (_: Exception) { }
+    recognizer = null
+  }
+
+  private fun copyVadAssetIfNeeded(target: File) {
+    if (target.isFile && target.length() > 0) return
+    target.parentFile?.mkdirs()
+    assets.open("sherpa/silero_vad.onnx").use { input ->
+      FileOutputStream(target).use { output -> input.copyTo(output) }
+    }
+  }
 
   private fun hasMicrophonePermission(): Boolean =
     ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
       PackageManager.PERMISSION_GRANTED
 
-  private fun sendSpeechEvent(
-    event: String,
-    values: ArrayList<String>? = null,
-    error: String? = null,
-    confidenceScores: FloatArray? = null,
-  ) {
-    PictureInPictureModule.emitSpeechEvent(event, values, error, confidenceScores)
+  private fun sendSpeechEvent(event: String, values: ArrayList<String>? = null, error: String? = null) {
+    PictureInPictureModule.emitSpeechEvent(event, values, error)
   }
 
   private fun createNotificationChannel() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-    val manager = getSystemService(NotificationManager::class.java)
-    manager.createNotificationChannel(
-      NotificationChannel(
-        CHANNEL_ID,
-        "Escucha continua de VOZUAL",
-        NotificationManager.IMPORTANCE_LOW,
-      ).apply {
-        description = "Mantiene activo el micrófono de VOZUAL durante la traducción."
-      },
+    getSystemService(NotificationManager::class.java).createNotificationChannel(
+      NotificationChannel(CHANNEL_ID, "Escucha continua de VOZUAL", NotificationManager.IMPORTANCE_LOW)
+        .apply { description = "Mantiene activo el micrófono de VOZUAL durante la traducción." },
     )
   }
 
   companion object {
-    private const val TAG = "VozualPipSpeech"
-    @Volatile
-    private var activeService: WeakReference<VoiceListeningService>? = null
-
-    fun finishCurrentPhrase(): Boolean {
-      val service = activeService?.get() ?: return false
-      service.finishPhrase()
-      return true
-    }
-
-    fun hasReadyRecognition(): Boolean =
-      activeService?.get()?.hasReachedReadyState == true
-
-    fun isActive(): Boolean = activeService?.get()?.destroyed == false
+    private const val TAG = "VozualSherpaAsr"
+    private const val SAMPLE_RATE = 16000
+    private const val MODEL_THREADS = 4
+    private const val VAD_THRESHOLD = 0.5f
+    private const val VAD_MIN_SILENCE_SECONDS = 0.35f
+    private const val VAD_MIN_SPEECH_SECONDS = 0.15f
+    private const val VAD_MAX_SPEECH_SECONDS = 5.0f
+    private const val MODE_CONTINUOUS = "continuous"
+    private const val CHANNEL_ID = "vozual_voice_listening"
+    private const val NOTIFICATION_ID = 2701
+    private const val STOP_REQUEST_CODE = 2702
+    private const val OPEN_APP_REQUEST_CODE = 2703
     const val ACTION_SPEECH_EVENT = "com.androsja.vozual.VOZUAL_SPEECH_EVENT"
     const val EXTRA_EVENT = "event"
     const val EXTRA_VALUES = "values"
@@ -548,23 +296,34 @@ class VoiceListeningService : Service() {
     const val EVENT_END = "end"
     const val EVENT_ERROR = "error"
     const val EVENT_STOPPED = "stopped"
-
     const val ACTION_STOP_LISTENING = "com.androsja.vozual.STOP_VOICE_LISTENING"
-    private const val CHANNEL_ID = "vozual_voice_listening"
-    private const val NOTIFICATION_ID = 2701
-    private const val STOP_REQUEST_CODE = 2702
-    private const val OPEN_APP_REQUEST_CODE = 2703
-    private const val INITIAL_HANDOFF_DELAY_MILLIS = 350L
-    private const val RECOGNITION_READY_TIMEOUT_MILLIS = 8_000L
-    private const val RECOGNITION_STALL_TIMEOUT_MILLIS = 20_000L
-    private const val TERMINAL_CALLBACK_TIMEOUT_MILLIS = 4_000L
-    private const val WATCHDOG_RECOVERY_DELAY_MILLIS = 250L
-    // Google's Android on-device provider does not expose es-CO on every
-    // device. These fallbacks remain fully local and preserve Spanish speech
-    // recognition without silently switching to a network recognizer.
-    private val RECOGNITION_LANGUAGES = listOf("es-CO", "es-US", "es-ES")
-    const val ERROR_OFFLINE_UNAVAILABLE = "offline_speech_unavailable"
-    const val ERROR_OFFLINE_LANGUAGE_UNAVAILABLE = "offline_es_co_unavailable"
     const val ERROR_MICROPHONE_PERMISSION_DENIED = "microphone_permission_denied"
+    const val ERROR_MODEL_MISSING = "sherpa_model_missing"
+
+    @Volatile private var activeService: WeakReference<VoiceListeningService>? = null
+    @Volatile private var listeningMode: String = "phrase"
+
+    fun setListeningMode(mode: String) { listeningMode = mode }
+    fun finishCurrentPhrase(): Boolean {
+      val service = activeService?.get() ?: return false
+      if (service.destroyed || !service.hasReachedReadyState) return false
+      service.finishRequested = true
+      return true
+    }
+    fun hasReadyRecognition(): Boolean = activeService?.get()?.hasReachedReadyState == true
+    fun isActive(): Boolean = activeService?.get()?.destroyed == false
+    fun hasModelFiles(context: android.content.Context): Boolean {
+      val files = modelFiles(context)
+      return files.model.isFile && files.tokens.isFile && files.model.length() > 0 && files.tokens.length() > 0
+    }
+    private data class ModelFiles(val model: File, val tokens: File, val vad: File)
+    private fun modelFiles(context: android.content.Context): ModelFiles {
+      val directory = File(context.getExternalFilesDir(null) ?: context.filesDir, "sherpa-es")
+      return ModelFiles(
+        File(directory, "model.onnx"),
+        File(directory, "tokens.txt"),
+        File(context.filesDir, "sherpa/silero_vad.onnx"),
+      )
+    }
   }
 }

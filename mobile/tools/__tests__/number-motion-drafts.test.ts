@@ -43,13 +43,53 @@ function readMotion(gloss: string): {
 }
 
 describe('LSC number motion drafts', () => {
+  it('includes the existing owner-approved SIETE, OCHO, and NUEVE motions in the published catalogs', () => {
+    const assets = path.resolve(__dirname, '../../assets');
+    const draftCatalog = JSON.parse(fs.readFileSync(
+      path.join(assets, 'motions/drafts/numbers/sign-catalog.json'),
+      'utf8',
+    )) as {entries: Array<{gloss: string; speechAliases: string[]; approvalStatus: string}>};
+    const published = JSON.parse(fs.readFileSync(
+      path.join(assets, 'motions/published_signs.json'),
+      'utf8',
+    )) as {publishedGlosses: string[]};
+    const linguistic = JSON.parse(fs.readFileSync(
+      path.join(assets, 'data/lsc_linguistic_catalog.json'),
+      'utf8',
+    )) as {entries: Array<{gloss: string; motion: {published: boolean}; review: {publicationStatus?: string}}>};
+
+    const numbers = [['SIETE', 'siete', '7'], ['OCHO', 'ocho', '8'], ['NUEVE', 'nueve', '9']] as const;
+    for (const [gloss, alias, digit] of numbers) {
+      const draft = draftCatalog.entries.find(entry => entry.gloss === gloss);
+      const sign = linguistic.entries.find(entry => entry.gloss === gloss);
+      const source = readMotion(gloss);
+      const publishedMotion = JSON.parse(fs.readFileSync(
+        path.join(assets, `motions/${gloss.toLowerCase()}.motion.json`),
+        'utf8',
+      )) as {frames: unknown[]};
+
+      expect(draft).toMatchObject({
+        gloss,
+        speechAliases: [alias, digit],
+        approvalStatus: 'owner-approved-prototype',
+      });
+      expect(published.publishedGlosses).toContain(gloss);
+      expect(sign).toMatchObject({
+        gloss,
+        motion: {published: true},
+        review: {publicationStatus: 'owner-approved-prototype'},
+      });
+      expect(publishedMotion.frames).toEqual(source.frames);
+    }
+  });
+
   it('keeps the four long CINCO fingers extended and visibly separated', () => {
     const motion = readMotion('CINCO');
     const lastFrame = motion.frames[motion.frames.length - 1].bodyHands;
-    const fingerRoots = [38, 42, 46, 50].map(index => lastFrame[index][0]);
-    const lateralGaps = fingerRoots.slice(1).map((x, index) => Number((x - fingerRoots[index]).toFixed(5)));
+    const fingerRoots = [59, 63, 67, 71].map(index => lastFrame[index][0]);
+    const lateralGaps = fingerRoots.slice(1).map((x, index) => Number(Math.abs(x - fingerRoots[index]).toFixed(5)));
 
-    expect(motion.avatarProfile.rigLeftFingerStates).toEqual({
+    expect(motion.avatarProfile.rigRightFingerStates).toEqual({
       thumb: 'extended',
       index: 'extended',
       middle: 'extended',
@@ -57,36 +97,36 @@ describe('LSC number motion drafts', () => {
       pinky: 'extended',
     });
     expect(lateralGaps).toEqual([0.0522, 0.054, 0.0522]);
-    expect(motion.avatarProfile.rigLeftFingerSplayDegrees).toBe(20);
+    expect(motion.avatarProfile.rigRightFingerSplayDegrees).toBe(20);
     expect(motion.semantic.handshapePresentationNote).toMatch(/not regional performance evidence/);
   });
 
   it('separates the extended fingers in DOS, TRES, and CUATRO', () => {
     const extendedFingerRoots: Record<string, number[]> = {
-      DOS: [38, 42],
-      TRES: [38, 42, 46],
-      CUATRO: [38, 42, 46, 50],
+      DOS: [59, 63],
+      TRES: [59, 63, 67],
+      CUATRO: [59, 63, 67, 71],
     };
     for (const [gloss, landmarks] of Object.entries(extendedFingerRoots)) {
       const motion = readMotion(gloss);
       const lastFrame = motion.frames[motion.frames.length - 1].bodyHands;
       const gaps = landmarks.slice(1).map((landmark, index) => (
-        Number((lastFrame[landmark][0] - lastFrame[landmarks[index]][0]).toFixed(5))
+        Number(Math.abs(lastFrame[landmark][0] - lastFrame[landmarks[index]][0]).toFixed(5))
       ));
 
       expect(gaps.every(gap => gap >= 0.0522)).toBe(true);
       expect(motion.semantic.handshapePresentationNote).toMatch(/1.8 lateral landmark spread factor/);
-      expect(motion.avatarProfile.rigLeftFingerSplayDegrees).toBe(
+      expect(motion.avatarProfile.rigRightFingerSplayDegrees).toBe(
         gloss === 'DOS' ? 28 : gloss === 'TRES' ? 22 : 16,
       );
     }
   });
 
-  it('keeps the inactive right hand absent in every generated number pose', () => {
+  it('keeps the inactive left hand absent in every generated number pose', () => {
     for (const gloss of ['UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS']) {
       const motion = readMotion(gloss);
       expect(motion.frames.every(frame => (
-        frame.bodyHands.slice(54, 75).every(point => point.every(value => value === 0))
+        frame.bodyHands.slice(33, 54).every(point => point.every(value => value === 0))
       ))).toBe(true);
     }
   });
@@ -96,11 +136,11 @@ describe('LSC number motion drafts', () => {
       const motion = readMotion(gloss);
       const lastFrame = motion.frames[motion.frames.length - 1].bodyHands;
 
-      expect(lastFrame[13]).toEqual([0.82, 0.75, -0.02]);
-      expect(lastFrame[15]).toEqual([0.77, 0.58, -0.04]);
-      expect(lastFrame[15][0]).toBeGreaterThan(0.7);
-      expect(lastFrame[15][1]).toBeLessThan(0.6);
-      expect(motion.semantic.locationPresentationNote).toMatch(/not centered in front of the face/);
+      expect(lastFrame[14]).toEqual([0.18, 0.75, -0.02]);
+      expect(lastFrame[16]).toEqual([0.23, 0.58, -0.04]);
+      expect(lastFrame[16][0]).toBeLessThan(0.3);
+      expect(lastFrame[16][1]).toBeLessThan(0.6);
+      expect(motion.semantic.locationPresentationNote).toMatch(/active right hand is placed high beside the avatar face/);
     }
   });
 
@@ -109,7 +149,7 @@ describe('LSC number motion drafts', () => {
     const authoring = readAuthoringEntry('SEIS');
     const indexExtensionRatio = (frameIndex: number) => {
       const hands = motion.frames[frameIndex].bodyHands;
-      const chain = [38, 39, 40, 41];
+      const chain = [59, 60, 61, 62];
       const distance = (from: number, to: number) => Math.hypot(
         ...hands[to].map((value, axis) => value - hands[from][axis]),
       );
@@ -125,7 +165,7 @@ describe('LSC number motion drafts', () => {
       repetitions: 2,
     });
     expect(motion.frames).toHaveLength(72);
-    expect(motion.avatarProfile.rigLeftFingerStates).toEqual({
+    expect(motion.avatarProfile.rigRightFingerStates).toEqual({
       thumb: 'closed',
       index: 'captured',
       middle: 'closed',
@@ -141,6 +181,6 @@ describe('LSC number motion drafts', () => {
       title: 'Elementos para una didáctica del lenguaje y las matemáticas en estudiantes sordos de niveles iniciales',
       pages: '94-96',
     });
-    expect(motion.semantic.movementPresentationNote).toMatch(/flexes down 2 times/);
+    expect(motion.semantic.movementPresentationNote).toMatch(/extends and flex down 2 times/);
   });
 });

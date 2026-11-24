@@ -1,22 +1,19 @@
-# HOLA Golden Regression
+# HOLA motion regression
 
-`mobile/tools/verify-hola-golden.js` is a local, read-only regression gate for
-`mobile/assets/motions/hola.motion.json`. It verifies the raw file byte length
-and SHA-256 before parsing the JSON contract. It then checks:
+The local HOLA draft follows the right-handed demonstration in [Una seña para ti: Hola, by INSOR](https://conecta.insor.gov.co/contenido-accesible/una-sena-para-ti-hola/). At 30 FPS, the 73 frames include the opening and closing rest. The right hand rises from the abdomen with the fingers together, angled toward the outer right eyebrow. The index fingertip reaches the temple at frames 16–19. The open hand lifts slightly away, turns during the descent and returns to the left hand at the abdomen.
 
-- 30 FPS and 36 frames;
-- `pose33_left21_right21_face468` layout;
-- left active hand;
-- forehead contact from frames 0 through 12;
-- camera-facing palm at contact.
+The authored depth is an estimate from the frontal video. The shared avatar runtime uses shoulder-relative depth and the model’s temple to reproduce the contact on its own skeleton. The JSON is a local draft pending visual review.
 
-Run it from `mobile/`:
+The latest owner visual reference supersedes the earlier pose requested at
+896 ms. Right wrist X/Y/Z reaches −17°/85°/4° at frame 13 (433 ms), holds through
+frame 33 (1100 ms) during ascent and outward release, then relaxes by frame 39
+(1300 ms) for the descent. Thumb extension is 100% and forearm axial rotation
+is 0°. The same settings apply on the way up and as the hand moves forward.
 
-```bash
+From `mobile/`, run the regression check with:
+
+```sh
 node tools/verify-hola-golden.js
 ```
 
-The gate has no Firebase, Android, APK, device, or asset-writing dependency.
-The SHA-256 is the reviewed golden identity of the current HOLA file. Any
-intentional asset change must update the golden value through a separate
-review; this regression must not rewrite the motion asset automatically.
+It verifies the asset digest, frame count, frame rate, landmark layout, active hand, contact interval and palm orientation. An intentional motion change requires updating the expected values after comparing the new playback with the reference.

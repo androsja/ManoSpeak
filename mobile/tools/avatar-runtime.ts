@@ -143,6 +143,8 @@ type AvatarProfile = {
   rigContactLandmark?: number;
   rigContactSnap?: number;
   rigContactUseAvatarAnchor?: boolean;
+  /** Authored hand and elbow Z share the shoulder's coordinate system. */
+  rigArmDepthSpace?: 'shoulder-relative';
   rigContactWindows?: RiggedContactWindow[];
   rigContactFadeFrames?: number;
   rigHeadVerticalOffset?: number;
@@ -932,13 +934,15 @@ function shouldDrawCartoonAvatar() {
   return renderMode === 'cartoon' || (renderMode === 'rigged' && riggedAvatar == null);
 }
 
+const CAPTURE_TO_WORLD_SCALE = 3.1;
+
 function world(point: Point): THREE.Vector3 {
   // This deliberately stays on the capture plane.  A perspective camera
   // changes limb proportions; the orthographic projection matches VOZUAL's
   // diagnostic overlay and therefore the recorded body dimensions.
   return new THREE.Vector3(
-    (point[0] - 0.5) * 3.1,
-    (0.57 - point[1]) * 3.1,
+    (point[0] - 0.5) * CAPTURE_TO_WORLD_SCALE,
+    (0.57 - point[1]) * CAPTURE_TO_WORLD_SCALE,
     0,
   );
 }
@@ -1199,7 +1203,7 @@ function riggedHandTargetPoint(
   const flipDepth = side === 'L'
     ? activeProfile?.rigLeftHandDepthFlip
     : activeProfile?.rigRightHandDepthFlip;
-  const depthScale = THREE.MathUtils.clamp(profileDepthScale ?? 3.1, 0.5, 9);
+  const depthScale = THREE.MathUtils.clamp(profileDepthScale ?? CAPTURE_TO_WORLD_SCALE, 0.5, 9);
   const depthDirection = flipDepth ? -1 : 1;
   target.z = wristWorldZ - (point[2] - wrist[2]) * depthScale * depthDirection;
   return target;
@@ -1673,11 +1677,6 @@ function applyKinematicRiggedArmTrajectory(side: 'left' | 'right', wrist: RigWri
   const shoulder = upperBone.getWorldPosition(new THREE.Vector3());
   const restElbow = forearmBone.getWorldPosition(new THREE.Vector3());
   const targetWrist = handBone.getWorldPosition(new THREE.Vector3()).add(delta);
-  const wristDirection = targetWrist.clone().sub(shoulder);
-  const rawDistance = wristDirection.length();
-  if (rawDistance < 0.000001) return true;
-  wristDirection.multiplyScalar(1 / rawDistance);
-
   const restWristDistance = handBone.getWorldPosition(new THREE.Vector3()).distanceTo(shoulder);
   const authoredChainReach = lengths.upper + lengths.lower;
   // Some exported rigs include a bind-pose offset between deform-bone origins.
@@ -1686,19 +1685,31 @@ function applyKinematicRiggedArmTrajectory(side: 'left' | 'right', wrist: RigWri
   const reachCalibration = Math.max(1, restWristDistance / Math.max(0.001, authoredChainReach));
   const upperReach = lengths.upper * reachCalibration;
   const lowerReach = lengths.lower * reachCalibration;
+  return solveRiggedArm(rigSide, shoulder, targetWrist, restElbow, upperReach, lowerReach);
+}
+
+function solveRiggedArm(
+  rigSide: 'L' | 'R', shoulder: THREE.Vector3, targetWrist: THREE.Vector3,
+  elbowHint: THREE.Vector3, upperReach: number, lowerReach: number,
+): boolean {
+  const wristDirection = targetWrist.clone().sub(shoulder);
+  const rawDistance = wristDirection.length();
+  if (rawDistance < 0.000001) return true;
+  wristDirection.multiplyScalar(1 / rawDistance);
+
   const minimumReach = Math.max(0.01, Math.abs(upperReach - lowerReach) + 0.001);
   const maximumReach = Math.max(minimumReach, upperReach + lowerReach - 0.001);
   const wristDistance = THREE.MathUtils.clamp(rawDistance, minimumReach, maximumReach);
   targetWrist.copy(shoulder).addScaledVector(wristDirection, wristDistance);
 
-  const restElbowOffset = restElbow.clone().sub(shoulder);
+  const restElbowOffset = elbowHint.clone().sub(shoulder);
   const bendDirection = restElbowOffset.addScaledVector(
     wristDirection,
     -restElbowOffset.dot(wristDirection),
   );
   if (bendDirection.lengthSq() < 0.000001) {
-    bendDirection.set(side === 'left' ? -1 : 1, 0, 0)
-      .addScaledVector(wristDirection, side === 'left' ? 0.25 : -0.25);
+    bendDirection.set(rigSide === 'L' ? -1 : 1, 0, 0)
+      .addScaledVector(wristDirection, rigSide === 'L' ? 0.25 : -0.25);
   }
   bendDirection.normalize();
   const along = (
@@ -1712,10 +1723,11 @@ function applyKinematicRiggedArmTrajectory(side: 'left' | 'right', wrist: RigWri
     .addScaledVector(bendDirection, height);
 
   placeRiggedBoneBetween(`DEF-upper_arm.${rigSide}`, shoulder, elbowTarget, upperReach);
-  riggedAvatar.updateMatrixWorld(true);
-  const solvedElbow = forearmBone.getWorldPosition(new THREE.Vector3());
+  riggedAvatar?.updateMatrixWorld(true);
+  const solvedElbow = riggedBone(`DEF-forearm.${rigSide}`)?.getWorldPosition(new THREE.Vector3());
+  if (!solvedElbow) return false;
   placeRiggedForearmBetween(rigSide, solvedElbow, targetWrist, lowerReach);
-  riggedAvatar.updateMatrixWorld(true);
+  riggedAvatar?.updateMatrixWorld(true);
   return true;
 }
 
@@ -2298,6 +2310,10 @@ function profileContactAnchor(frame: MotionFrame): THREE.Vector3 | undefined {
 
 function profileRiggedContactAnchor(frame: MotionFrame): THREE.Vector3 | undefined {
   if (!activeProfile?.rigContactUseAvatarAnchor) return profileContactAnchor(frame);
+  if (activeProfile.contactAnchor === 'temple') {
+    const side = activeProfile.activeHand === 'left' ? 'L' : 'R';
+    return riggedBone(`DEF-temple.${side}`)?.getWorldPosition(new THREE.Vector3());
+  }
   if (activeProfile.contactAnchor === 'cheek') {
     const side = activeRiggedHand
       ?? (activeProfile.activeHand === 'right' ? 'R' : 'L');
@@ -2928,13 +2944,18 @@ function applyRiggedHandEditPose(
       handBone.updateWorldMatrix(false, true);
     }
   }
+  const handName = side === 'L' ? 'left' : 'right';
+  const hasAnimatedForearmRoll = activeProfile?.rigHandKeyframes?.some(keyframe => (
+    keyframe[handName]?.forearmAxialRollDegrees !== undefined
+  ));
+  if (hasAnimatedForearmRoll) applyProfileForearmAxialRoll(side, pose.forearmAxialRollDegrees);
   riggedAvatar?.updateMatrixWorld(true);
 }
 
-function applyProfileForearmAxialRoll(side: 'L' | 'R') {
-  const degrees = side === 'L'
+function applyProfileForearmAxialRoll(side: 'L' | 'R', overrideDegrees?: number) {
+  const degrees = overrideDegrees ?? (side === 'L'
     ? activeProfile?.rigLeftForearmAxialRollDegrees
-    : activeProfile?.rigRightForearmAxialRollDegrees;
+    : activeProfile?.rigRightForearmAxialRollDegrees);
   if (!degrees) return;
   const forearm = riggedBone(`DEF-forearm.${side}`);
   const endpoint = riggedBoneEndpoint(`DEF-forearm.${side}`);
@@ -3232,6 +3253,32 @@ function driveRiggedHand(
   const upperBone = riggedBone(`DEF-upper_arm.${side}`);
   if (!upperBone) return;
   const actualShoulder = upperBone.getWorldPosition(new THREE.Vector3());
+  if (activeProfile?.rigArmDepthSpace === 'shoulder-relative') {
+    // These authored points use one depth origin for the entire arm. Solve
+    // at the model's own bone lengths; the elbow landmark sets the bend plane.
+    wristScreenTarget.z = actualShoulder.z - (capturedWrist[2] - shoulder[2]) * CAPTURE_TO_WORLD_SCALE;
+    elbowScreenTarget.z = actualShoulder.z - (elbow[2] - shoulder[2]) * CAPTURE_TO_WORLD_SCALE;
+    setRiggedLongitudinalScale(`DEF-forearm.${side}`, 1);
+    const handBone = riggedBone(`DEF-hand.${side}`);
+    const positionArm = () => {
+      solveRiggedArm(side, actualShoulder, wristScreenTarget.clone(), elbowScreenTarget, lengths.upper, lengths.lower);
+      applyProfileForearmAxialRoll(side);
+      if (driveCapturedHandPose && valid(hand[0])) driveRiggedPalmAndFingers(side, hand, handBone);
+      else restoreRiggedHandPose(side);
+    };
+    positionArm();
+    const contactSide = activeProfile.activeHand === 'left' ? 'L' : 'R';
+    const weight = profileContactWeight() * THREE.MathUtils.clamp(activeProfile.rigContactSnap ?? 0, 0, 1);
+    if (driveCapturedHandPose && side === contactSide && weight > 0 && activeProfile.rigContactLandmark !== undefined) {
+      const tip = riggedHandLandmarkWorld(side, activeProfile.rigContactLandmark);
+      const anchor = profileRiggedContactAnchor(frame);
+      if (tip && anchor && handBone) {
+        wristScreenTarget.lerp(handBone.getWorldPosition(new THREE.Vector3()).add(anchor.sub(tip)), weight);
+        positionArm();
+      }
+    }
+    return;
+  }
   const elbowTarget = targetAtRiggedLength(
     actualShoulder,
     elbowScreenTarget,
@@ -3695,6 +3742,7 @@ window.getVozualRigDiagnostics = () => {
   return {
     clipFrame: activeFrameIndex,
     aligned: riggedAligned,
+    contactAnchor: vectorValues(frame && profileRiggedContactAnchor(frame)),
     livelyFace: {
       expression: undefined,
       intensity: 0,
@@ -4941,9 +4989,10 @@ function requestClip(
     if (requestId !== latestPlaybackRequest) return;
     playClip(normalizedClip, playbackId, playbackSpeed, continuePhrase);
   });
-  // ADIOS is installed and integrity-checked with the other Firebase signs.
-  // Prefer those released bytes over the local authoring preview plan.
-  const load = normalizedClip === 'ADIOS'
+  // Downloaded or injected motions take precedence over local authoring plans
+  // that may still be present in a development build.
+  const useInstalledMotion = installedMotionDocuments.has(normalizedClip) || installedMotionBytes.has(normalizedClip);
+  const load = useInstalledMotion || normalizedClip === 'ADIOS'
     ? startLegacyPlayback()
     : renderMode === 'rigged'
     ? ensureKinematicPlan(normalizedClip).then(plan => {

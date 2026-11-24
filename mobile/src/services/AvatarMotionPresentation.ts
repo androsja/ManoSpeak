@@ -136,6 +136,7 @@ export const EDITOR_FIST_FINGER_CURLS: Readonly<Record<RiggedFingerName, readonl
 
 export type RiggedHandEditPose = {
   elbowRotation: number;
+  forearmAxialRollDegrees: number;
   wristPitch: number;
   wristYaw: number;
   wristRoll: number;
@@ -203,6 +204,7 @@ function normalizedRiggedHandEditPose(
 ): RiggedHandEditPose {
   return {
     elbowRotation: boundedEditValue(pose?.elbowRotation, -180, 180),
+    forearmAxialRollDegrees: boundedEditValue(pose?.forearmAxialRollDegrees, -180, 180),
     wristPitch: boundedEditValue(pose?.wristPitch, -180, 180),
     wristYaw: boundedEditValue(pose?.wristYaw, -180, 180),
     wristRoll: boundedEditValue(pose?.wristRoll, -180, 180),
@@ -305,6 +307,7 @@ function mixRiggedHandEditPose(
   const mix = (first: number, second: number) => first + (second - first) * amount;
   return {
     elbowRotation: mix(start.elbowRotation, end.elbowRotation),
+    forearmAxialRollDegrees: mix(start.forearmAxialRollDegrees, end.forearmAxialRollDegrees),
     wristPitch: mix(start.wristPitch, end.wristPitch),
     wristYaw: mix(start.wristYaw, end.wristYaw),
     wristRoll: mix(start.wristRoll, end.wristRoll),

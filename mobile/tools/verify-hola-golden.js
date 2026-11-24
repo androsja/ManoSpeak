@@ -8,15 +8,15 @@ const path = require('path');
 const DEFAULT_ASSET_PATH = path.resolve(__dirname, '../assets/motions/hola.motion.json');
 
 const HOLA_GOLDEN = Object.freeze({
-  byteLength: 1171340,
-  sha256: '75b67d4a3c9335a2e8a5ce196a96833b52a722a391134e2e5437ec0706b2dc66',
+  byteLength: 389024,
+  sha256: '414aada475136b534900aa71a1f47af39bcadfc9d9e00d788c981542f6f55169',
   fps: 30,
-  frameCount: 36,
+  frameCount: 73,
   layout: 'pose33_left21_right21_face468',
-  activeHand: 'left',
-  contactAnchor: 'forehead',
-  contactStartFrame: 0,
-  contactEndFrame: 12,
+  activeHand: 'right',
+  contactAnchor: 'temple',
+  contactStartFrame: 16,
+  contactEndFrame: 19,
   palmAtContact: 'camera',
 });
 

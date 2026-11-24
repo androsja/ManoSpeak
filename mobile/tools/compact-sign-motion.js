@@ -75,6 +75,20 @@ function compileMotion(motion, scale = DEFAULT_SCALE, sourceName = 'motion') {
   return output;
 }
 
+function sourceMotionPath(sourceDirectory, clip) {
+  const fileFor = gloss => path.join(sourceDirectory, `${gloss.toLocaleLowerCase('es-CO')}.motion.json`);
+  const directPath = fileFor(clip);
+  if (fs.existsSync(directPath)) return directPath;
+  // Some published clip IDs differ from their dictionary gloss (ADIOS / ADIÓS).
+  const catalogPath = path.join(sourceDirectory, '../data/lsc_linguistic_catalog.json');
+  if (fs.existsSync(catalogPath)) {
+    const {entries} = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+    const entry = entries.find(item => item.motion?.clip === clip);
+    if (entry?.gloss && fs.existsSync(fileFor(entry.gloss))) return fileFor(entry.gloss);
+  }
+  throw new Error(`No source motion for ${clip} at ${directPath}.`);
+}
+
 function buildAvatarProfiles(sourceDirectory) {
   const catalogPath = path.join(sourceDirectory, 'published_signs.json');
   const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
@@ -86,11 +100,15 @@ function buildAvatarProfiles(sourceDirectory) {
     : {};
   return Object.fromEntries(glosses.flatMap(rawGloss => {
     const gloss = String(rawGloss).trim();
-    const sourcePath = path.join(sourceDirectory, `${gloss.toLowerCase()}.motion.json`);
-    const sourceMotion = parseLegacyMotionDocument(
-      JSON.parse(fs.readFileSync(sourcePath, 'utf8')),
-      sourcePath,
-    );
+    const sourcePath = sourceMotionPath(sourceDirectory, gloss);
+    const sourceMotion = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+    // Number recipes carry authoring notes under semantic, separately from
+    // the versioned motion-semantics contract used by landmark recordings.
+    if (sourceMotion.semantic?.schema === 'vozual.number-motion-draft') {
+      validateMotion(sourceMotion, sourcePath);
+    } else {
+      parseLegacyMotionDocument(sourceMotion, sourcePath);
+    }
     const profileOverride = profileOverrides[gloss.toUpperCase()];
     const profile = (sourceMotion.avatarProfile || profileOverride)
       ? {...(sourceMotion.avatarProfile || {}), ...(profileOverride || {})}
@@ -129,7 +147,7 @@ function compactPublishedMotions(sourceDirectory, outputDirectory) {
   let compactBytes = 0;
   for (const rawGloss of glosses) {
     const gloss = String(rawGloss).trim();
-    const sourcePath = path.join(sourceDirectory, `${gloss.toLowerCase()}.motion.json`);
+    const sourcePath = sourceMotionPath(sourceDirectory, gloss);
     const outputPath = path.join(outputDirectory, `${motionAssetName(gloss)}.motion.bin`);
     const source = fs.readFileSync(sourcePath);
     const sourceMotion = JSON.parse(source.toString('utf8'));

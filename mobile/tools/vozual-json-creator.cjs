@@ -52,7 +52,7 @@ function safeFileId(gloss) {
   return result;
 }
 
-function buildRuntimePreview(gloss, motion, baseName) {
+function buildRuntimePreview(gloss, motion, baseName, handReference = false) {
   const previewRoot = path.join(PREVIEW_OUTPUT_DIR, baseName);
   const sourceDirectory = path.join(previewRoot, 'source');
   const runtimeDirectory = path.join(previewRoot, 'runtime');
@@ -72,6 +72,7 @@ function buildRuntimePreview(gloss, motion, baseName) {
     sourceDirectory,
     runtimeMotions,
   ], {cwd: MOBILE_ROOT, stdio: 'pipe'});
+  fs.writeFileSync(path.join(runtimeMotions, motionFileName), `${JSON.stringify(motion, null, 2)}\n`);
 
   const esbuild = path.join(MOBILE_ROOT, 'node_modules/.bin/esbuild');
   if (!fs.existsSync(esbuild)) {
@@ -87,7 +88,7 @@ function buildRuntimePreview(gloss, motion, baseName) {
   ], {cwd: MOBILE_ROOT, stdio: 'pipe'});
 
   const previewTemplatePath = path.join(MOBILE_ROOT, 'tools/avatar/preview.html');
-  const avatarModelPath = path.join(MOBILE_ROOT, 'assets/models/vozual_woman_avatar_hands_v4.glb');
+  const avatarModelPath = path.join(MOBILE_ROOT, 'assets/models/vozual_woman_avatar_hands_v4_mobile.glb');
   if (!fs.existsSync(previewTemplatePath) || !fs.existsSync(avatarModelPath)) {
     throw new Error('Falta la plantilla o el modelo 3D usado por la vista previa de Vozual.');
   }
@@ -113,6 +114,16 @@ function buildRuntimePreview(gloss, motion, baseName) {
       body.hand-pose-reference .copy > :not(#title):not(#hand-pose-reference-panel) { display: none !important; }
       body.hand-pose-reference .copy #title { margin: 0 0 12px; font-size: 23px; }
       body.hand-pose-reference .hand-pose-reference-panel { display: block; }
+      body.hand-pose-reference .timeline { display: block; position: static; margin: 12px 0; padding: 12px; }
+      body.hand-pose-reference #seek { width: 100%; }
+      body.hand-pose-reference #pose-reference-save-frame { width: 100%; min-height: 46px; margin-top: 8px; }
+      body.hand-pose-reference[data-json-page="true"] { overflow: hidden; }
+      body.hand-pose-reference[data-json-page="true"] .visual-comparison,
+      body.hand-pose-reference[data-json-page="true"] .copy > :not(#hand-pose-reference-panel) { display: none !important; }
+      body.hand-pose-reference #pose-reference-json-panel:not([hidden]) { position: fixed; inset: 0; z-index: 10000; display: flex; flex-direction: column; gap: 16px; overflow: auto; padding: clamp(16px, 4vw, 48px); background: #0a1220; }
+      body.hand-pose-reference .pose-reference-json-toolbar { position: sticky; top: -1px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px; background: #111e2e; border: 1px solid #31445a; border-radius: 12px; }
+      body.hand-pose-reference .pose-reference-json-toolbar h1 { margin: 0; font-size: 22px; }
+      body.hand-pose-reference #pose-reference-json-panel pre { flex: 1; min-height: 70vh; margin: 0; overflow: auto; white-space: pre; background: #07111f; color: #d8e6f5; border: 1px solid #31445a; border-radius: 12px; padding: 24px; font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
       body.hand-pose-reference .quick-avatar-refresh { display: none !important; }
       @media (max-width: 900px) {
         body.creator-preview { grid-template-columns: minmax(280px, 620px); }
@@ -125,38 +136,33 @@ function buildRuntimePreview(gloss, motion, baseName) {
   previewHtml = previewHtml
     .replace('<title>VOZUAL · Simulación móvil</title>', '<title>VOZUAL Creator · Vista previa local</title>')
     .replace('</head>', `${previewOnlyStyles}\n  </head>`)
-    .replace('<body>', `<body class="creator-preview${baseName === 'hand-pose-reference' ? ' hand-pose-reference' : ''}">`)
+    .replace('<body>', `<body class="creator-preview${handReference ? ' hand-pose-reference' : ''}">`)
     .replace('SIMULACIÓN FIEL DE LA APP', 'VISTA PREVIA LOCAL · SIN PUBLICAR');
   fs.writeFileSync(path.join(runtimeDirectory, 'index.html'), previewHtml);
   fs.copyFileSync(avatarModelPath, path.join(runtimeDirectory, 'vozual_woman_avatar.glb'));
   fs.writeFileSync(path.join(runtimeDirectory, 'recordings.json'), '{}\n');
   previewRoots.set(baseName, runtimeDirectory);
-  const referenceParameters = baseName === 'hand-pose-reference'
+  const referenceParameters = handReference
     ? (() => {
       const hand = motion.avatarProfile?.activeHand === 'right' ? 'right' : 'left';
       const offsets = hand === 'right'
         ? motion.avatarProfile?.rigRightFingerSpatialOffsets?.thumb
         : motion.avatarProfile?.rigLeftFingerSpatialOffsets?.thumb;
-      return `&pose_reference=1&hand=${hand}&palm_roll=${Number(motion.avatarProfile?.rigRightPalmAxialRollDegrees ?? motion.avatarProfile?.rigLeftPalmAxialRollDegrees) || 0}&finger=thumb&finger_lateral=${Number(offsets?.lateral) || 0}&finger_forward=${Number(offsets?.forward) || 0}`;
+      return `&pose_reference=1${gloss === 'DIEZ' ? '&pose_reference_preset=fist' : ''}&hand=${hand}&palm_roll=${Number(motion.avatarProfile?.rigRightPalmAxialRollDegrees ?? motion.avatarProfile?.rigLeftPalmAxialRollDegrees) || 0}&finger=thumb&finger_lateral=${Number(offsets?.lateral) || 0}&finger_forward=${Number(offsets?.forward) || 0}`;
     })()
     : '';
   return `/preview/${baseName}/?gloss=${encodeURIComponent(gloss)}&creator_preview=1${referenceParameters}`;
 }
 
-function buildHandPoseReference() {
-  if (!fs.existsSync(DIEZ_MOTION_PATH)) {
-    throw new Error('No se encontró el borrador local DIEZ para preparar la mano de referencia.');
-  }
-  const sourceMotion = JSON.parse(fs.readFileSync(DIEZ_MOTION_PATH, 'utf8'));
-  if (!Array.isArray(sourceMotion.frames) || sourceMotion.frames.length === 0) {
-    throw new Error('El borrador DIEZ no contiene cuadros de movimiento para la referencia.');
-  }
-  const referenceMotion = {
-    ...sourceMotion,
-    frames: sourceMotion.frames.map(frame => JSON.parse(JSON.stringify(frame))),
-  };
-  delete referenceMotion.semantic;
-  return buildRuntimePreview('DIEZ', referenceMotion, 'hand-pose-reference');
+function buildHandPoseReference(gloss) {
+  const name = safeGloss(gloss || 'DIEZ');
+  const motionPath = name === 'DIEZ' ? DIEZ_MOTION_PATH
+    : path.join(MOBILE_ROOT, 'assets/motions', `${name.toLocaleLowerCase('es-CO')}.motion.json`);
+  if (!fs.existsSync(motionPath)) fail(`No se encontró la seña ${name}.`);
+  const motion = JSON.parse(fs.readFileSync(motionPath, 'utf8'));
+  const baseName = name === 'DIEZ' ? 'hand-pose-reference' : `hand-pose-reference-${safeFileId(name)}`;
+  const url = buildRuntimePreview(name, motion, baseName, true);
+  return name === 'HOLA' ? `${url}&zoom=60&reference_frame=${motion.avatarProfile.contactStartFrame}` : url;
 }
 
 function normalizeAuthoringDocument(raw) {
@@ -270,6 +276,12 @@ function send(response, status, body, contentType = 'application/json; charset=u
 function servePreview(requestUrl, response) {
   const match = requestUrl.pathname.match(/^\/preview\/([a-z0-9-]+)(?:\/(.*))?$/);
   if (!match) return false;
+  const gloss = requestUrl.searchParams.get('gloss');
+  if (match[1] === 'hand-pose-reference' && !match[2] && gloss && gloss.toUpperCase() !== 'DIEZ') {
+    response.writeHead(302, {location: `/hand-pose-reference?gloss=${encodeURIComponent(gloss)}`, 'cache-control': 'no-store'});
+    response.end();
+    return true;
+  }
   const previewRoot = previewRoots.get(match[1]);
   if (!previewRoot) {
     send(response, 404, {ok: false, error: 'Genera los JSON de esta seña antes de abrir su vista previa.'});
@@ -327,7 +339,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === 'GET' && requestUrl.pathname === '/hand-pose-reference') {
     try {
       response.writeHead(302, {
-        location: buildHandPoseReference(),
+        location: buildHandPoseReference(requestUrl.searchParams.get('gloss')),
         'cache-control': 'no-store',
       });
       response.end();

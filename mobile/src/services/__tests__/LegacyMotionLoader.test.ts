@@ -9,7 +9,7 @@ import {
 
 describe('LegacyMotionLoader', () => {
   it('accepts legacy motions without semantic metadata', () => {
-    const motion = parseLegacyMotionDocument(hola);
+    const motion = parseLegacyMotionDocument({fps: hola.fps, frames: hola.frames});
 
     expect(motion.semantic).toBeUndefined();
     expect(motion.frames).toBe(hola.frames);

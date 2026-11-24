@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.speech.SpeechRecognizer
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -39,7 +38,7 @@ class PictureInPictureModule(context: ReactApplicationContext) :
       promise.reject("NO_ACTIVITY", "VOZUAL no tiene una ventana activa.")
       return
     }
-    if (!VoiceListeningService.isActive() && !hasOnDeviceSpeechRecognizer()) {
+    if (!VoiceListeningService.isActive() && !hasLocalSherpaModel()) {
       rejectUnavailableLocalRecognition(promise)
       return
     }
@@ -68,7 +67,7 @@ class PictureInPictureModule(context: ReactApplicationContext) :
       promise.resolve(true)
       return
     }
-    if (!hasOnDeviceSpeechRecognizer()) {
+    if (!hasLocalSherpaModel()) {
       rejectUnavailableLocalRecognition(promise)
       return
     }
@@ -135,6 +134,7 @@ class PictureInPictureModule(context: ReactApplicationContext) :
 
   @ReactMethod
   fun setListeningMode(mode: String, microphoneActive: Boolean) {
+    VoiceListeningService.setListeningMode(mode)
     (reactApplicationContext.currentActivity as? MainActivity)?.updateVozualPipAction(
       mode,
       microphoneActive,
@@ -179,14 +179,13 @@ class PictureInPictureModule(context: ReactApplicationContext) :
       Intent(reactApplicationContext, VoiceListeningService::class.java),
     )
 
-  private fun hasOnDeviceSpeechRecognizer(): Boolean =
-    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-      SpeechRecognizer.isOnDeviceRecognitionAvailable(reactApplicationContext)
+  private fun hasLocalSherpaModel(): Boolean =
+    VoiceListeningService.hasModelFiles(reactApplicationContext)
 
   private fun rejectUnavailableLocalRecognition(promise: Promise) {
     promise.reject(
       "OFFLINE_SPEECH_UNAVAILABLE",
-      "El reconocimiento local no está disponible. Instala un idioma de voz sin conexión.",
+      "El modelo de reconocimiento local de VOZUAL no está instalado en este teléfono.",
     )
   }
 

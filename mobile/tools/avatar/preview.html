@@ -325,8 +325,12 @@
       .pose-reference-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
       .pose-reference-modes button { min-height: 54px; border: 1px solid #456079; background: #07111f; color: #c9d5e3; font-size: 11px; }
       .pose-reference-modes button[aria-pressed="true"] { border-color: #20d6ce; background: #12383d; color: #d8fffc; }
+      .pose-reference-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+      .pose-reference-sides button { min-height: 46px; border: 1px solid #456079; background: #07111f; color: #c9d5e3; font-size: 11px; }
+      .pose-reference-sides button[aria-pressed="true"] { border-color: #20d6ce; background: #12383d; color: #d8fffc; }
       .pose-reference-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
       .pose-reference-actions .primary { background: #20d6ce; color: #07111f; }
+      .pose-reference-play { width: 100%; min-height: 48px; margin: 12px 0 4px; }
       #pose-reference-status { min-height: 20px; margin-top: 10px; color: #7ee7c1; font-size: 12px; line-height: 1.4; }
       button, select {
         min-height: 44px;
@@ -473,9 +477,28 @@
         <div class="pose-reference-card">
           <h2>Muéstrame cómo debe verse la mano</h2>
           <p>Mueve cada dedo y gira la mano. El avatar cambia al instante; puedes copiar los ajustes para compartir la pose.</p>
+          <div class="pose-reference-modes" role="tablist" aria-label="Vista de pose y JSON">
+            <button id="pose-reference-tab-pose" type="button" role="tab" aria-selected="true">AVATAR</button>
+            <button id="pose-reference-tab-json" type="button" role="tab" aria-selected="false">JSON</button>
+          </div>
+          <div id="pose-reference-json-panel" hidden>
+            <div class="pose-reference-json-toolbar">
+              <button id="pose-reference-json-back" type="button">← AVATAR</button>
+              <h1 id="pose-reference-json-title">JSON · HOLA</h1>
+              <a id="pose-reference-json-download" download>DESCARGAR JSON</a>
+            </div>
+            <pre id="pose-reference-json"></pre>
+          </div>
+          <div id="pose-reference-controls">
+          <div class="pose-reference-sides" role="group" aria-label="Mano que se va a editar">
+            <button id="pose-reference-side-left" type="button" aria-pressed="false">MANO IZQUIERDA</button>
+            <button id="pose-reference-side-right" type="button" aria-pressed="true">MANO DERECHA</button>
+          </div>
+          <button class="primary pose-reference-play" id="pose-reference-run" type="button">EJECUTAR SEÑA</button>
+          <button class="primary" id="pose-reference-save-frame" type="button">GUARDAR ESTA POSE EN EL INSTANTE</button>
           <div class="pose-reference-modes" role="group" aria-label="Parte del brazo que se va a mover">
             <button id="pose-reference-mode-hand" type="button" aria-pressed="true">MANO · GIRAR MUÑECA</button>
-            <button id="pose-reference-mode-arm" type="button" aria-pressed="false">ANTEBRAZO · CODO A MUÑECA</button>
+            <button id="pose-reference-mode-arm" type="button" aria-pressed="false">MOVER BRAZO</button>
           </div>
           <p id="pose-reference-mode-help">Este modo rota la mano en la muñeca. Cambia a ANTEBRAZO para mover el extremo de la muñeca manteniendo el codo como pivote.</p>
           <div class="pose-reference-pad" id="pose-reference-pad" role="slider" tabindex="0" aria-label="Giro e inclinación de la muñeca">
@@ -517,13 +540,13 @@
           <div class="pose-reference-row"><label for="pose-reference-ring">Anular</label><input id="pose-reference-ring" type="range" min="-100" max="100" step="1" value="0" /><output id="pose-reference-ring-value">0%</output></div>
           <div class="pose-reference-row"><label for="pose-reference-pinky">Meñique</label><input id="pose-reference-pinky" type="range" min="-100" max="100" step="1" value="0" /><output id="pose-reference-pinky-value">0%</output></div>
           <div class="pose-reference-actions">
-            <button class="primary" id="pose-reference-run" type="button">EJECUTAR DIEZ · GIRO DE MUÑECA</button>
             <button class="primary" id="pose-reference-fist" type="button">PUÑO NATURAL</button>
             <button id="pose-reference-reset" type="button">REINICIAR AJUSTES</button>
             <button id="pose-reference-copy" type="button">COPIAR DESCRIPCIÓN</button>
           </div>
           <div id="pose-reference-status" role="status" aria-live="polite">Preparando la mano…</div>
-          <p>Referencia visual local. Solo genera archivos temporales del visor; no guarda cambios en JSON ni publica a Firebase. Envíame una captura o la descripción copiada.</p>
+          <p>Referencia visual local. Los ajustes actuales están guardados en el JSON de esta seña.</p>
+          </div>
         </div>
       </section>
       <section class="rig-editor" aria-label="Editor de manos y rostro por cuadro">
@@ -667,7 +690,7 @@
     <script>
       const parameters = new URLSearchParams(window.location.search);
       const handPoseReferenceMode = parameters.get('pose_reference') === '1';
-      const poseReferenceHand = parameters.get('hand') === 'right' ? 'right' : 'left';
+      let poseReferenceHand = parameters.get('hand') === 'left' ? 'left' : 'right';
       const initialReferencePalmRoll = Math.min(180, Math.max(-180, Number(parameters.get('palm_roll')) || 0));
       let gloss = (parameters.get('gloss') || '').trim().toUpperCase();
       const status = document.getElementById('status');
@@ -734,13 +757,15 @@
       let rigSavedKeyframesSignature = '[]';
       let rigEditorPose = emptyRigEditorHands();
       let rigEditorHandProfiles = emptyRigEditorHandProfiles();
-      let poseReferenceInitialHand;
-      let poseReferenceInitialHandProfile;
-      let poseReferenceThumbExtension = 0;
-      let poseReferenceFingerSpatialOffsets = Object.fromEntries(
+      let poseReferenceInitialHands = {};
+      let poseReferenceInitialHandProfiles = {};
+      const defaultThumbExtension = parameters.get('pose_reference_preset') === 'fist' ? 0 : 1;
+      let poseReferenceThumbExtension = defaultThumbExtension;
+      const emptyPoseReferenceFingerOffsets = () => Object.fromEntries(
         ['thumb', 'index', 'middle', 'ring', 'pinky'].map(finger => [finger, {lateral: 0, forward: 0}]),
       );
-      poseReferenceFingerSpatialOffsets[parameters.get('finger') || 'thumb'] = {
+      let poseReferenceFingerSpatialOffsets = {left: emptyPoseReferenceFingerOffsets(), right: emptyPoseReferenceFingerOffsets()};
+      poseReferenceFingerSpatialOffsets[poseReferenceHand][parameters.get('finger') || 'thumb'] = {
         lateral: Number(parameters.get('finger_lateral')) || 0,
         forward: Number(parameters.get('finger_forward')) || 0,
       };
@@ -772,6 +797,7 @@
       function emptyRigEditorHand() {
         return {
           elbowRotation: 0,
+          forearmAxialRollDegrees: 0,
           wristPitch: 0,
           wristYaw: 0,
           wristRoll: 0,
@@ -1076,8 +1102,14 @@
           frame,
           transitionFrames: Math.min(120, Math.max(1, Math.round(Number(rigTransitionFrames.value) || 6))),
           ...rigEditorFace,
-          left: copyRigEditorPose(rigEditorPose).left,
-          right: copyRigEditorPose(rigEditorPose).right,
+          left: {
+            ...copyRigEditorPose(rigEditorPose).left,
+            forearmAxialRollDegrees: rigEditorHandProfiles.left.forearmAxialRollDegrees,
+          },
+          right: {
+            ...copyRigEditorPose(rigEditorPose).right,
+            forearmAxialRollDegrees: rigEditorHandProfiles.right.forearmAxialRollDegrees,
+          },
         };
         return sortedRigEditorKeyframes([
           ...keyframes.filter(candidate => Number(candidate.frame) !== frame),
@@ -1195,7 +1227,7 @@
         document.getElementById('pose-reference-elbow-rotation-value').value = `${elbowRotation}°`;
         document.getElementById('pose-reference-palm-roll-value').value = `${palmRoll}°`;
         const selectedFinger = document.getElementById('pose-reference-finger-select').value;
-        const selectedOffset = poseReferenceFingerSpatialOffsets[selectedFinger];
+        const selectedOffset = poseReferenceFingerSpatialOffsets[poseReferenceHand][selectedFinger];
         document.getElementById('pose-reference-finger-pad').setAttribute(
           'aria-label',
           `Mover el dedo ${selectedFinger} hacia los lados y hacia delante`,
@@ -1227,7 +1259,7 @@
         window.setVozualPalmAxialRoll?.(gloss, poseReferenceHand, palmRoll);
         window.setVozualThumbExtension?.(gloss, poseReferenceHand, poseReferenceThumbExtension);
         const selectedFinger = document.getElementById('pose-reference-finger-select').value;
-        const selectedOffset = poseReferenceFingerSpatialOffsets[selectedFinger];
+        const selectedOffset = poseReferenceFingerSpatialOffsets[poseReferenceHand][selectedFinger];
         window.setVozualFingerSpatialOffset?.(
           gloss,
           poseReferenceHand,
@@ -1239,13 +1271,57 @@
       }
 
       function initializePoseReference() {
+        const referencePanel = document.getElementById('hand-pose-reference-panel');
+        referencePanel.querySelector('.pose-reference-card').append(document.querySelector('.timeline'));
+        const poseTab = document.getElementById('pose-reference-tab-pose');
+        const jsonTab = document.getElementById('pose-reference-tab-json');
+        const poseControls = document.getElementById('pose-reference-controls');
+        const jsonPanel = document.getElementById('pose-reference-json-panel');
+        const jsonPath = `./motions/${gloss.toLocaleLowerCase('es-CO')}.motion.json`;
+        document.getElementById('pose-reference-json-download').href = jsonPath;
+        poseTab.addEventListener('click', () => {
+          poseControls.hidden = false;
+          jsonPanel.hidden = true;
+          poseTab.setAttribute('aria-selected', 'true');
+          jsonTab.setAttribute('aria-selected', 'false');
+        });
+        jsonTab.addEventListener('click', async () => {
+          poseControls.hidden = true;
+          jsonPanel.hidden = false;
+          document.body.dataset.jsonPage = 'true';
+          document.getElementById('pose-reference-json-title').textContent = `JSON · ${gloss}`;
+          poseTab.setAttribute('aria-selected', 'false');
+          jsonTab.setAttribute('aria-selected', 'true');
+          const output = document.getElementById('pose-reference-json');
+          if (output.textContent && !output.textContent.startsWith('No se pudo leer el JSON:')) return;
+          output.textContent = 'Cargando JSON…';
+          try {
+            const response = await fetch(jsonPath);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            output.textContent = JSON.stringify(await response.json(), null, 2);
+          } catch (error) {
+            output.textContent = `No se pudo leer el JSON: ${error.message}`;
+          }
+        });
+        document.getElementById('pose-reference-json-back').addEventListener('click', () => {
+          document.body.dataset.jsonPage = 'false';
+          jsonPanel.hidden = true;
+          poseControls.hidden = false;
+          poseTab.setAttribute('aria-selected', 'true');
+          jsonTab.setAttribute('aria-selected', 'false');
+        });
         rigEditorHand.value = poseReferenceHand;
+        document.getElementById('pose-reference-side-left').setAttribute('aria-pressed', String(poseReferenceHand === 'left'));
+        document.getElementById('pose-reference-side-right').setAttribute('aria-pressed', String(poseReferenceHand === 'right'));
         const initialFinger = parameters.get('finger');
         if (['thumb', 'index', 'middle', 'ring', 'pinky'].includes(initialFinger)) {
           document.getElementById('pose-reference-finger-select').value = initialFinger;
         }
         const playbackState = window.getVozualPlaybackState?.();
-        if (playbackState?.active && playbackState.frameIndex < 6) {
+        const referenceFrame = Number(parameters.get('reference_frame'));
+        if (playbackState?.active && Number.isInteger(referenceFrame) && referenceFrame > 0) {
+          window.seekVozualPlayback?.((referenceFrame / Math.max(1, rigEditorFps)) * 1000);
+        } else if (playbackState?.active && playbackState.frameIndex < 6) {
           window.seekVozualPlayback?.((6 / Math.max(1, rigEditorFps)) * 1000);
         }
         if (!loadRigEditorForGloss(true)) {
@@ -1256,12 +1332,18 @@
         pause.textContent = 'CONTINUAR';
         readRigEditorControls();
         document.getElementById('pose-reference-palm-roll').value = String(initialReferencePalmRoll);
-        if (rigEditorPose[poseReferenceHand].fist < 0.99) applyNaturalFistPreset();
+        if (parameters.get('pose_reference_preset') === 'fist'
+            && rigEditorPose[poseReferenceHand].fist < 0.99) {
+          applyNaturalFistPreset();
+        }
         readRigEditorControls();
-        poseReferenceInitialHand = JSON.parse(JSON.stringify(rigEditorPose[poseReferenceHand]));
-        poseReferenceInitialHandProfile = {...rigEditorHandProfiles[poseReferenceHand]};
-        previewPoseReference();
-        document.getElementById('pose-reference-status').textContent = 'Puño listo. Arrastra el control o rota la muñeca hasta que los nudillos se vean como quieres.';
+        poseReferenceInitialHands = JSON.parse(JSON.stringify(rigEditorPose));
+        poseReferenceInitialHandProfiles = JSON.parse(JSON.stringify(rigEditorHandProfiles));
+        if (parameters.get('pose_reference_preset') === 'fist') previewPoseReference();
+        else updatePoseReferenceControls();
+        document.getElementById('pose-reference-status').textContent = parameters.get('pose_reference_preset') === 'fist'
+          ? 'Puño listo. Ajusta la mano hasta que los nudillos se vean como quieres.'
+          : `Mano ${poseReferenceHand === 'right' ? 'derecha' : 'izquierda'} lista. Pulsa Ejecutar seña para ver ${gloss}.`;
         return true;
       }
 
@@ -1286,7 +1368,7 @@
         const horizontal = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
         const vertical = Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height));
         const selectedFinger = document.getElementById('pose-reference-finger-select').value;
-        poseReferenceFingerSpatialOffsets[selectedFinger] = {
+        poseReferenceFingerSpatialOffsets[poseReferenceHand][selectedFinger] = {
           lateral: Number(((horizontal - 0.5) * 0.24).toFixed(3)),
           forward: Number(((0.5 - vertical) * 0.24).toFixed(3)),
         };
@@ -1303,8 +1385,12 @@
         const verticalOffset = Number(document.getElementById('rig-vertical-offset').value) || 0;
         const palmRoll = Number(document.getElementById('pose-reference-palm-roll').value) || 0;
         const selectedFinger = document.getElementById('pose-reference-finger-select').value;
-        const selectedOffset = poseReferenceFingerSpatialOffsets[selectedFinger];
+        const selectedOffset = poseReferenceFingerSpatialOffsets[poseReferenceHand][selectedFinger];
         const fist = Math.round((Number(document.getElementById('rig-fist').value) || 0));
+        const playback = window.getVozualPlaybackState?.();
+        const moment = playback?.active
+          ? `Seña ${gloss}, instante ${Math.round(playback.positionMs)} ms / ${Math.round(playback.durationMs)} ms, cuadro ${playback.frameIndex}. `
+          : '';
         const fingerNames = {thumb: 'pulgar', index: 'índice', middle: 'medio', ring: 'anular', pinky: 'meñique'};
         const fingerPose = Object.entries(fingerNames).map(([finger, name]) => {
           const amount = Math.round((Number(document.getElementById(`rig-${finger}`).value) || 0) * 100);
@@ -1313,11 +1399,11 @@
         const description = `Referencia de mano en VOZUAL (${poseReferenceHand}): puño ${fist}%; ${fingerPose}; dedo conectado al control espacial ${selectedFinger}, lateral ${selectedOffset.lateral.toFixed(3)}, hacia delante ${selectedOffset.forward.toFixed(3)}; muñeca X ${pitch}°, Y ${yaw}°, Z ${wristRoll}°; codo ${elbowRotation}°; posición horizontal ${horizontalOffset}%, vertical ${verticalOffset}%; giro de antebrazo ${forearmRoll}°; giro de palma ${palmRoll}°. Es una referencia visual local.`;
         const feedback = document.getElementById('pose-reference-status');
         try {
-          await navigator.clipboard.writeText(description);
+          await navigator.clipboard.writeText(moment + description);
           feedback.textContent = 'Descripción copiada. Envíamela junto con una captura del avatar.';
         } catch {
           const buffer = document.createElement('textarea');
-          buffer.value = description;
+          buffer.value = moment + description;
           buffer.style.position = 'fixed';
           buffer.style.opacity = '0';
           document.body.appendChild(buffer);
@@ -1326,7 +1412,7 @@
           buffer.remove();
           feedback.textContent = copied
             ? 'Descripción copiada. Envíamela junto con una captura del avatar.'
-            : description;
+            : moment + description;
         }
       }
 
@@ -1835,8 +1921,17 @@
             const state = window.getVozualPlaybackState?.();
             if (state?.active) synchronizeSourceVideo(state, {force: true, pauseAtEnd: true});
             status.textContent = `${gloss} terminó. Cambia entre PUNTOS, PERSONAJE o la superposición y reprodúcela otra vez.`;
+            if (handPoseReferenceMode) {
+              document.getElementById('pose-reference-status').textContent = `${gloss} terminó.`;
+            }
           }
-          if (message.type === 'error') status.textContent = `ERROR: ${message.message || 'No se pudo cargar la seña.'}`;
+          if (message.type === 'error') {
+            const errorMessage = message.message || 'No se pudo cargar la seña.';
+            status.textContent = `ERROR: ${errorMessage}`;
+            if (handPoseReferenceMode) {
+              document.getElementById('pose-reference-status').textContent = `Error: ${errorMessage}`;
+            }
+          }
         },
       };
 
@@ -2119,7 +2214,7 @@
         fingerPad.addEventListener('pointercancel', () => { draggingFingerPad = false; });
         fingerPad.addEventListener('keydown', event => {
           const selectedFinger = document.getElementById('pose-reference-finger-select').value;
-          const offset = poseReferenceFingerSpatialOffsets[selectedFinger];
+          const offset = poseReferenceFingerSpatialOffsets[poseReferenceHand][selectedFinger];
           if (event.key === 'ArrowLeft') offset.lateral = Math.max(-0.12, offset.lateral - 0.01);
           else if (event.key === 'ArrowRight') offset.lateral = Math.min(0.12, offset.lateral + 0.01);
           else if (event.key === 'ArrowUp') offset.forward = Math.min(0.12, offset.forward + 0.01);
@@ -2141,8 +2236,19 @@
           previewPoseReference();
         });
         document.getElementById('pose-reference-palm-roll').addEventListener('input', previewPoseReference);
-        document.getElementById('pose-reference-run').addEventListener('click', replay);
         document.getElementById('pose-reference-finger-select').addEventListener('change', previewPoseReference);
+        ['left', 'right'].forEach(side => {
+          document.getElementById(`pose-reference-side-${side}`).addEventListener('click', () => {
+            poseReferenceHand = side;
+            rigEditorHand.value = side;
+            document.getElementById('pose-reference-side-left').setAttribute('aria-pressed', String(side === 'left'));
+            document.getElementById('pose-reference-side-right').setAttribute('aria-pressed', String(side === 'right'));
+            poseReferenceThumbExtension = defaultThumbExtension;
+            renderRigEditorControls();
+            previewPoseReference();
+            document.getElementById('pose-reference-status').textContent = `Mano ${side === 'right' ? 'derecha' : 'izquierda'} seleccionada. Los controles ahora mueven ese lado.`;
+          });
+        });
         document.getElementById('pose-reference-thumb').addEventListener('input', event => {
           poseReferenceThumbExtension = Number(event.target.value) / 100;
           document.getElementById('pose-reference-thumb-value').value = `${event.target.value}% extendido`;
@@ -2179,16 +2285,14 @@
           previewPoseReference();
         });
         document.getElementById('pose-reference-reset').addEventListener('click', () => {
-          if (poseReferenceInitialHand) {
-            rigEditorPose[poseReferenceHand] = JSON.parse(JSON.stringify(poseReferenceInitialHand));
+          if (poseReferenceInitialHands[poseReferenceHand]) {
+            rigEditorPose[poseReferenceHand] = JSON.parse(JSON.stringify(poseReferenceInitialHands[poseReferenceHand]));
           }
-          if (poseReferenceInitialHandProfile) {
-            rigEditorHandProfiles[poseReferenceHand] = {...poseReferenceInitialHandProfile};
+          if (poseReferenceInitialHandProfiles[poseReferenceHand]) {
+            rigEditorHandProfiles[poseReferenceHand] = {...poseReferenceInitialHandProfiles[poseReferenceHand]};
           }
-          poseReferenceThumbExtension = 0;
-          poseReferenceFingerSpatialOffsets = Object.fromEntries(
-            ['thumb', 'index', 'middle', 'ring', 'pinky'].map(finger => [finger, {lateral: 0, forward: 0}]),
-          );
+          poseReferenceThumbExtension = defaultThumbExtension;
+          poseReferenceFingerSpatialOffsets[poseReferenceHand] = emptyPoseReferenceFingerOffsets();
           document.getElementById('pose-reference-thumb').value = '0';
           document.getElementById('pose-reference-palm-roll').value = String(initialReferencePalmRoll);
           renderRigEditorControls();
@@ -2197,6 +2301,26 @@
         });
         document.getElementById('pose-reference-copy').addEventListener('click', copyPoseReferenceDescription);
       }
+      document.getElementById('pose-reference-run').addEventListener('click', () => {
+        const referenceStatus = document.getElementById('pose-reference-status');
+        if (!gloss || typeof window.playVozualClip !== 'function') {
+          referenceStatus.textContent = 'No se pudo iniciar el avatar. Espera a que cargue e inténtalo otra vez.';
+          return;
+        }
+        replay();
+        referenceStatus.textContent = `Ejecutando ${gloss}…`;
+      });
+      document.getElementById('pose-reference-save-frame').addEventListener('click', () => {
+        const state = window.getVozualPlaybackState?.();
+        if (!state?.active) return;
+        window.setVozualPlaybackPaused?.(true);
+        syncRigEditorFrame(state.frameIndex);
+        previewPoseReference();
+        document.getElementById('rig-keyframe-upsert').click();
+        rigSaveButton.click();
+        document.getElementById('pose-reference-status').textContent =
+          `Pose guardada en ${Math.round(state.positionMs)} ms. La mano se interpolará hacia el siguiente ajuste.`;
+      });
       rigFacialFields.forEach(field => {
         document.getElementById(field.id).addEventListener('input', previewRigEditorControls);
       });

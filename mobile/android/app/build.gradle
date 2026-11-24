@@ -107,6 +107,30 @@ react {
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 def configuredArchitectures = (project.findProperty('reactNativeArchitectures') ?: 'armeabi-v7a,arm64-v8a').split(',')
 def enableAbiSplits = (project.findProperty('enableAbiSplits') ?: 'false').toBoolean()
+def sherpaRuntimeAar = file("${buildDir}/third-party/sherpa-onnx-1.12.39.aar")
+
+tasks.register("fetchSherpaRuntime") {
+    outputs.file(sherpaRuntimeAar)
+    doLast {
+        def expectedSha256 = "d228a731ec3125170c962e2d52ad3fe012f3616e5047a87e2743d851d69c176d"
+        if (!sherpaRuntimeAar.isFile()) {
+            sherpaRuntimeAar.parentFile.mkdirs()
+            new URL("https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.39/sherpa-onnx-1.12.39.aar")
+                .withInputStream { input -> sherpaRuntimeAar.withOutputStream { output -> output << input } }
+        }
+        def actualSha256 = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(sherpaRuntimeAar.bytes)
+            .encodeHex()
+            .toString()
+        if (actualSha256 != expectedSha256) {
+            sherpaRuntimeAar.delete()
+            throw new GradleException("Sherpa-ONNX AAR checksum did not match the pinned release.")
+        }
+    }
+}
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn("fetchSherpaRuntime")
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -141,6 +165,8 @@ android {
 
     packagingOptions {
         pickFirst 'lib/**/libc++_shared.so'
+        // React Native's existing ONNX Runtime is shared by translation and Sherpa.
+        pickFirst 'lib/**/libonnxruntime.so'
         pickFirst 'lib/**/libfbjni.so'
         pickFirst 'META-INF/androidx.appcompat_appcompat.version'
         pickFirst 'META-INF/androidx.swiperefreshlayout_swiperefreshlayout.version'
@@ -263,4 +289,6 @@ dependencies {
 
     // Google MediaPipe Tasks Vision API (Modern)
     implementation("com.google.mediapipe:tasks-vision:1.0.0")
+    // This release matches the app's ONNX Runtime 1.24.3 native ABI.
+    implementation files(sherpaRuntimeAar)
 }

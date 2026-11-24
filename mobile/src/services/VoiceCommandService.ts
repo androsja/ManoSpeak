@@ -61,6 +61,21 @@ export type IncrementalSpeechMatchUpdate<T extends string> = {
 };
 
 /**
+ * Sherpa's Android continuous listener emits one final result per VAD segment,
+ * not cumulative finals for a single phrase. Each event is therefore a fresh
+ * sign request, even when it repeats the preceding result.
+ */
+export function standaloneSpeechMatches<T extends string>(
+  current: readonly T[],
+  isFinal: boolean,
+): IncrementalSpeechMatchUpdate<T> {
+  return {
+    newWords: isFinal ? [...current] : [],
+    nextRecognizedWords: [],
+  };
+}
+
+/**
  * Advances the signs already emitted for one recognizer utterance.
  * A final result closes the utterance so the same phrase can be emitted again.
  */
