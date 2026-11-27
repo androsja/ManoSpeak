@@ -154,9 +154,11 @@ function buildRuntimePreview(gloss, motion, baseName, handReference = false) {
   return `/preview/${baseName}/?gloss=${encodeURIComponent(gloss)}&creator_preview=1${referenceParameters}`;
 }
 
-function buildHandPoseReference(gloss) {
+function buildHandPoseReference(gloss, draft = false) {
   const name = safeGloss(gloss || 'DIEZ');
-  const motionPath = name === 'DIEZ' ? DIEZ_MOTION_PATH
+  const motionPath = draft
+    ? path.join(MOBILE_ROOT, 'assets/motions/drafts/courtesy', `${safeFileId(name)}.motion.json`)
+    : name === 'DIEZ' ? DIEZ_MOTION_PATH
     : path.join(MOBILE_ROOT, 'assets/motions', `${name.toLocaleLowerCase('es-CO')}.motion.json`);
   if (!fs.existsSync(motionPath)) fail(`No se encontró la seña ${name}.`);
   const motion = JSON.parse(fs.readFileSync(motionPath, 'utf8'));
@@ -339,7 +341,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === 'GET' && requestUrl.pathname === '/hand-pose-reference') {
     try {
       response.writeHead(302, {
-        location: buildHandPoseReference(requestUrl.searchParams.get('gloss')),
+        location: buildHandPoseReference(requestUrl.searchParams.get('gloss'), requestUrl.searchParams.get('draft') === '1'),
         'cache-control': 'no-store',
       });
       response.end();

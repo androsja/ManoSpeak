@@ -2015,13 +2015,19 @@ function applyRiggedMouthContraction(intensity: number) {
 }
 
 function applyCapturedRiggedFace(frame: MotionFrame) {
-  if (!activeFaceReference) return;
+  if (!activeFaceReference) {
+    if (frame.headOrientation) rotateRiggedHeadAndFace(frame.headOrientation);
+    return;
+  }
   const presentation = capturedFacePresentation(
     frame.face,
     activeFaceReference,
     activeFaceCalibration,
   );
-  if (!presentation) return;
+  if (!presentation) {
+    if (frame.headOrientation) rotateRiggedHeadAndFace(frame.headOrientation);
+    return;
+  }
   const headOrientation = frame.headOrientation ?? {
     yaw: presentation.headYaw,
     pitch: presentation.headPitch,
@@ -4410,7 +4416,7 @@ function retargetMotion(motion: Motion): Motion {
   return {
     fps: motion.fps,
     frames: motion.frames.map(frame => {
-      const headOrientation = capturedHeadOrientation(frame.face);
+      const headOrientation = frame.headOrientation ?? capturedHeadOrientation(frame.face);
       return {
         bodyHands: frame.bodyHands.map(retargetBody),
         face: frame.face.map(retargetFace),

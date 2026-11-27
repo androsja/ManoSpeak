@@ -18,8 +18,10 @@ import {
   View,
 } from 'react-native';
 import RNFS from 'react-native-fs';
+import {ensureAndroidSpeechModel} from '../services/AndroidSpeechModelService';
 import {
   advanceIncrementalSpeechMatches,
+  advanceRevisableSpeechMatches,
   androidDirectSignVocabulary,
   extractKnownSpeechWords,
   mergeSpeechSegments,
@@ -30,17 +32,12 @@ import {
   normalizeSpeech,
 } from '../services/VoiceCommandService';
 import type {InstalledPhrase, InstalledSign} from '../services/SignLanguageService';
-import {
-  playableLscPhraseVocabulary,
-  playableLscPhraseSuggestions,
-} from '../services/LscPhraseAssetCatalogService';
 import {resolveRuntimeLscPlayback} from '../services/LscRuntimePlaybackService';
 import {
   deriveListenerFlowState,
   listenerFlowAccessibilityLabel,
 } from '../services/ListenerFlowState';
 import {PHRASE_CONTINUATION_GRACE_MS} from '../services/SignPhraseContinuity';
-import {nextPhraseSuggestionIndex} from '../services/PhraseSuggestionService';
 import { AvatarClip, AvatarRenderMode, SkeletalAvatar } from './SkeletalAvatar';
 import {PipSkeletalAvatar} from './PipSkeletalAvatar';
 import type {ActivationAccount} from '../services/ActivationService';
@@ -71,12 +68,12 @@ import {SUPPORTED_APP_LOCALES, useI18n} from '../i18n/I18n';
 // avatar clip. A clip may stay in VOZUAL without entering this vocabulary.
 const PLAYBACK_SPEEDS = [0.5, 1, 2, 3, 4] as const;
 const PLAYBACK_SPEED_PREFERENCE_PATH = `${RNFS.DocumentDirectoryPath}/vozual-playback-speed.json`;
-const LISTENER_TUTORIAL_PATH = `${RNFS.DocumentDirectoryPath}/vozual-listener-tutorial-v1.json`;
 const AVATAR_ZOOM_MIN = 0.85;
 const AVATAR_ZOOM_MAX = 1.3;
 const AVATAR_ZOOM_STEP = 0.05;
 const DEFAULT_AVATAR_ZOOM = 1;
 const CONTINUOUS_PREFIX_WAIT_MS = 1200;
+const IOS_SIGN_BATCH_MS = 300;
 const MIN_FINAL_SPEECH_CONFIDENCE = 0.55;
 type ListeningMode = 'continuous' | 'phrase';
 // Reviewed LSC playback requires a person to confirm the transcript first.
@@ -130,7 +127,7 @@ type SpeechAudioModule = {
   restoreAudioAfter: (delayMillis: number) => void;
 };
 type IosSpeechRecognizerModule = {
-  start: (locale: string, mode: ListeningMode) => Promise<boolean>;
+  start: (locale: string, mode: ListeningMode, contextualStrings?: string[]) => Promise<boolean>;
   stop: () => Promise<boolean>;
   finishPhrase: () => Promise<boolean>;
   isListening: () => Promise<boolean>;
@@ -186,6 +183,8 @@ export function ListenerScreen({
   const phraseFinalizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const deferredSpeechTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const deferredSpeechPrefix = useRef('');
+  const iosPartialSignTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const iosPendingSignMatches = useRef<KnownWord[] | undefined>(undefined);
   const iosRecognitionRestartTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const startActivityRecognitionRef = useRef<() => Promise<void>>(async () => undefined);
   const iosLastSpeechEvent = useRef<SpeechEvent | undefined>(undefined);
@@ -215,6 +214,7 @@ export function ListenerScreen({
   const [phraseFinalizing, setPhraseFinalizing] = useState(false);
   const [recognitionReady, setRecognitionReady] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [speechModelDownloadProgress, setSpeechModelDownloadProgress] = useState<number | null>(null);
   const [transcript, setTranscript] = useState('');
   const [transcriptDraft, setTranscriptDraft] = useState('');
   const [transcriptConfirmationVisible, setTranscriptConfirmationVisible] = useState(false);
@@ -239,7 +239,6 @@ export function ListenerScreen({
   const [licensesVisible, setLicensesVisible] = useState(false);
   const [accountActionPending, setAccountActionPending] = useState(false);
   const [accountActionError, setAccountActionError] = useState('');
-  const [phraseSuggestionIndex, setPhraseSuggestionIndex] = useState(0);
   const [tutorialVisible, setTutorialVisible] = useState(false);
   const [pictureInPictureMode, setPictureInPictureMode] = useState(false);
   const [avatarReady, setAvatarReady] = useState(false);
@@ -284,22 +283,26 @@ export function ListenerScreen({
   const reportPlaybackDiagnostic = useCallback((event: string, value: string) => {
     pictureInPicture?.reportPlaybackEvent(event, value);
   }, []);
-  const phraseSuggestions = useMemo(
-    () => playableLscPhraseSuggestions(installedSigns),
-    [installedSigns],
-  );
-  const phraseSuggestion = phraseSuggestions.length > 0
-    ? phraseSuggestions[phraseSuggestionIndex % phraseSuggestions.length]
-    : '';
   const androidAutoVocabulary = useMemo(
     () => androidDirectSignVocabulary(installedSigns),
     [installedSigns],
   );
   const androidAutoSignsAvailable = Platform.OS === 'android' && androidAutoVocabulary.length > 0;
-  const knownWords = useMemo(() => {
-    if (Platform.OS === 'android') return androidAutoVocabulary;
-    return playableLscPhraseVocabulary(installedSigns);
-  }, [androidAutoVocabulary, installedSigns]);
+  const knownWords = androidAutoVocabulary;
+  const iosDirectSignsAvailable = Platform.OS === 'ios' && knownWords.length > 0;
+  const iosSpeechContextualStrings = useMemo(() => {
+    const unique = new Map<string, string>();
+    const phrases = installedSigns.flatMap(sign => [sign.gloss, ...sign.speechAliases]);
+    for (const phrase of phrases) {
+      const cleaned = phrase.trim().replace(/\s+/g, ' ');
+      const normalized = normalizeSpeech(cleaned);
+      if (!normalized || normalized.split(' ').length > 2 || unique.has(normalized)) continue;
+      unique.set(normalized, cleaned);
+      if (unique.size >= 100) break;
+    }
+    return [...unique.values()];
+  }, [installedSigns]);
+  const directSignListeningAvailable = androidAutoSignsAvailable || iosDirectSignsAvailable;
   const installedSignCount = installedSigns.length;
   // Development builds exercise the complete Plus flow without contacting a
   // store or charging a real payment method. Release builds always use the
@@ -353,32 +356,6 @@ export function ListenerScreen({
     setListeningMode(fallbackMode);
     listeningModeRef.current = fallbackMode;
   }, [availableListeningModes, listeningMode]);
-
-  const showNextPhraseSuggestion = useCallback(() => {
-    setPhraseSuggestionIndex(current => nextPhraseSuggestionIndex(
-      current,
-      Math.random(),
-      phraseSuggestions.length,
-    ));
-  }, [phraseSuggestions.length]);
-
-  useEffect(() => {
-    const timer = setInterval(showNextPhraseSuggestion, 60_000);
-    return () => clearInterval(timer);
-  }, [showNextPhraseSuggestion]);
-
-  useEffect(() => {
-    let active = true;
-    if (Platform.OS === 'android') return () => { active = false; };
-    RNFS.exists(LISTENER_TUTORIAL_PATH)
-      .then(completed => {
-        if (active && !completed) setTutorialVisible(true);
-      })
-      .catch(() => {
-        if (active) setTutorialVisible(true);
-      });
-    return () => { active = false; };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -585,11 +562,9 @@ export function ListenerScreen({
   }, [avatarRenderMode, avatarZoom, playbackSpeed]);
 
   useEffect(() => {
-    const nativeMode = Platform.OS === 'android' && androidAutoSignsAvailable
-      ? 'continuous'
-      : listeningMode;
+    const nativeMode = directSignListeningAvailable ? 'continuous' : listeningMode;
     pictureInPicture?.setListeningMode(nativeMode, listening);
-  }, [androidAutoSignsAvailable, listening, listeningMode]);
+  }, [androidAutoSignsAvailable, directSignListeningAvailable, listening, listeningMode]);
 
   const applyPictureInPictureState = useCallback((compact: boolean) => {
     const wasCompact = pictureInPictureModeRef.current;
@@ -657,6 +632,34 @@ export function ListenerScreen({
       && normalizeSpeech(word) !== normalizeSpeech(lastStartedSignRef.current ?? '');
     startSign(word, continuation);
   }, [startSign]);
+
+  const queueIosSpeechMatches = useCallback((
+    recognizedSigns: readonly KnownWord[],
+    isFinal: boolean,
+    hasTranscript = false,
+  ) => {
+    const {newWords, nextRecognizedWords} = advanceRevisableSpeechMatches(
+      recognizedWords.current,
+      recognizedSigns,
+      isFinal,
+    );
+    recognizedWords.current = nextRecognizedWords;
+    speechDebug('ios-direct-sign-match-check', {
+      final: isFinal,
+      matchedOccurrences: recognizedSigns.length,
+      newlyMatchedOccurrences: newWords.length,
+    });
+    if (newWords.length > 0) {
+      signQueue.current.push(...newWords.map(word => word.toUpperCase()));
+      playNextSign();
+      setErrorMessage('');
+    } else if (recognizedSigns.length > 0) {
+      setErrorMessage('');
+    } else if (isFinal && hasTranscript) {
+      setErrorMessage('No hay una seña descargada que coincida con esa palabra.');
+    }
+    if (isFinal) recognizedWords.current = [];
+  }, [playNextSign]);
 
   const handleText = useCallback((text: string, isFinal = false, selectedEntryId?: string) => {
     setTranscript(text);
@@ -732,18 +735,6 @@ export function ListenerScreen({
     setAmbiguousCandidates([]);
   }, []);
 
-  const playSuggestedPhrase = useCallback(() => {
-    if (!phraseSuggestion || listening || playingSign) return;
-    recognizedWords.current = [];
-    handleText(phraseSuggestion, true);
-  }, [handleText, listening, phraseSuggestion, playingSign]);
-
-  const dismissTutorial = useCallback(() => {
-    setTutorialVisible(false);
-    RNFS.writeFile(LISTENER_TUTORIAL_PATH, JSON.stringify({completedAt: new Date().toISOString()}), 'utf8')
-      .catch(() => undefined);
-  }, []);
-
   const clearDeferredSpeech = useCallback(() => {
     if (deferredSpeechTimer.current) clearTimeout(deferredSpeechTimer.current);
     deferredSpeechTimer.current = undefined;
@@ -769,8 +760,8 @@ export function ListenerScreen({
       hasMeasuredConfidence,
       lowConfidenceFinal,
     });
+    if (bestText) setTranscript(bestText);
     if (Platform.OS === 'android') {
-      if (bestText) setTranscript(bestText);
       const recognizedSigns = bestText ? extractKnownSpeechWords(bestText, knownWords) : [];
       // Sherpa continuous mode emits each VAD segment as its own final result.
       // It does not send cumulative final results, so deduplicating against
@@ -788,11 +779,39 @@ export function ListenerScreen({
       // Queue matches from the complete installed sign vocabulary.
       // Repeated partial callbacks do not replay a word, while repeated words
       // in one utterance remain separate sign requests.
-      if (!androidAutoSignsAvailable || (isFinal && lowConfidenceFinal) || newWords.length === 0) return;
+      if (!androidAutoSignsAvailable) return;
+      if (newWords.length === 0) {
+        if (isFinal && bestText) setErrorMessage('No hay una seña descargada que coincida con esa palabra.');
+        return;
+      }
       recognizedWords.current = [];
       signQueue.current.push(...newWords.map(word => word.toUpperCase()));
       playNextSign();
       setErrorMessage('');
+      return;
+    }
+    if (iosDirectSignsAvailable) {
+      const recognizedSigns = bestText ? extractKnownSpeechWords(bestText, knownWords) : [];
+      setPlannedLsc(recognizedSigns.join(' · '));
+      if (isFinal) {
+        if (iosPartialSignTimer.current) clearTimeout(iosPartialSignTimer.current);
+        iosPartialSignTimer.current = undefined;
+        iosPendingSignMatches.current = undefined;
+        queueIosSpeechMatches(recognizedSigns, true, Boolean(bestText));
+      } else {
+        // Flush on a fixed deadline. Revisions update the pending batch
+        // without postponing playback while speech continues.
+        iosPendingSignMatches.current = recognizedSigns;
+        if (iosPartialSignTimer.current !== undefined) return;
+        iosPartialSignTimer.current = setTimeout(() => {
+          iosPartialSignTimer.current = undefined;
+          const pendingMatches = iosPendingSignMatches.current;
+          iosPendingSignMatches.current = undefined;
+          if (pendingMatches && listeningRef.current) {
+            queueIosSpeechMatches(pendingMatches, false);
+          }
+        }, IOS_SIGN_BATCH_MS);
+      }
       return;
     }
     if (listeningModeRef.current === 'phrase' && !isFinal) {
@@ -871,7 +890,7 @@ export function ListenerScreen({
       setPhraseFinalizing(false);
       void pictureInPicture?.stopListeningService();
     }
-  }, [androidAutoSignsAvailable, clearDeferredSpeech, handleText, installedSigns, knownWords, playNextSign, requestTranscriptConfirmation]);
+  }, [androidAutoSignsAvailable, clearDeferredSpeech, handleText, installedSigns, iosDirectSignsAvailable, knownWords, playNextSign, queueIosSpeechMatches, requestTranscriptConfirmation]);
 
   const markRecognitionUnavailable = useCallback(() => {
     recognitionReadyRef.current = false;
@@ -880,9 +899,10 @@ export function ListenerScreen({
   }, []);
 
   const startActivityRecognition = useCallback(async () => {
+    const nativeMode = iosDirectSignsAvailable ? 'continuous' : listeningModeRef.current;
     speechDebug('start-request', {
       platform: Platform.OS,
-      mode: listeningModeRef.current,
+      mode: nativeMode,
       listening: listeningRef.current,
       ready: recognitionReadyRef.current,
     });
@@ -902,7 +922,11 @@ export function ListenerScreen({
         if (!iosSpeechRecognizer) {
           throw new Error(OFFLINE_SPEECH_MESSAGE);
         }
-        await iosSpeechRecognizer.start('es-CO', listeningModeRef.current);
+        await iosSpeechRecognizer.start(
+          'es-CO',
+          nativeMode,
+          iosDirectSignsAvailable ? iosSpeechContextualStrings : undefined,
+        );
         nativeStartInFlight.current = false;
         if (
           listeningRef.current &&
@@ -1016,14 +1040,16 @@ export function ListenerScreen({
         );
       }
     }
-  }, [markRecognitionUnavailable]);
+  }, [iosDirectSignsAvailable, iosSpeechContextualStrings, markRecognitionUnavailable]);
   startActivityRecognitionRef.current = startActivityRecognition;
 
   const startListening = useCallback(async () => {
     if (listeningRef.current || listeningStartInFlight.current) return;
+    if (iosDirectSignsAvailable) listeningModeRef.current = 'continuous';
     listeningStartInFlight.current = true;
     nativePipSpeechActiveRef.current = false;
     setStarting(true);
+    setSpeechModelDownloadProgress(null);
     if (Platform.OS === 'android') {
       setTranscript('');
       setPlannedLsc('');
@@ -1032,6 +1058,8 @@ export function ListenerScreen({
     setMicrophonePermissionBlocked(false);
     try {
       if (Platform.OS === 'android') {
+        await ensureAndroidSpeechModel(setSpeechModelDownloadProgress);
+        setSpeechModelDownloadProgress(null);
         const permission = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
           {
@@ -1074,15 +1102,21 @@ export function ListenerScreen({
       listeningRef.current = false;
       markRecognitionUnavailable();
       setListening(false);
-      setErrorMessage(error instanceof Error ? error.message : 'No se pudo iniciar el reconocimiento de voz.');
+      setErrorMessage(error instanceof Error
+        ? `No se pudo preparar la voz sin conexión: ${error.message}. Toca HABLAR para reintentar.`
+        : 'No se pudo preparar la voz sin conexión. Toca HABLAR para reintentar.');
     } finally {
       listeningStartInFlight.current = false;
       setStarting(false);
+      setSpeechModelDownloadProgress(null);
     }
-  }, [markRecognitionUnavailable, startActivityRecognition]);
+  }, [iosDirectSignsAvailable, markRecognitionUnavailable, startActivityRecognition]);
 
   const startPhraseListening = useCallback(async () => {
     if (listeningRef.current || playingRef.current) return;
+    if (iosPartialSignTimer.current) clearTimeout(iosPartialSignTimer.current);
+    iosPartialSignTimer.current = undefined;
+    iosPendingSignMatches.current = undefined;
     if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
     phraseFinalizeTimer.current = undefined;
     phrasePartialTextRef.current = '';
@@ -1097,16 +1131,14 @@ export function ListenerScreen({
   }, [startListening]);
 
   useEffect(() => {
-    if (
-      Platform.OS !== 'android'
-      || !androidAutoSignsAvailable
-      || !avatarReady
-      || autoListeningAttempted.current
-    ) return;
+    const canAutoStart = Platform.OS === 'android'
+      ? androidAutoSignsAvailable
+      : true;
+    if (!canAutoStart || !avatarReady || autoListeningAttempted.current) return;
     autoListeningAttempted.current = true;
-    speechDebug('android-direct-sign-auto-start', 'listener-ready');
+    speechDebug('listener-auto-start', {platform: Platform.OS, state: 'listener-ready'});
     startPhraseListening().catch(error => {
-      speechDebug('android-direct-sign-auto-start-failed', error);
+      speechDebug('listener-auto-start-failed', {platform: Platform.OS, error});
     });
   }, [androidAutoSignsAvailable, avatarReady, startPhraseListening]);
 
@@ -1342,6 +1374,9 @@ export function ListenerScreen({
     markRecognitionUnavailable();
     recognizedWords.current = [];
     signQueue.current = [];
+    if (iosPartialSignTimer.current) clearTimeout(iosPartialSignTimer.current);
+    iosPartialSignTimer.current = undefined;
+    iosPendingSignMatches.current = undefined;
     phrasePartialTextRef.current = '';
     clearDeferredSpeech();
     if (iosRecognitionRestartTimer.current) clearTimeout(iosRecognitionRestartTimer.current);
@@ -1377,9 +1412,9 @@ export function ListenerScreen({
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('onVozualPipPrimaryAction', () => {
       if (!pictureInPictureModeRef.current) return;
-      if (Platform.OS === 'android' && androidAutoSignsAvailable) {
+      if (directSignListeningAvailable) {
         if (listeningRef.current) stopListening().catch(() => undefined);
-        else startListening().catch(() => undefined);
+        else startPhraseListening().catch(() => undefined);
         return;
       }
       if (listeningModeRef.current === 'phrase') {
@@ -1391,7 +1426,7 @@ export function ListenerScreen({
       else void startListening();
     });
     return () => subscription.remove();
-  }, [androidAutoSignsAvailable, finishPhraseListening, startListening, startPhraseListening, stopListening]);
+  }, [directSignListeningAvailable, finishPhraseListening, startListening, startPhraseListening, stopListening]);
 
   useEffect(() => {
     if (Platform.OS === 'ios') {
@@ -1454,12 +1489,18 @@ export function ListenerScreen({
               finalizeIosSpeechResult();
               return;
             }
+            if (iosPendingSignMatches.current && listeningRef.current) {
+              finalizeIosSpeechResult();
+            }
             if (!event.willRestart) markRecognitionUnavailable();
           },
         );
         return () => {
           listeningRef.current = false;
           recognitionGeneration.current += 1;
+          if (iosPartialSignTimer.current) clearTimeout(iosPartialSignTimer.current);
+          iosPartialSignTimer.current = undefined;
+          iosPendingSignMatches.current = undefined;
           startSubscription.remove();
           partialSubscription.remove();
           resultsSubscription.remove();
@@ -1552,7 +1593,7 @@ export function ListenerScreen({
         if (
           event.type === 'error'
           && typeof event.error === 'string'
-          && OFFLINE_SPEECH_ERRORS.has(event.error)
+          && (OFFLINE_SPEECH_ERRORS.has(event.error) || event.error === 'local_capture_failed')
         ) {
           if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
           phraseFinalizeTimer.current = undefined;
@@ -1562,7 +1603,9 @@ export function ListenerScreen({
           setRecognitionReady(false);
           setListening(false);
           setPhraseFinalizing(false);
-          setErrorMessage(OFFLINE_SPEECH_MESSAGE);
+          setErrorMessage(event.error === 'local_capture_failed'
+            ? 'Se interrumpió la escucha. Toca HABLAR para volver a activarla.'
+            : OFFLINE_SPEECH_MESSAGE);
           pictureInPicture?.stopListeningService().catch(() => false);
           return;
         }
@@ -1623,8 +1666,6 @@ export function ListenerScreen({
     );
 
     return () => {
-      listeningRef.current = false;
-      recognitionGeneration.current += 1;
       startSubscription.remove();
       partialResultsSubscription.remove();
       finalResultsSubscription.remove();
@@ -1632,14 +1673,20 @@ export function ListenerScreen({
       endSubscription.remove();
       volumeSubscription.remove();
       pipSpeechSubscription.remove();
-      nativeVoice?.destroySpeech(() => undefined);
-      void pictureInPicture?.stopListeningService();
-      speechAudio?.restoreAudioAfter(900);
-      if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
-      clearDeferredSpeech();
-      clearPhraseContinuationTimer();
     };
   }, [androidAutoSignsAvailable, clearDeferredSpeech, clearPhraseContinuationTimer, finalizeIosSpeechResult, markRecognitionUnavailable, onSpeechResults, scheduleIosRecognitionRestart]);
+
+  useEffect(() => () => {
+    if (Platform.OS !== 'android') return;
+    listeningRef.current = false;
+    recognitionGeneration.current += 1;
+    nativeVoice?.destroySpeech(() => undefined);
+    void pictureInPicture?.stopListeningService();
+    speechAudio?.restoreAudioAfter(900);
+    if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
+    clearDeferredSpeech();
+    clearPhraseContinuationTimer();
+  }, [clearDeferredSpeech, clearPhraseContinuationTimer]);
 
   const onSignEnd = useCallback(() => {
     const nextWord = signQueue.current.shift();
@@ -1720,14 +1767,14 @@ export function ListenerScreen({
             {account ? t('listener.settings') : t('listener.activateFree')}
           </Text>
         </Pressable>}
-        {Platform.OS === 'android' && <Pressable
+        <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('listener.downloadedSigns', {count: installedSignCount})}
           onPress={onManageSignLanguages}
           style={styles.avatarSignCountBadge}
         >
           <Text style={styles.signCountText}>{installedSignCount}</Text>
-        </Pressable>}
+        </Pressable>
         {compactMode ? (
           <PipSkeletalAvatar
             clip={activeClip}
@@ -1803,42 +1850,28 @@ export function ListenerScreen({
             );
           })}
         </View>}
-        {Platform.OS !== 'android' && tutorialVisible && (
+        {tutorialVisible && (
           <View style={styles.tutorialCard} accessibilityLabel={t('listener.tutorial.label')}>
             <View style={styles.tutorialHeader}>
               <Text style={styles.tutorialTitle}>{t('listener.tutorial.title')}</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('listener.tutorial.close')}
-                onPress={dismissTutorial}
+                onPress={() => setTutorialVisible(false)}
                 style={styles.tutorialDismissButton}
               >
                 <Text style={styles.tutorialDismissText}>×</Text>
               </Pressable>
             </View>
-            <Text style={styles.tutorialText}>
-              {t('listener.tutorial.instructions')}
-            </Text>
+            <Text style={styles.tutorialText}>{t('listener.tutorial.instructions')}</Text>
             <Text style={styles.tutorialPointer}>{t('listener.tutorial.pointer')}</Text>
           </View>
         )}
-        {Platform.OS !== 'android' && __DEV__ && <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Reproducir la seña de prueba ADIÓS"
-          disabled={!avatarReady || playingSign}
-          onPress={() => {
-            setPlannedLsc('ADIÓS · JSON LOCAL');
-            startSign('ADIOS', false);
-          }}
-          style={[styles.adiosPreviewButton, (!avatarReady || playingSign) && styles.adiosPreviewButtonDisabled]}
-        >
-          <Text style={styles.adiosPreviewButtonText}>VER SEÑA ADIÓS</Text>
-        </Pressable>}
         {(Platform.OS !== 'android' || androidAutoSignsAvailable) && <Pressable
           accessibilityRole="button"
           style={[styles.button, listening && styles.buttonActive, speechButtonDisabled && styles.buttonDisabled]}
-          onPress={Platform.OS === 'android'
-            ? (listening ? stopListening : startListening)
+          onPress={directSignListeningAvailable
+            ? (listening ? stopListening : startPhraseListening)
             : listeningMode === 'phrase'
               ? (listening ? finishPhraseListening : startPhraseListening)
               : (listening ? stopListening : startListening)}
@@ -1847,13 +1880,12 @@ export function ListenerScreen({
           {speechActionBusy
             ? <ActivityIndicator color="#07111F" />
             : <Text style={styles.buttonText}>
-              {Platform.OS === 'android'
-                ? (listening ? t('listener.stopListening') : t('listener.speak'))
-                : listeningMode === 'phrase'
-                ? (playingSign ? t('listener.replaying') : listening ? t('listener.finishPhrase') : t('listener.speak'))
-                : listening ? t('listener.stopListening') : t('listener.activateMicrophone')}
+              {listening ? t('listener.stopListening') : t('listener.speak')}
             </Text>}
         </Pressable>}
+        {Platform.OS === 'android' && speechModelDownloadProgress !== null && (
+          <Text style={styles.status}>Descargando voz sin conexión: {speechModelDownloadProgress}%</Text>
+        )}
         {accessPolicy.canUsePictureInPicture && <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('listener.openFloating')}
@@ -1871,53 +1903,39 @@ export function ListenerScreen({
             {t('listener.openFloatingAction')}
           </Text>
         </Pressable>}
-        {Platform.OS === 'android' && androidAutoSignsAvailable ? (
+        {phraseFinalizing ? (
+          <View style={styles.microphoneProgress} accessibilityLabel={t('listener.preparingTranslation')}>
+            <ActivityIndicator size="small" color="#16D9D1" />
+            <Text style={styles.microphoneProgressText}>{t('listener.preparingSign')}</Text>
+          </View>
+        ) : starting || microphonePreparing ? (
+          <View style={styles.microphoneProgress} accessibilityLabel={t('listener.preparingMicrophone')}>
+            <ActivityIndicator size="small" color="#16D9D1" />
+            <Text style={styles.microphoneProgressText}>{t('listener.preparingMicrophoneDetail')}</Text>
+          </View>
+        ) : (
           <View
             style={styles.liveListeningStatus}
-            accessibilityLabel={starting || microphonePreparing
-              ? t('listener.preparingMicrophone')
-              : listening
-                ? t('listener.liveListening')
-                : t('listener.liveIdle')}
+            accessibilityLabel={listening
+              ? t('listener.liveListening')
+              : installedSignCount > 0 ? t('listener.liveIdle') : t('listener.liveRequiresDownload')}
             accessibilityLiveRegion="polite"
           >
             <View
               style={[
                 styles.liveListeningIndicator,
                 listening && styles.liveListeningIndicatorActive,
-                !listening && !starting && !microphonePreparing && styles.liveListeningIndicatorIdle,
+                !listening && styles.liveListeningIndicatorIdle,
               ]}
             />
             <Text style={styles.liveListeningText}>
-              {starting || microphonePreparing
-                ? t('listener.preparingMicrophone')
-                : listening
-                  ? t('listener.liveListening')
-                  : t('listener.liveIdle')}
+              {listening
+                ? t('listener.liveListening')
+                : installedSignCount > 0 ? t('listener.liveIdle') : t('listener.liveRequiresDownload')}
             </Text>
           </View>
-        ) : Platform.OS === 'android' ? (
-          <Text style={styles.status}>
-            {t('listener.liveRequiresDownload')}
-          </Text>
-        ) : phraseFinalizing ? (
-          <View style={styles.microphoneProgress} accessibilityLabel={t('listener.preparingTranslation')}>
-            <ActivityIndicator size="small" color="#16D9D1" />
-            <Text style={styles.microphoneProgressText}>{t('listener.preparingSign')}</Text>
-          </View>
-        ) : microphonePreparing ? (
-          <View style={styles.microphoneProgress} accessibilityLabel={t('listener.preparingMicrophone')}>
-            <ActivityIndicator size="small" color="#16D9D1" />
-            <Text style={styles.microphoneProgressText}>{t('listener.preparingMicrophoneDetail')}</Text>
-          </View>
-        ) : (
-          listening && <Text style={styles.status}>
-            {listeningMode === 'phrase'
-              ? t('listener.listeningFinish')
-              : t('listener.continuousActive')}
-          </Text>
         )}
-        {Platform.OS === 'android' && androidAutoSignsAvailable && (
+        {directSignListeningAvailable && (
           <View style={styles.detectedWordsCard}>
             <Text
               accessibilityLiveRegion="polite"
@@ -1974,7 +1992,7 @@ export function ListenerScreen({
             </Pressable>
           </View>
         )}
-        {Platform.OS !== 'android' && transcript ? (
+        {Platform.OS !== 'android' && !iosDirectSignsAvailable && transcript ? (
           <View
             testID={`listener-flow-${listenerFlowState}`}
             style={styles.recognizedCard}
@@ -2037,56 +2055,6 @@ export function ListenerScreen({
             ))}
           </View>
         )}
-        {Platform.OS !== 'android' && <View style={styles.suggestionCard}>
-          {phraseSuggestions.length > 0 ? (
-            <>
-            <View style={styles.suggestionHeader}>
-              <Text style={styles.suggestionLabel}>{t('listener.recommendedPhrase')}</Text>
-              <Text style={styles.suggestionCount}>{t('listener.possibleCount', {count: phraseSuggestions.length})}</Text>
-            </View>
-            <Text style={styles.suggestionText} numberOfLines={2} ellipsizeMode="tail">
-              “{phraseSuggestion}”
-            </Text>
-            <Text style={styles.suggestionHint}>
-              {t('listener.suggestionHint')}
-            </Text>
-            <View style={styles.suggestionButtons}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('listener.nextSuggestionLabel')}
-                onPress={showNextPhraseSuggestion}
-                style={styles.suggestionButtonSecondary}
-              >
-                <Text style={styles.suggestionButtonSecondaryText}>{t('listener.nextSuggestion')}</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('listener.viewSuggestionLabel', {phrase: phraseSuggestion})}
-                disabled={listening || playingSign}
-                onPress={playSuggestedPhrase}
-                style={[styles.suggestionButtonPrimary, (listening || playingSign) && styles.suggestionButtonDisabled]}
-              >
-                <Text style={styles.suggestionButtonPrimaryText}>{t('listener.viewInLsc')}</Text>
-              </Pressable>
-            </View>
-            </>
-          ) : (
-            <>
-              <Text style={styles.suggestionLabel}>{t('listener.recommendedPhrases')}</Text>
-              <Text style={styles.suggestionEmptyText}>
-                {t('listener.noSuggestions')}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('listener.openLibraryLabel')}
-                onPress={onManageSignLanguages}
-                style={styles.suggestionButtonSecondary}
-              >
-                <Text style={styles.suggestionButtonSecondaryText}>{t('listener.openLibrary')}</Text>
-              </Pressable>
-            </>
-          )}
-        </View>}
       </View>}
 
       {!compactMode && <Modal
@@ -2429,9 +2397,6 @@ const styles = StyleSheet.create({
   buttonActive: { backgroundColor: '#FF5470' },
   buttonDisabled: { opacity: 0.62 },
   buttonText: { color: '#07111F', fontWeight: '800', letterSpacing: 0.4 },
-  adiosPreviewButton: { marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: '#69DDD9', backgroundColor: '#15394B', paddingVertical: 12, alignItems: 'center' },
-  adiosPreviewButtonDisabled: { opacity: 0.45 },
-  adiosPreviewButtonText: { color: '#69DDD9', fontWeight: '900', letterSpacing: 0.5 },
   floatingButton: { marginTop: 8, borderRadius: 12, borderWidth: 1, borderColor: '#16D9D1', paddingVertical: 11, alignItems: 'center' },
   floatingButtonDisabled: { borderColor: '#526174' },
   floatingButtonText: { color: '#16D9D1', fontWeight: '800', letterSpacing: 0.4 },
@@ -2467,19 +2432,6 @@ const styles = StyleSheet.create({
   signUpdateTitle: { color: '#69DDD9', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
   signUpdateDetail: { color: '#D8E1EC', marginTop: 3, fontSize: 11, fontWeight: '700', lineHeight: 15 },
   signUpdateAction: { color: '#07111F', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: '#16D9D1', fontSize: 10, fontWeight: '900', letterSpacing: 0.25, overflow: 'hidden' },
-  suggestionCard: { marginTop: 8, padding: 12, borderRadius: 12, backgroundColor: '#102337', borderWidth: 1, borderColor: '#31506A' },
-  suggestionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  suggestionLabel: { color: '#69DDD9', fontSize: 10, fontWeight: '900', letterSpacing: 0.45, lineHeight: 15 },
-  suggestionCount: { color: '#A9B8C9', fontSize: 9, fontWeight: '900', letterSpacing: 0.3 },
-  suggestionText: { color: '#F7F9FC', marginTop: 4, fontSize: 15, fontWeight: '800', lineHeight: 20 },
-  suggestionHint: { color: '#A9B8C9', marginTop: 4, fontSize: 10, lineHeight: 14 },
-  suggestionButtons: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  suggestionButtonPrimary: { flex: 1, minHeight: 34, paddingHorizontal: 12, borderRadius: 9, backgroundColor: '#16D9D1', alignItems: 'center', justifyContent: 'center' },
-  suggestionButtonPrimaryText: { color: '#07111F', fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
-  suggestionButtonSecondary: { alignSelf: 'flex-start', minHeight: 34, paddingHorizontal: 12, borderRadius: 9, borderWidth: 1, borderColor: '#31506A', backgroundColor: '#20344B', alignItems: 'center', justifyContent: 'center' },
-  suggestionButtonSecondaryText: { color: '#D8E1EC', fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
-  suggestionButtonDisabled: { opacity: 0.48 },
-  suggestionEmptyText: { color: '#A9B8C9', marginTop: 4, marginBottom: 10, fontSize: 12, lineHeight: 17 },
   error: { color: '#A9B8C9', textAlign: 'center', marginTop: 8, fontSize: 12 },
   permissionGuidance: { alignItems: 'center', marginTop: 8, gap: 7 },
   permissionGuidanceText: { color: '#A9B8C9', textAlign: 'center', fontSize: 11, lineHeight: 15 },

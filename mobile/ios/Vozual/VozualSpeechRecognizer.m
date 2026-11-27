@@ -23,6 +23,7 @@ static NSString *const VozualSpeechEndEvent = @"onVozualIosSpeechEnd";
 @property(nonatomic, assign) BOOL restartScheduled;
 @property(nonatomic, assign) BOOL hasListeners;
 @property(nonatomic, assign) NSInteger generation;
+@property(nonatomic, copy) NSArray<NSString *> *contextualStrings;
 @end
 
 @implementation VozualSpeechRecognizer
@@ -134,11 +135,30 @@ RCT_EXPORT_MODULE();
 RCT_REMAP_METHOD(start,
                  startWithLocale:(NSString *)locale
                  mode:(NSString *)mode
+                 contextualStrings:(NSArray *)contextualStrings
                  resolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
   self.localeIdentifier = locale.length > 0 ? locale : @"es-CO";
   self.phraseMode = [mode isEqualToString:@"phrase"];
+  NSMutableArray<NSString *> *phrases = [NSMutableArray array];
+  NSMutableSet<NSString *> *seenPhrases = [NSMutableSet set];
+  for (id value in contextualStrings) {
+    if (![value isKindOfClass:[NSString class]]) {
+      continue;
+    }
+    NSString *phrase = [(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString *key = phrase.lowercaseString;
+    if (phrase.length == 0 || [seenPhrases containsObject:key]) {
+      continue;
+    }
+    [seenPhrases addObject:key];
+    [phrases addObject:phrase];
+    if (phrases.count >= 100) {
+      break;
+    }
+  }
+  self.contextualStrings = phrases;
   self.desiredListening = YES;
   self.interrupted = NO;
 
@@ -266,6 +286,7 @@ RCT_REMAP_METHOD(isListening,
   self.recognitionRequest = [[SFSpeechAudioBufferRecognitionRequest alloc] init];
   self.recognitionRequest.requiresOnDeviceRecognition = YES;
   self.recognitionRequest.shouldReportPartialResults = YES;
+  self.recognitionRequest.contextualStrings = self.contextualStrings;
   self.recognitionRequest.taskHint = SFSpeechRecognitionTaskHintDictation;
   self.audioEngine = [[AVAudioEngine alloc] init];
   AVAudioInputNode *inputNode = self.audioEngine.inputNode;
@@ -299,9 +320,15 @@ RCT_REMAP_METHOD(isListening,
             }
             confidence = @(total / segments.count);
           }
+          // Dictation can format separate spoken numbers into one string.
+          // Offer the original token boundaries to the installed-sign matcher.
+          NSArray<NSString *> *tokens = [segments valueForKey:@"substring"];
+          NSString *segmentedText = [tokens componentsJoinedByString:@" "];
+          NSArray *alternatives = segmentedText.length && ![text isEqualToString:segmentedText]
+            ? @[text, segmentedText] : @[text];
           NSDictionary *payload = confidence == nil
-            ? @{@"value": @[text]}
-            : @{@"value": @[text], @"confidence": @[confidence]};
+            ? @{@"value": alternatives}
+            : @{@"value": alternatives, @"confidence": @[confidence]};
           if (text.length > 0) {
             [self emit:VozualSpeechPartialEvent body:payload];
           }
@@ -349,7 +376,9 @@ RCT_REMAP_METHOD(isListening,
     return NO;
   }
 
-  NSLog(@"[VOZUAL_IOS_ASR] session %ld started", (long)sessionGeneration);
+  NSLog(@"[VOZUAL_IOS_ASR] session %ld started with %lu vocabulary hints",
+        (long)sessionGeneration,
+        (unsigned long)self.contextualStrings.count);
   [self emit:VozualSpeechStartEvent body:@{@"generation": @(sessionGeneration)}];
   [self schedulePreventiveRotationForGeneration:sessionGeneration];
   return YES;

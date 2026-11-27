@@ -112,6 +112,11 @@ service cloud.firestore {
         allow read: if get(/databases/$(database)/documents/signJsonReleases/$(releaseId)).data.published == true;
         allow write: if false;
       }
+
+      match /motions/{signId}/compressedChunks/{chunkId} {
+        allow read: if get(/databases/$(database)/documents/signJsonReleases/$(releaseId)).data.published == true;
+        allow write: if false;
+      }
     }
 
     match /{document=**} {

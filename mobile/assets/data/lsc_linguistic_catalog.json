@@ -1835,15 +1835,16 @@
         "published": true
       },
       "review": {
-        "status": "legacy_approved",
+        "status": "approved",
         "regionalVariants": [],
         "ownerApproval": {
           "status": "approved",
           "approvedBy": "project_owner",
-          "approvedAt": "2026-09-13T00:14:03+00:00",
-          "reviewFingerprint": "7c4782109d53c0413525ad64ea538bf8e389c81d756fa3309849ed526ea60722",
-          "reviewedAt": "2026-09-13T00:14:03+00:00"
-        }
+          "approvedAt": "2026-11-26T19:30:29.933380+00:00",
+          "reviewedAt": "2026-11-26T19:30:29.933380+00:00",
+          "reviewFingerprint": "e8250304a3bc2b0719bd928d7efcaf65dfce42ee69e1ba236472d7ddaa5c592d"
+        },
+        "reviewScope": "Owner visual approval of the authored JSON preview based on INSOR page 485."
       }
     },
     {
@@ -3565,11 +3566,24 @@
         ],
         "synonyms": [
           "disculpa",
-          "disculpe"
+          "disculpe",
+          "perdóname",
+          "perdóneme",
+          "discúlpame",
+          "discúlpeme",
+          "pido perdón",
+          "te pido perdón",
+          "le pido perdón",
+          "disculpas",
+          "pido disculpas",
+          "te pido disculpas"
         ],
         "forms": [
           {
             "text": "perdón"
+          },
+          {
+            "text": "perdon"
           },
           {
             "text": "disculpa"
@@ -3578,7 +3592,34 @@
             "text": "disculpe"
           },
           {
-            "text": "perdon"
+            "text": "perdóname"
+          },
+          {
+            "text": "perdóneme"
+          },
+          {
+            "text": "discúlpame"
+          },
+          {
+            "text": "discúlpeme"
+          },
+          {
+            "text": "pido perdón"
+          },
+          {
+            "text": "te pido perdón"
+          },
+          {
+            "text": "le pido perdón"
+          },
+          {
+            "text": "disculpas"
+          },
+          {
+            "text": "pido disculpas"
+          },
+          {
+            "text": "te pido disculpas"
           }
         ]
       },
@@ -3591,8 +3632,16 @@
         "published": true
       },
       "review": {
-        "status": "legacy_approved",
-        "regionalVariants": []
+        "status": "approved",
+        "regionalVariants": [],
+        "ownerApproval": {
+          "status": "approved",
+          "approvedBy": "project_owner",
+          "approvedAt": "2026-11-27T00:34:00+00:00",
+          "reviewedAt": "2026-11-27T00:34:00+00:00",
+          "reviewFingerprint": "974f7a26975383dc7f81bf9d7553ba37662941a6e5a616a9a741a70600971578"
+        },
+        "reviewScope": "Owner visual approval of the authored fist-on-left-pectoral JSON preview."
       }
     },
     {

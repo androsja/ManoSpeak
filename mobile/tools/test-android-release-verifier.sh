@@ -21,6 +21,7 @@ run_verifier() {
     cd "$mobile_root"
     PATH="$fixture_bin:$PATH" \
       READELF="$fixture_bin/llvm-readelf" \
+      VOZUAL_VERIFY_SPEECH_MODEL=0 \
       "$verifier" "$fixture_aab"
   )
 }

@@ -26,7 +26,12 @@ import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.File
 import java.io.FileOutputStream
 import java.lang.ref.WeakReference
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /** Owns local Sherpa-ONNX ASR while VOZUAL listens in Home or PiP. */
 class VoiceListeningService : Service() {
@@ -35,8 +40,8 @@ class VoiceListeningService : Service() {
   @Volatile private var hasReachedReadyState = false
   @Volatile private var finishRequested = false
   private val stopRequested = AtomicBoolean(false)
-  private var captureThread: Thread? = null
-  private var audioRecord: AudioRecord? = null
+  @Volatile private var captureThread: Thread? = null
+  @Volatile private var audioRecord: AudioRecord? = null
   private var recognizer: OfflineRecognizer? = null
   private var vad: Vad? = null
   private val recognizedSegments = mutableListOf<String>()
@@ -101,8 +106,7 @@ class VoiceListeningService : Service() {
     stopRequested.set(true)
     hasReachedReadyState = false
     try { audioRecord?.stop() } catch (_: Exception) { }
-    captureThread?.join(1000)
-    releaseSherpa()
+    // The capture thread releases native resources once decoding has stopped.
     sendSpeechEvent(EVENT_END)
     if (activeService?.get() === this) activeService = null
     super.onDestroy()
@@ -119,6 +123,12 @@ class VoiceListeningService : Service() {
   }
 
   private fun runCaptureLoop() {
+    val decoder = ThreadPoolExecutor(
+      1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue<Runnable>(12),
+      { task -> Thread(task, "VozualSherpaDecoder") },
+    )
+    val decodeFailure = AtomicReference<Exception?>()
+    var completingPhrase = false
     try {
       val files = modelFiles(this)
       copyVadAssetIfNeeded(files.vad)
@@ -168,6 +178,7 @@ class VoiceListeningService : Service() {
         throw IllegalStateException("Android no pudo abrir el micrófono.")
       }
       audioRecord = recorder
+      if (destroyed) return
       recorder.startRecording()
       hasReachedReadyState = true
       sendSpeechEvent(EVENT_START)
@@ -175,17 +186,18 @@ class VoiceListeningService : Service() {
 
       val pcm = ShortArray(1024)
       while (!destroyed && !stopRequested.get()) {
+        decodeFailure.get()?.let { throw it }
         val count = recorder.read(pcm, 0, pcm.size, AudioRecord.READ_BLOCKING)
         if (count < 0) throw IllegalStateException("No se pudo leer el micrófono ($count).")
         if (count > 0) {
           val samples = FloatArray(count) { index -> pcm[index] / 32768.0f }
           vad?.acceptWaveform(samples)
-          decodeAvailableSegments()
+          submitAvailableSegments(decoder, decodeFailure)
         }
         if (finishRequested) {
           vad?.flush()
-          decodeAvailableSegments()
-          finishCurrentPhraseResult()
+          submitAvailableSegments(decoder, decodeFailure)
+          completingPhrase = true
           break
         }
       }
@@ -195,44 +207,67 @@ class VoiceListeningService : Service() {
     } catch (error: Exception) {
       Log.e(TAG, "Sherpa speech recognition failed", error)
       if (!destroyed && !stopRequested.get()) {
-        sendSpeechEvent(EVENT_ERROR, error = error.message ?: "No se pudo iniciar el reconocimiento local.")
+        sendSpeechEvent(EVENT_ERROR, error = ERROR_CAPTURE_FAILED)
       }
     } finally {
       hasReachedReadyState = false
       try { audioRecord?.stop() } catch (_: Exception) { }
       audioRecord?.release()
       audioRecord = null
+      if (completingPhrase) decoder.shutdown() else decoder.shutdownNow()
+      // An in-flight native decode may finish after Android stops the service.
+      // Keep its recognizer alive until the worker has returned.
+      decoder.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)
+      if (completingPhrase && !destroyed) {
+        val failure = decodeFailure.get()
+        if (failure == null) finishCurrentPhraseResult()
+        else sendSpeechEvent(EVENT_ERROR, error = ERROR_CAPTURE_FAILED)
+        sendSpeechEvent(EVENT_END)
+      }
       releaseSherpa()
       captureThread = null
-      if (finishRequested && !destroyed) sendSpeechEvent(EVENT_END)
     }
   }
 
-  private fun decodeAvailableSegments() {
+  private fun submitAvailableSegments(decoder: ThreadPoolExecutor, failure: AtomicReference<Exception?>) {
     val activeVad = vad ?: return
-    val activeRecognizer = recognizer ?: return
     while (!activeVad.empty()) {
       val samples = activeVad.front().samples
       activeVad.pop()
       if (samples.isEmpty()) continue
-      val stream = activeRecognizer.createStream()
       try {
-        stream.acceptWaveform(samples, SAMPLE_RATE)
-        activeRecognizer.decode(stream)
-        val text = activeRecognizer.getResult(stream).text.trim()
-        if (text.isNotEmpty()) {
-          recognizedSegments.add(text)
-          val joined = recognizedSegments.joinToString(" ")
-          if (listeningMode == MODE_CONTINUOUS) {
-            sendSpeechEvent(EVENT_RESULTS, arrayListOf(text))
-            recognizedSegments.clear()
-          } else {
-            sendSpeechEvent(EVENT_PARTIAL_RESULTS, arrayListOf(joined))
+        decoder.execute {
+          if (!destroyed && failure.get() == null) {
+            try {
+              decodeSegment(samples)
+            } catch (error: Exception) {
+              failure.compareAndSet(null, error)
+            }
           }
         }
-      } finally {
-        stream.release()
+      } catch (error: RejectedExecutionException) {
+        throw IllegalStateException("La transcripción se atrasó. Vuelve a activar el micrófono.", error)
       }
+    }
+  }
+
+  private fun decodeSegment(samples: FloatArray) {
+    val activeRecognizer = recognizer ?: return
+    val stream = activeRecognizer.createStream()
+    try {
+      stream.acceptWaveform(samples, SAMPLE_RATE)
+      activeRecognizer.decode(stream)
+      val text = activeRecognizer.getResult(stream).text.trim()
+      if (destroyed || text.isEmpty()) return
+      if (listeningMode == MODE_CONTINUOUS) {
+        sendSpeechEvent(EVENT_RESULTS, arrayListOf(text))
+      } else {
+        recognizedSegments.add(text)
+        val joined = recognizedSegments.joinToString(" ")
+        sendSpeechEvent(EVENT_PARTIAL_RESULTS, arrayListOf(joined))
+      }
+    } finally {
+      stream.release()
     }
   }
 
@@ -298,6 +333,7 @@ class VoiceListeningService : Service() {
     const val EVENT_STOPPED = "stopped"
     const val ACTION_STOP_LISTENING = "com.androsja.vozual.STOP_VOICE_LISTENING"
     const val ERROR_MICROPHONE_PERMISSION_DENIED = "microphone_permission_denied"
+    private const val ERROR_CAPTURE_FAILED = "local_capture_failed"
     const val ERROR_MODEL_MISSING = "sherpa_model_missing"
 
     @Volatile private var activeService: WeakReference<VoiceListeningService>? = null

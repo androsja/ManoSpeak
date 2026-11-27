@@ -8,6 +8,8 @@ import {
   where,
 } from '@react-native-firebase/firestore';
 import RNFS from 'react-native-fs';
+import {fromByteArray, toByteArray} from 'base64-js';
+import {gunzipSync} from 'fflate';
 import {parseJsonMotionDocument, type JsonMotionDocument} from './JsonMotionLoader';
 
 const LIBRARY_ROOT = `${RNFS.DocumentDirectoryPath}/vozual-sign-languages`;
@@ -52,11 +54,17 @@ export type PublishedSign = {
   motionFormat: 'compact-v2' | 'legacy-json-v2';
   jsonReleaseId?: string;
   jsonChunkCount?: number;
+  jsonCompressedChunkCount?: number;
+  compressedSizeBytes?: number;
   approved: boolean;
   compiled: boolean;
   published: boolean;
   updatedAt?: unknown;
 };
+
+function transferSizeBytes(sign: PublishedSign): number {
+  return sign.compressedSizeBytes ?? sign.sizeBytes;
+}
 
 /**
  * A reviewed Spanish phrase that can be suggested after its complete sign
@@ -344,6 +352,17 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
   const jsonChunkCount = data.jsonChunkCount === undefined
     ? undefined
     : positiveInteger(data.jsonChunkCount, 'jsonChunkCount');
+  const jsonCompressedChunkCount = data.jsonCompressedChunkCount === undefined
+    ? undefined
+    : positiveInteger(data.jsonCompressedChunkCount, 'jsonCompressedChunkCount');
+  const compressedSizeBytes = data.compressedSizeBytes === undefined
+    ? undefined
+    : positiveInteger(data.compressedSizeBytes, 'compressedSizeBytes');
+  if ((jsonCompressedChunkCount !== undefined || compressedSizeBytes !== undefined || data.jsonCompression !== undefined)
+      && (motionFormat !== 'legacy-json-v2' || data.jsonCompression !== 'gzip'
+        || jsonCompressedChunkCount === undefined || compressedSizeBytes === undefined)) {
+    throw new Error(`Sign ${id} has invalid compressed JSON metadata.`);
+  }
   const hasChunkedJsonSource = motionFormat === 'legacy-json-v2'
     && Boolean(jsonReleaseId)
     && jsonChunkCount !== undefined;
@@ -379,6 +398,8 @@ export function parsePublishedSign(id: string, data: unknown): PublishedSign {
     motionFormat,
     jsonReleaseId,
     jsonChunkCount,
+    jsonCompressedChunkCount,
+    compressedSizeBytes,
     approved: true,
     compiled: true,
     published: true,
@@ -581,8 +602,8 @@ export function mergeSignLanguageStatuses(
       installedSignCount: installed.length,
       changeCount: pendingSigns.length + removedSigns.length
         + pendingPhrases.length + removedPhrases.length,
-      totalSizeBytes: languageSigns.reduce((total, sign) => total + sign.sizeBytes, 0),
-      pendingSizeBytes: pendingSigns.reduce((total, sign) => total + sign.sizeBytes, 0),
+      totalSizeBytes: languageSigns.reduce((total, sign) => total + transferSizeBytes(sign), 0),
+      pendingSizeBytes: pendingSigns.reduce((total, sign) => total + transferSizeBytes(sign), 0),
       revision,
       followed: followed.has(language.id) || installed.length > 0,
       dismissed: state.dismissedRevisions[language.id] === revision,
@@ -641,7 +662,7 @@ function localLibraryStatuses(state: SignLibraryState): SignLanguageStatus[] {
       installedPhrases,
       installedSignCount: installedSigns.length,
       changeCount: 0,
-      totalSizeBytes: signs.reduce((total, sign) => total + sign.sizeBytes, 0),
+      totalSizeBytes: signs.reduce((total, sign) => total + transferSizeBytes(sign), 0),
       pendingSizeBytes: 0,
       revision,
       followed: true,
@@ -948,21 +969,33 @@ export async function installSignLanguageChanges(
         || (sign.motionFormat === 'compact-v2' && !isRecord(asset.avatarProfile))
       ) throw new Error(`Sign ${sign.gloss} has invalid asset metadata.`);
       if (hasChunkedJsonSource) {
-        const chunkCollection = `signJsonReleases/${sign.jsonReleaseId}/motions/${sign.id}/chunks`;
-        const chunks = await Promise.all(Array.from({length: sign.jsonChunkCount!}, async (_, index) => {
+        const compressed = sign.jsonCompressedChunkCount !== undefined;
+        const chunkCount = compressed ? sign.jsonCompressedChunkCount! : sign.jsonChunkCount!;
+        const chunkKind = compressed ? 'compressedChunks' : 'chunks';
+        const chunkCollection = `signJsonReleases/${sign.jsonReleaseId}/motions/${sign.id}/${chunkKind}`;
+        const chunks = await Promise.all(Array.from({length: chunkCount}, async (_, index) => {
           const chunkId = String(index).padStart(4, '0');
           const chunkSnapshot = await getDoc(doc(getFirestore(), `${chunkCollection}/${chunkId}`));
           if (!chunkSnapshot.exists()) throw new Error(`Sign ${sign.gloss} is missing JSON chunk ${index}.`);
           return chunkSnapshot.data();
         }));
-        if (chunks.length !== sign.jsonChunkCount || chunks.some((chunk, index) => (
+        if (chunks.length !== chunkCount || chunks.some((chunk, index) => (
           chunk.releaseId !== sign.jsonReleaseId
           || chunk.signId !== sign.id
           || chunk.index !== index
-          || chunk.count !== sign.jsonChunkCount
+          || chunk.count !== chunkCount
           || typeof chunk.contentBase64 !== 'string'
         ))) throw new Error(`Sign ${sign.gloss} has incomplete JSON motion chunks.`);
-        await RNFS.writeFile(temporaryPath, chunks.map(chunk => chunk.contentBase64).join(''), 'base64');
+        const encoded = chunks.map(chunk => chunk.contentBase64).join('');
+        if (compressed) {
+          const zipped = toByteArray(encoded);
+          if (zipped.byteLength !== sign.compressedSizeBytes) {
+            throw new Error(`Sign ${sign.gloss} has an invalid compressed size.`);
+          }
+          await RNFS.writeFile(temporaryPath, fromByteArray(gunzipSync(zipped)), 'base64');
+        } else {
+          await RNFS.writeFile(temporaryPath, encoded, 'base64');
+        }
       } else if (downloadUrl) {
         await RNFS.downloadFile({fromUrl: downloadUrl, toFile: temporaryPath}).promise;
       } else if (assetReference?.storagePath && storageAdapter) {
@@ -972,7 +1005,7 @@ export async function installSignLanguageChanges(
       } else {
         throw new Error(`Sign ${sign.gloss} has storagePath metadata but no Firebase Storage adapter or legacy content.`);
       }
-      onProgress?.(Math.min(1, (completedBytes + sign.sizeBytes) / totalBytes));
+      onProgress?.(Math.min(1, (completedBytes + transferSizeBytes(sign)) / totalBytes));
       const fileStat = await RNFS.stat(temporaryPath);
       if (fileStat.size !== sign.sizeBytes) {
         throw new Error(`Sign ${sign.gloss} has an invalid downloaded size.`);
@@ -1000,7 +1033,7 @@ export async function installSignLanguageChanges(
         temporaryPath,
         finalPath,
       });
-      completedBytes += sign.sizeBytes;
+      completedBytes += transferSizeBytes(sign);
       onProgress?.(Math.min(1, completedBytes / totalBytes));
     }
 

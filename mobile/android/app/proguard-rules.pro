@@ -3,3 +3,5 @@
 -keep class com.androsja.vozual.MediaPipeFrameProcessorPlugin { *; }
 -keep class com.androsja.vozual.VoiceListeningService { *; }
 -keep class com.androsja.vozual.PipActionReceiver { *; }
+# Sherpa JNI looks up Kotlin configuration fields by their original names.
+-keep class com.k2fsa.sherpa.onnx.** { *; }

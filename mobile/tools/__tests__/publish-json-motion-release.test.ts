@@ -8,7 +8,12 @@ const {buildRelease} = require('../publish-json-motion-release.cjs') as {
     version: number,
     glosses: string[],
     inputs: {motionDirectory: string; catalogPath: string},
-  ) => {signs: Array<{metadata: {speechAliases: string[]}}>};
+  ) => {signs: Array<{metadata: {
+    speechAliases: string[];
+    jsonCompression: string;
+    compressedSizeBytes: number;
+    sizeBytes: number;
+  }; compressedChunks: string[]}>};
 };
 
 function sha256(value: string): string {
@@ -57,6 +62,10 @@ describe('JSON motion release speech metadata', () => {
 
       expect(release.signs[0].metadata.speechAliases).toEqual(['uno', '1']);
       expect(release.signs[1].metadata.speechAliases).toEqual(['comer', 'come', 'comes', 'comía']);
+      expect(release.signs[0].metadata.jsonCompression).toBe('gzip');
+      expect(release.signs[0].compressedChunks).toHaveLength(1);
+      expect(release.signs[0].metadata.compressedSizeBytes)
+        .toBeLessThan(release.signs[0].metadata.sizeBytes);
     } finally {
       fs.rmSync(root, {recursive: true, force: true});
     }

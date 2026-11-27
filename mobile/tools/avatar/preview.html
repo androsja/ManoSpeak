@@ -1842,8 +1842,19 @@
           const publishedGlosses = Array.isArray(manifest.publishedGlosses)
             ? manifest.publishedGlosses
             : [];
+          if (parameters.get('creator_preview') === '1') {
+            for (const clip of publishedGlosses) {
+              const motionResponse = await fetch(`./motions/${clip.toLocaleLowerCase('es-CO')}.motion.json`);
+              if (!motionResponse.ok) throw new Error(`No se pudo cargar el JSON de ${clip}.`);
+              const motion = await motionResponse.json();
+              if (!window.installVozualMotionJson?.(clip, motion, motion.avatarProfile)) {
+                throw new Error(`El JSON de ${clip} no es válido.`);
+              }
+            }
+          }
           populateLibrary(publishedGlosses.length ? publishedGlosses : fallbackClips);
-        } catch {
+        } catch (error) {
+          if (parameters.get('creator_preview') === '1') throw error;
           populateLibrary(fallbackClips);
         }
       }
@@ -1915,6 +1926,10 @@
                 };
                 window.setTimeout(() => prepareReference(0), 120);
               }
+            }).catch(error => {
+              status.textContent = `ERROR: ${error.message}`;
+              document.getElementById('pose-reference-status').textContent = error.message;
+              document.getElementById('pose-reference-run').disabled = true;
             });
           }
           if (message.type === 'ended' && message.playbackId === playbackId) {

@@ -1,5 +1,6 @@
 import {
   advanceIncrementalSpeechMatches,
+  advanceRevisableSpeechMatches,
   androidDirectSignVocabulary,
   extractKnownSpeechWords,
   mergeSpeechSegments,
@@ -89,6 +90,35 @@ describe('advanceIncrementalSpeechMatches', () => {
       'ADIÓS',
       'ADIÓS',
     ]);
+  });
+});
+
+describe('advanceRevisableSpeechMatches', () => {
+  it('keeps a stable first word and adds later words as Apple expands a partial', () => {
+    const firstPartial = advanceRevisableSpeechMatches<string>([], ['UNO'], false);
+    expect(firstPartial).toEqual({
+      newWords: ['UNO'],
+      nextRecognizedWords: ['UNO'],
+    });
+
+    const settledLongerPartial = advanceRevisableSpeechMatches(
+      firstPartial.nextRecognizedWords,
+      ['UNO', 'DOS', 'TRES'],
+      false,
+    );
+    expect(settledLongerPartial).toEqual({
+      newWords: ['DOS', 'TRES'],
+      nextRecognizedWords: ['UNO', 'DOS', 'TRES'],
+    });
+
+    expect(advanceRevisableSpeechMatches(
+      settledLongerPartial.nextRecognizedWords,
+      ['UNO', 'DOS', 'TRES'],
+      true,
+    )).toEqual({
+      newWords: [],
+      nextRecognizedWords: [],
+    });
   });
 });
 

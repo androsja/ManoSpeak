@@ -310,6 +310,48 @@ describe('SignLanguageService', () => {
     }));
   });
 
+  it('downloads compressed JSON chunks and verifies the restored motion', async () => {
+    const motion = JSON.stringify({
+      version: 2,
+      fps: 30,
+      layout: 'pose33_left21_right21_face468',
+      avatarProfile: {activeHand: 'right'},
+      frames: [
+        {bodyHands: [[0, 0, 0]], face: [[0, 0, 0]]},
+        {bodyHands: [[0, 0, 0]], face: [[0, 0, 0]]},
+      ],
+    });
+    const compressed = require('zlib').gzipSync(Buffer.from(motion)) as Buffer;
+    const jsonSign = parsePublishedSign('lsc-co-hola', {
+      languageId: 'lsc-co', gloss: 'HOLA', version: 35,
+      assetName: 'hola.motion.json', sizeBytes: Buffer.byteLength(motion),
+      compressedSizeBytes: compressed.byteLength,
+      sha256: 'a'.repeat(64), profileSha256: 'b'.repeat(64), releaseSha256: 'c'.repeat(64),
+      speechAliases: ['hola'], categories: ['saludos_cortesia'], lexicalClass: 'fixed_expression',
+      verbType: 'none', requiresSubjectMarker: false,
+      motionFormat: 'legacy-json-v2', jsonReleaseId: 'lsc-co-json-v35',
+      jsonChunkCount: 1, jsonCompression: 'gzip', jsonCompressedChunkCount: 1,
+      approved: true, compiled: true, published: true,
+    });
+    const status = mergeSignLanguageStatuses([language], [jsonSign], state())[0];
+    expect(status.pendingSizeBytes).toBe(compressed.byteLength);
+    (getDoc as jest.Mock).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        releaseId: 'lsc-co-json-v35', signId: jsonSign.id, index: 0, count: 1,
+        contentBase64: compressed.toString('base64'),
+      }),
+    });
+    (require('react-native-fs').hash as jest.Mock).mockResolvedValueOnce(jsonSign.sha256);
+    (require('react-native-fs').stat as jest.Mock).mockResolvedValueOnce({size: jsonSign.sizeBytes});
+
+    await expect(installSignLanguageChanges(status)).resolves.toBe(1);
+    expect(getDoc).toHaveBeenCalledTimes(1);
+    await expect(readInstalledSignPayload('HOLA')).resolves.toEqual(expect.objectContaining({
+      motionDocument: expect.objectContaining({avatarProfile: {activeHand: 'right'}}),
+    }));
+  });
+
   it('accepts only independently downloadable approved compiled signs', () => {
     expect(sign.gloss).toBe('AGUA');
     expect(() => parsePublishedSign('draft', {

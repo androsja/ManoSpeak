@@ -13,6 +13,7 @@ jest.mock('react-native', () => ({
 }));
 
 jest.mock('../../services/SignLanguageService', () => ({}));
+jest.mock('../../services/AndroidSpeechModelService', () => ({ensureAndroidSpeechModel: jest.fn()}));
 
 import {
   handleLibraryBack,

@@ -1,0 +1,305 @@
+{
+  "gloss": "GRACIAS",
+  "status": "draft",
+  "language": "lsc-CO",
+  "reference": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf",
+  "referencePage": 485,
+  "description": "La mano derecha comienza apoyada sobre el vestido a la altura del abdomen, con la palma hacia el cuerpo y los dedos en diagonal hacia abajo. Sube cerca del torso y gira suavemente hasta llevar las yemas al mentón. Luego se desplaza hacia delante y abajo hasta tocar la palma izquierda, que permanece orientada hacia arriba. La cabeza se inclina suavemente durante la salida. Al terminar, la mano derecha vuelve a descansar sobre el vestido.",
+  "fps": 30,
+  "durationMs": 2400,
+  "coordinateSpace": "normalized-body-x-right-y-down-z-away",
+  "keyframes": [
+    {
+      "ms": 0,
+      "rightWrist": [
+        0.4,
+        1.13,
+        -0.32
+      ],
+      "rightElbow": [
+        0.27,
+        1.04,
+        -0.15
+      ],
+      "leftWrist": [
+        0.61,
+        1.04,
+        -0.3
+      ],
+      "leftElbow": [
+        0.78,
+        1,
+        -0.13
+      ],
+      "rightDirection": [
+        0.8,
+        0.6,
+        0
+      ],
+      "leftDirection": [
+        -1,
+        -0.15,
+        -0.2
+      ],
+      "headPitch": 0,
+      "rightAcross": [
+        0.6,
+        -0.8,
+        0
+      ]
+    },
+    {
+      "ms": 200,
+      "rightWrist": [
+        0.4,
+        1.13,
+        -0.32
+      ],
+      "rightElbow": [
+        0.27,
+        1.04,
+        -0.15
+      ],
+      "leftWrist": [
+        0.61,
+        1.04,
+        -0.3
+      ],
+      "leftElbow": [
+        0.78,
+        1,
+        -0.13
+      ],
+      "rightDirection": [
+        0.8,
+        0.6,
+        0
+      ],
+      "leftDirection": [
+        -1,
+        -0.15,
+        -0.2
+      ],
+      "headPitch": 0,
+      "rightAcross": [
+        0.6,
+        -0.8,
+        0
+      ]
+    },
+    {
+      "ms": 700,
+      "rightWrist": [
+        0.48,
+        0.66,
+        -0.17
+      ],
+      "rightElbow": [
+        0.23,
+        0.94,
+        -0.2
+      ],
+      "leftWrist": [
+        0.65,
+        0.89,
+        -0.37
+      ],
+      "leftElbow": [
+        0.79,
+        1,
+        -0.18
+      ],
+      "rightDirection": [
+        0,
+        -1,
+        0
+      ],
+      "leftDirection": [
+        -1,
+        -0.15,
+        -0.2
+      ],
+      "headPitch": 0
+    },
+    {
+      "ms": 900,
+      "rightWrist": [
+        0.48,
+        0.66,
+        -0.17
+      ],
+      "rightElbow": [
+        0.23,
+        0.94,
+        -0.2
+      ],
+      "leftWrist": [
+        0.65,
+        0.89,
+        -0.37
+      ],
+      "leftElbow": [
+        0.79,
+        1,
+        -0.18
+      ],
+      "rightDirection": [
+        0,
+        -1,
+        0
+      ],
+      "leftDirection": [
+        -1,
+        -0.15,
+        -0.2
+      ],
+      "headPitch": 0
+    },
+    {
+      "ms": 1400,
+      "rightWrist": [
+        0.43,
+        0.81,
+        -0.26
+      ],
+      "rightElbow": [
+        0.25,
+        1,
+        -0.18
+      ],
+      "leftWrist": [
+        0.65,
+        0.89,
+        -0.37
+      ],
+      "leftElbow": [
+        0.79,
+        1,
+        -0.18
+      ],
+      "rightDirection": [
+        0.7,
+        0.25,
+        -0.65
+      ],
+      "leftDirection": [
+        -1,
+        -0.15,
+        -0.2
+      ],
+      "headPitch": 0.14
+    },
+    {
+      "ms": 1600,
+      "rightWrist": [
+        0.43,
+        0.81,
+        -0.26
+      ],
+      "rightElbow": [
+        0.25,
+        1,
+        -0.18
+      ],
+      "leftWrist": [
+        0.65,
+        0.89,
+        -0.37
+      ],
+      "leftElbow": [
+        0.79,
+        1,
+        -0.18
+      ],
+      "rightDirection": [
+        0.7,
+        0.25,
+        -0.65
+      ],
+      "leftDirection": [
+        -1,
+        -0.15,
+        -0.2
+      ],
+      "headPitch": 0.14
+    },
+    {
+      "ms": 2200,
+      "rightWrist": [
+        0.4,
+        1.13,
+        -0.32
+      ],
+      "rightElbow": [
+        0.27,
+        1.04,
+        -0.15
+      ],
+      "leftWrist": [
+        0.61,
+        1.04,
+        -0.3
+      ],
+      "leftElbow": [
+        0.78,
+        1,
+        -0.13
+      ],
+      "rightDirection": [
+        0.8,
+        0.6,
+        0
+      ],
+      "leftDirection": [
+        -1,
+        -0.15,
+        -0.2
+      ],
+      "headPitch": 0,
+      "rightAcross": [
+        0.6,
+        -0.8,
+        0
+      ]
+    },
+    {
+      "ms": 2400,
+      "rightWrist": [
+        0.4,
+        1.13,
+        -0.32
+      ],
+      "rightElbow": [
+        0.27,
+        1.04,
+        -0.15
+      ],
+      "leftWrist": [
+        0.61,
+        1.04,
+        -0.3
+      ],
+      "leftElbow": [
+        0.78,
+        1,
+        -0.13
+      ],
+      "rightDirection": [
+        0.8,
+        0.6,
+        0
+      ],
+      "leftDirection": [
+        -1,
+        -0.15,
+        -0.2
+      ],
+      "headPitch": 0,
+      "rightAcross": [
+        0.6,
+        -0.8,
+        0
+      ]
+    }
+  ]
+}

@@ -53,9 +53,9 @@ describe('LinguisticCatalogService', () => {
   });
 
   it('does not expose a linguistically reviewed sign before personal approval', () => {
-    expect(findPublishedLscEntry('PERDÓN')).toBeUndefined();
-    expect(planPublishedLscGlosses(['PERDÓN'])).toEqual([]);
-    expect(resolvePublishedLscPlan('perdón').tokens).toEqual([]);
+    expect(findPublishedLscEntry('PENSAR')).toBeUndefined();
+    expect(planPublishedLscGlosses(['PENSAR'])).toEqual([]);
+    expect(resolvePublishedLscPlan('pensar').tokens).toEqual([]);
   });
 
   it('recognizes voice forms only for personally approved clips', () => {
@@ -75,9 +75,9 @@ describe('LinguisticCatalogService', () => {
   });
 
   it('plans only signs that the user downloaded', () => {
-    const installed = new Set(['AGUA']);
-    expect(resolvePublishedLscPlan('agua y amigo', installed).tokens.map(token => token.gloss))
-      .toEqual(['AGUA']);
+    const installed = new Set(['UNO']);
+    expect(resolvePublishedLscPlan('uno y amigo', installed).tokens.map(token => token.gloss))
+      .toEqual(['UNO']);
   });
 
   it('uses linguistic metadata downloaded with an independent sign', () => {

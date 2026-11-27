@@ -1,0 +1,85 @@
+{
+  "gloss": "PERDÓN",
+  "status": "draft",
+  "language": "lsc-CO",
+  "description": "La mano derecha se cierra en puño (todos los dedos cerrados, palma hacia el pecho). Sube desde el reposo en el vestido, se traslada hasta el lado izquierdo del pecho (lado contrario al de la mano activa) y realiza dos giros circulares suaves y visibles en el plano del pecho. Luego regresa al reposo. La mano izquierda permanece inactiva junto al costado del vestido.",
+  "reference": "Owner-defined sign for VOZUAL; replaces the INSOR p.491 two-hand variant after owner visual review on 2026-11-26.",
+  "fps": 30,
+  "durationMs": 2400,
+  "coordinateSpace": "normalized-body-x-right-y-down-z-away",
+  "handshape": {
+    "right": "fist",
+    "rightFingerStates": {
+      "thumb": "closed",
+      "index": "closed",
+      "middle": "closed",
+      "ring": "closed",
+      "pinky": "closed"
+    }
+  },
+  "circleMotion": {
+    "plane": "XY",
+    "note": "Circle is drawn in the frontal (XY) body plane; Z stays constant at centerZ (no depth oscillation). angle=0 → top of circle (minimum Y). Clockwise on screen: X = centerX + RADIUS_X*sin(angle), Y = centerY - RADIUS_Y*cos(angle).",
+    "centerX": 0.58,
+    "centerY": 0.83,
+    "centerZ": -0.38,
+    "radiusX": 0.055,
+    "radiusY": 0.048,
+    "turns": 2,
+    "startFrame": 12,
+    "framesPerTurn": 18,
+    "holdFrames": 4,
+    "circleStartWrist": [0.58, 0.782, -0.38],
+    "continuityNote": "Phase 1 ends at circleStartWrist (angle=0 top of circle). Phase 3/4 depart from circleStartWrist. No discontinuity at any phase boundary."
+  },
+  "keyframes": [
+    {
+      "ms": 0,
+      "label": "rest",
+      "rightWrist": [0.40, 1.13, -0.36],
+      "rightElbow": [0.27, 1.04, -0.20]
+    },
+    {
+      "ms": 200,
+      "label": "rest-hold",
+      "rightWrist": [0.40, 1.13, -0.36],
+      "rightElbow": [0.27, 1.04, -0.20]
+    },
+    {
+      "ms": 400,
+      "label": "approach-chest",
+      "rightWrist": [0.49, 0.956, -0.37],
+      "rightElbow": [0.285, 1.015, -0.23]
+    },
+    {
+      "ms": 600,
+      "label": "circle-start",
+      "rightWrist": [0.58, 0.782, -0.38],
+      "rightElbow": [0.30, 0.9904, -0.26]
+    },
+    {
+      "ms": 1800,
+      "label": "circle-end",
+      "rightWrist": [0.58, 0.782, -0.38],
+      "rightElbow": [0.30, 0.9904, -0.26]
+    },
+    {
+      "ms": 2000,
+      "label": "return-mid",
+      "rightWrist": [0.49, 0.956, -0.37],
+      "rightElbow": [0.285, 1.015, -0.23]
+    },
+    {
+      "ms": 2200,
+      "label": "rest-approach",
+      "rightWrist": [0.40, 1.13, -0.36],
+      "rightElbow": [0.27, 1.04, -0.20]
+    },
+    {
+      "ms": 2400,
+      "label": "rest",
+      "rightWrist": [0.40, 1.13, -0.36],
+      "rightElbow": [0.27, 1.04, -0.20]
+    }
+  ]
+}

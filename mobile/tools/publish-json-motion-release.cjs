@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const {spawnSync} = require('child_process');
 const {motionAssetName} = require('./compact-sign-motion');
 
@@ -116,9 +117,15 @@ function buildRelease(releaseId, version, glosses, inputs = {}) {
   const signs = glosses.map(gloss => {
     const input = releaseInputs(gloss, inputs);
     const base64 = input.bytes.toString('base64');
+    const compressed = zlib.gzipSync(input.bytes, {level: 9});
+    const compressedBase64 = compressed.toString('base64');
     const chunks = [];
+    const compressedChunks = [];
     for (let start = 0; start < base64.length; start += CHUNK_CHARACTERS) {
       chunks.push(base64.slice(start, start + CHUNK_CHARACTERS));
+    }
+    for (let start = 0; start < compressedBase64.length; start += CHUNK_CHARACTERS) {
+      compressedChunks.push(compressedBase64.slice(start, start + CHUNK_CHARACTERS));
     }
     return {
       metadata: {
@@ -138,6 +145,9 @@ function buildRelease(releaseId, version, glosses, inputs = {}) {
         requiresSubjectMarker: input.descriptor.requiresSubjectMarker,
         motionFormat: 'legacy-json-v2',
         jsonChunkCount: chunks.length,
+        jsonCompression: 'gzip',
+        jsonCompressedChunkCount: compressedChunks.length,
+        compressedSizeBytes: compressed.byteLength,
         approved: true,
         compiled: true,
         published: true,
@@ -147,6 +157,7 @@ function buildRelease(releaseId, version, glosses, inputs = {}) {
         ...(input.metadata.reviewScope ? {reviewScope: input.metadata.reviewScope} : {}),
       },
       chunks,
+      compressedChunks,
     };
   });
   return {
@@ -199,12 +210,14 @@ async function publish(releaseId, version, glosses, dryRun, inputs = {}) {
     pointerPath,
     releasePath,
     version,
-    signs: signs.map(({metadata, chunks}) => ({
+    signs: signs.map(({metadata, chunks, compressedChunks}) => ({
       id: metadata.id,
       gloss: metadata.gloss,
       sizeBytes: metadata.sizeBytes,
       sha256: metadata.sha256,
       chunkCount: chunks.length,
+      compressedSizeBytes: metadata.compressedSizeBytes,
+      compressedChunkCount: compressedChunks.length,
     })),
   };
   if (dryRun) {
@@ -221,7 +234,7 @@ async function publish(releaseId, version, glosses, dryRun, inputs = {}) {
     if (version <= currentVersion) throw new Error('New release version must be greater than the active version.');
   }
   await firestoreRequest(token, 'POST', `signJsonReleases?documentId=${encodeURIComponent(releaseId)}`, firestoreDocument(manifest));
-  for (const {metadata, chunks} of signs) {
+  for (const {metadata, chunks, compressedChunks} of signs) {
     for (const [index, contentBase64] of chunks.entries()) {
       const documentId = String(index).padStart(4, '0');
       const chunkPath = `${releasePath}/motions/${metadata.id}/chunks?documentId=${documentId}`;
@@ -230,6 +243,18 @@ async function publish(releaseId, version, glosses, dryRun, inputs = {}) {
         signId: metadata.id,
         index,
         count: chunks.length,
+        sha256: metadata.sha256,
+        contentBase64,
+      }));
+    }
+    for (const [index, contentBase64] of compressedChunks.entries()) {
+      const documentId = String(index).padStart(4, '0');
+      const chunkPath = `${releasePath}/motions/${metadata.id}/compressedChunks?documentId=${documentId}`;
+      await firestoreRequest(token, 'POST', chunkPath, firestoreDocument({
+        releaseId,
+        signId: metadata.id,
+        index,
+        count: compressedChunks.length,
         sha256: metadata.sha256,
         contentBase64,
       }));

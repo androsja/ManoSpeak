@@ -387,7 +387,13 @@ RCT_EXPORT_METHOD(setListeningMode:(NSString *)mode microphoneActive:(BOOL)micro
 RCT_EXPORT_METHOD(setAvatarPresentation:(NSString *)renderMode
                   avatarZoom:(double)avatarZoom
                   playbackSpeed:(double)playbackSpeed) {}
-RCT_EXPORT_METHOD(reportPlaybackEvent:(NSString *)event publishedGloss:(NSString *)publishedGloss) {}
+RCT_EXPORT_METHOD(reportPlaybackEvent:(NSString *)event publishedGloss:(NSString *)publishedGloss)
+{
+  if ([NSProcessInfo.processInfo.environment[@"VOZUAL_TRACE_PLAYBACK"] isEqualToString:@"1"] &&
+      ([event isEqualToString:@"play-sign"] || [event isEqualToString:@"avatar-playback-ended"])) {
+    NSLog(@"[VOZUAL_PLAYBACK] %@ %@", event, publishedGloss);
+  }
+}
 
 - (void)pictureInPictureControllerDidStartPictureInPicture:
   (AVPictureInPictureController *)pictureInPictureController

@@ -4,6 +4,7 @@ import {
   Alert,
   BackHandler,
   FlatList,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,6 +24,7 @@ import {
   type SignLanguageStatus,
 } from '../services/SignLanguageService';
 import {playableLscPhraseSuggestions} from '../services/LscPhraseAssetCatalogService';
+import {ensureAndroidSpeechModel} from '../services/AndroidSpeechModelService';
 import {useI18n} from '../i18n/I18n';
 
 type Props = {
@@ -76,6 +78,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
   const [activeLanguageId, setActiveLanguageId] = useState('');
   const [activeSignId, setActiveSignId] = useState('');
   const [progress, setProgress] = useState(0);
+  const [voiceProgress, setVoiceProgress] = useState(0);
   const [catalogLanguageId, setCatalogLanguageId] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState(ALL_CATEGORIES);
@@ -153,8 +156,15 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
     setActiveLanguageId(language.id);
     setActiveSignId('');
     setProgress(0);
+    setVoiceProgress(0);
     try {
-      const changed = await installSignLanguageChanges(language, setProgress);
+      const voiceInstallation = initialSetup && Platform.OS === 'android'
+        ? ensureAndroidSpeechModel(setVoiceProgress)
+        : Promise.resolve();
+      const [changed] = await Promise.all([
+        installSignLanguageChanges(language, setProgress),
+        voiceInstallation,
+      ]);
       try {
         await onSelectedLanguageChange?.(language.id);
       } catch {
@@ -174,6 +184,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
     } finally {
       setActiveLanguageId('');
       setProgress(0);
+      setVoiceProgress(0);
     }
   };
 
@@ -189,7 +200,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
         removedSigns: [],
         pendingPhrases: [],
         removedPhrases: [],
-        pendingSizeBytes: sign.sizeBytes,
+        pendingSizeBytes: sign.compressedSizeBytes ?? sign.sizeBytes,
       };
       await installSignLanguageChanges(selectedSignStatus, setProgress);
       try {
@@ -290,6 +301,23 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
       </View>
     );
   };
+
+  if (initialSetup && activeLanguageId && !activeSignId) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.brand}>VOZUAL</Text>
+        <Text style={styles.title}>Preparando la app</Text>
+        <Text style={styles.description}>
+          Descargando señas y voz para usarlas sin conexión. Mantén la app abierta hasta que termine.
+        </Text>
+        <ActivityIndicator color="#38BDF8" size="large" />
+        <Text style={styles.progress}>Señas: {Math.round(progress * 100)}%</Text>
+        {Platform.OS === 'android' && (
+          <Text style={styles.progress}>Voz: {voiceProgress}% · paquete de 126 MB</Text>
+        )}
+      </View>
+    );
+  }
 
   if (catalogLanguage) {
     return (

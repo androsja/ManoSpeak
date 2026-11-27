@@ -61,9 +61,9 @@ export type IncrementalSpeechMatchUpdate<T extends string> = {
 };
 
 /**
- * Sherpa's Android continuous listener emits one final result per VAD segment,
- * not cumulative finals for a single phrase. Each event is therefore a fresh
- * sign request, even when it repeats the preceding result.
+ * A completed recognizer segment is a fresh sign request. Partial callbacks
+ * can revise cumulative speech, so queueing each complete segment as a batch
+ * preserves its order without letting intermediate text consume sign words.
  */
 export function standaloneSpeechMatches<T extends string>(
   current: readonly T[],
@@ -100,6 +100,34 @@ export function advanceIncrementalSpeechMatches<T extends string>(
   }
 
   return {newWords: [...newWords], nextRecognizedWords};
+}
+
+/**
+ * Handles Apple's partial transcripts, which can revise or replace earlier
+ * words instead of always growing from the beginning like Android segments.
+ */
+export function advanceRevisableSpeechMatches<T extends string>(
+  emitted: readonly T[],
+  current: readonly T[],
+  isFinal: boolean,
+): IncrementalSpeechMatchUpdate<T> {
+  const maximumOverlap = Math.min(emitted.length, current.length);
+  let overlap = maximumOverlap;
+  while (overlap > 0) {
+    const matchesPriorSuffix = current
+      .slice(0, overlap)
+      .every((word, index) => word === emitted[emitted.length - overlap + index]);
+    if (matchesPriorSuffix) break;
+    overlap -= 1;
+  }
+
+  const newWords = current.slice(overlap);
+  return {
+    newWords,
+    nextRecognizedWords: isFinal || current.length === 0
+      ? []
+      : [...emitted, ...newWords],
+  };
 }
 
 export function speechContainsWord(text: string, word: string): boolean {

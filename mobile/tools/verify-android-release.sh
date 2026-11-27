@@ -97,6 +97,21 @@ trap cleanup EXIT
 unzip -q "$aab_path" 'base/lib/arm64-v8a/*.so' -d "$temp_dir"
 unzip -p "$aab_path" base/assets/index.android.bundle > "$temp_dir/index.android.bundle"
 
+# The first-run speech model is downloaded with a pinned checksum. Sherpa JNI
+# looks up Kotlin field names directly, so release shrinking must retain them.
+if [[ "${VOZUAL_VERIFY_SPEECH_MODEL:-1}" == '1' ]]; then
+  grep -aFq '9539b206ba7cb46231e24eb1f1d7269370bfd45209c549d70e2bfd0e9f3b021a' "$temp_dir/index.android.bundle" \
+    || die "verified first-run Spanish speech model installer is absent"
+  mapping_path="android/app/build/outputs/mapping/release/mapping.txt"
+  [[ -f "$mapping_path" ]] || die "release R8 mapping is missing"
+  dexdump_bin="$android_sdk/build-tools/36.0.0/dexdump"
+  [[ -x "$dexdump_bin" ]] || die "Android SDK dexdump is unavailable"
+  unzip -p "$aab_path" base/dex/classes.dex > "$temp_dir/classes.dex"
+  "$dexdump_bin" -f "$temp_dir/classes.dex" > "$temp_dir/classes.txt"
+  awk '/Class descriptor  :.*OfflineRecognizerConfig/ { within=1 } within && /name *:.*decodingMethod/ { found=1; exit } within && /Direct methods/ { exit } END { exit !found }' "$temp_dir/classes.txt" \
+    || die "Sherpa JNI configuration field was renamed by R8"
+fi
+
 for development_marker in \
   'Compra de prueba aprobada' \
   'ENTORNO DE PRUEBA' \
