@@ -72,3 +72,44 @@ TraductorSeñas/ (Vozual root)
 | Run Training Tests | `poetry run pytest` | Unit testing models and extractors |
 | Run Linter | `poetry run ruff check .` | Ruff fast lint checks |
 | Run Typecheck | `poetry run mypy .` | Python strict typing |
+
+## 6. Authoring and Publishing New LSC Signs
+
+Follow this end-to-end workflow whenever creating, refining, or publishing a Colombian Sign Language (LSC) sign:
+
+1. **Research the LSC Reference First:**
+   - Look up the sign in the local references under `docs/references/lsc-manuals/` (`diccionario-basico-lsc-insor-mineducacion.pdf`, `diccionario-lsc-signwriting-2023.pdf`, `elementos-didactica-lsc-y-matematicas-estudiantes-sordos.pdf`) or in an owner-provided video/description.
+   - Record the exact source citation and page number in the authoring recipe and documentation. Do not invent handshapes or claim linguistic approval without owner review.
+
+2. **Create a Procedural Authoring Draft (`drafts/`):**
+   - Add an editable keyframe recipe at `mobile/assets/motions/drafts/<category>/<slug>.authoring.json` and a deterministic generator script at `mobile/tools/generate-<slug>-motion-draft.cjs` (follow existing courtesy examples such as `mobile/tools/generate-gracias-motion-draft.cjs` and `mobile/tools/generate-querer-motion-draft.cjs`).
+   - Generate `mobile/assets/motions/drafts/<category>/<slug>.motion.json` in `version: 2`, `layout: "pose33_left21_right21_face468"` format:
+     - Keep uncaptured `face` landmarks as zeros unless explicitly captured, and drive facial expressions/handshapes via `avatarProfile` (`activeHand`, `forceTwoHands`, `rigArmDepthSpace: "shoulder-relative"`, `rigRightHandShape`, `rigLeftHandShape`, `rigHandKeyframes`, `contactAnchor`).
+     - Set `publicationReview.status` to `"draft"`.
+     - Add a unit test under `mobile/tools/__tests__/<slug>-authored-motion.test.ts` validating deterministic rebuilds, geometric/contact invariants, and `parseJsonMotionDocument`.
+
+3. **Preview on the 3D Avatar and Get Owner Approval:**
+   - Start the local 3D pose reference preview from `mobile/`:
+     ```bash
+     npm run pose:reference
+     ```
+   - Open `http://127.0.0.1:4175/hand-pose-reference?gloss=<URL_ENCODED_GLOSS>&draft=1` (or share the preview with the owner) and refine timing, coordinates, palm orientation, and finger curls until the owner explicitly approves the sign visually.
+   - Never treat a draft as approved or publish it to Firebase without explicit owner approval.
+
+4. **Promote the Approved Sign and Validate Locally:**
+   - Write the approved motion to `mobile/assets/motions/<gloss_lowercase>.motion.json` with `publicationReview.status = "approved"`.
+   - Update `mobile/assets/data/lsc_linguistic_catalog.json` (`review.status = "approved"`, `ownerApproval`, `synonyms`, `forms`), `mobile/assets/motions/published_signs.json`, `mobile/assets/motions/avatar_profile_overrides.json` (if runtime profile overrides are needed), and `mobile/assets/data/lsc_recommended_phrases.json` (when adding reviewed phrases).
+   - Run the validation suite from `mobile/`:
+     ```bash
+     npm run build:published-signs && npm run audit:avatar-signs && npm run verify:release-assets && npm test -- --runInBand && npm run typecheck && npm run lint
+     ```
+
+5. **Publish an Immutable Firebase JSON Release (`signJsonReleases`):**
+   - Always include the full set of live published glosses (not only the new sign) so existing signs stay available to users.
+   - Dry-run first, then publish with `--publish` using `mobile/tools/publish-json-motion-release.cjs`:
+     ```bash
+     cd mobile
+     node tools/publish-json-motion-release.cjs --release-id lsc-co-json-v<N> --version <N> --gloss HOLA --gloss GRACIAS ...
+     node tools/publish-json-motion-release.cjs --publish --release-id lsc-co-json-v<N> --version <N> --gloss HOLA --gloss GRACIAS ...
+     ```
+   - Verify the live release and pointer with `npm run verify:published-signs` and `npm run status:published-signs`.
