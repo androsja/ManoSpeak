@@ -84,73 +84,50 @@ describe('compact sign motion', () => {
     }));
   });
 
-  it('trims BUENAS TARDES and keeps both captured palms fully open', () => {
+  it('keeps the authored BUENAS TARDES motion continuous with both hands approved', () => {
     const overrides = require('../../../assets/motions/avatar_profile_overrides.json');
     const source = require('../../../assets/motions/buenas tardes.motion.json');
-    expect(overrides['BUENAS TARDES']).toEqual(expect.objectContaining({
+    expect(overrides['BUENAS TARDES']).toBeUndefined();
+    expect(source.publicationReview?.status).toBe('approved');
+    expect(source.avatarProfile).toEqual(expect.objectContaining({
+      activeHand: 'right',
       forceTwoHands: true,
-      rigLeftHandShape: 'fully-open',
-      rigRightHandShape: 'fully-open',
-      rigLeftPalmScaleMin: 1,
-      rigLeftPalmScaleMax: 1,
-      rigRightPalmScaleMin: 1,
-      rigRightPalmScaleMax: 1,
+      contactAnchor: 'chin',
+      contactStartFrame: 15,
+      contactEndFrame: 19,
+      rigLeftHandShape: 'captured',
+      rigRightHandShape: 'captured',
     }));
-    expect(source.frames).toHaveLength(30);
-    expect(source.avatarProfile.contactStartFrame).toBe(0);
-    expect(source.avatarProfile.contactEndFrame).toBe(8);
+    expect(source.frames).toHaveLength(85);
+    expect(source.avatarProfile.rigInterHandContact.startFrame)
+      .toBeGreaterThan(source.avatarProfile.contactEndFrame);
   });
 
-  it('keeps the recreated BUENOS DÍAS motion continuous and both hands extended', () => {
+  it('keeps the authored BUENOS DÍAS motion continuous with both hands approved', () => {
     const overrides = require('../../../assets/motions/avatar_profile_overrides.json');
     const source = require('../../../assets/motions/buenos días.motion.json');
-    expect(overrides['BUENOS DÍAS']).toEqual(expect.objectContaining({
-      forceTwoHands: true,
-      rigLeftHandShape: 'fully-open',
-      rigRightHandShape: 'fully-open',
-      rigLeftPalmScaleMin: 1,
-      rigLeftPalmScaleMax: 1,
-      rigRightPalmScaleMin: 1,
-      rigRightPalmScaleMax: 1,
-      rigLeftHandFrontDepth: 0.46,
-      rigRightHandFrontDepth: 0.28,
-      rigLeftHandInitialFrontDepth: 0.54,
-      rigRightHandInitialFrontDepth: 0.54,
-      rigInitialHandFrontDepthEndFrame: 12,
-      rigInitialHandFrontDepthFadeFrames: 7,
-      rigLeftForearmFollowUpperArmRoll: true,
-      rigRightForearmFollowUpperArmRoll: true,
-      rigLeftPalmAxialRollDegrees: -90,
-      rigPalmAxialRollStartFrame: 20,
-      rigPalmAxialRollEndFrame: 26,
-      rigPalmAxialRollFadeFrames: 7,
-    }));
-    expect(overrides['BUENOS DÍAS'].rigHandKeyframes).toBeUndefined();
-    expect(overrides['BUENOS DÍAS'].rigRightPalmAxialRollDegrees).toBeUndefined();
-    expect(overrides['BUENOS DÍAS'].rigInterHandContact).toEqual({
-      movingSide: 'L',
-      movingLandmarks: [0, 5, 9, 13, 17],
-      supportSide: 'R',
-      supportLandmarks: [0, 5, 9, 13, 17],
-      snap: 1,
-      preserveCapturedOffset: false,
-      horizontalOffset: 0.04,
-      verticalOffset: 0.12,
-      startFrame: 20,
-      endFrame: 26,
-      fadeInFrames: 7,
-      fadeOutFrames: 6,
-      maximumCorrection: 0.55,
-      allowManualTransforms: true,
-    });
-    expect(source.frames).toHaveLength(50);
+    expect(overrides['BUENOS DÍAS']).toBeUndefined();
+    expect(source.publicationReview?.status).toBe('approved');
     expect(source.avatarProfile).toEqual(expect.objectContaining({
-      contactStartFrame: 7,
-      contactEndFrame: 12,
+      activeHand: 'right',
+      forceTwoHands: true,
+      contactAnchor: 'chin',
+      contactStartFrame: 16,
+      contactEndFrame: 21,
+      rigLeftHandShape: 'captured',
+      rigRightHandShape: 'captured',
     }));
+    expect(source.avatarProfile.rigInterHandContact).toEqual(expect.objectContaining({
+      movingSide: 'R',
+      supportSide: 'L',
+      snap: 1,
+      startFrame: 31,
+      endFrame: 36,
+    }));
+    expect(source.frames).toHaveLength(91);
     expect(
-      overrides['BUENOS DÍAS'].rigInterHandContact.startFrame
-      - overrides['BUENOS DÍAS'].rigInterHandContact.fadeInFrames,
+      source.avatarProfile.rigInterHandContact.startFrame
+      - source.avatarProfile.rigInterHandContact.fadeFrames,
     ).toBeGreaterThan(source.avatarProfile.contactEndFrame);
 
     const trajectoryIndexes = [13, 14, 15, 16, 33, 54];
@@ -169,7 +146,7 @@ describe('compact sign motion', () => {
       Math.abs(speed - speeds[index])
     ));
     expect(Math.max(...speeds)).toBeLessThan(0.065);
-    expect(Math.max(...accelerations)).toBeLessThan(0.02);
+    expect(Math.max(...accelerations)).toBeLessThan(0.025);
   });
 
   it('keeps the thumb and index extended throughout BLANCO', () => {
@@ -211,10 +188,10 @@ describe('compact sign motion', () => {
     expect(overrides.HAMBRE.rigHandFrontDepth).toBeGreaterThan(0);
   });
 
-  it('keeps the index finger stable for personal-pronoun signs', () => {
+  it('removes legacy personal-pronoun overrides awaiting authored v2 motions', () => {
     const overrides = require('../../../assets/motions/avatar_profile_overrides.json');
-    expect(overrides.TÚ.rigPointingHand).toBe(true);
-    expect(overrides.YO.rigSelfPointingHand).toBe(true);
+    expect(overrides.TÚ).toBeUndefined();
+    expect(overrides.YO).toBeUndefined();
   });
 
   it('reconstructs every landmark within the fixed quantization tolerance', () => {

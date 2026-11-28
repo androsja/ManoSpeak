@@ -89,6 +89,9 @@ describe('native speech privacy contract', () => {
     expect(source).toContain('supportsOnDeviceRecognition');
     expect(source).toContain('requiresOnDeviceRecognition = YES');
     expect(source).toContain('segment.confidence');
+    expect(source).toContain('self.authorizing');
+    expect(source).toContain('self.audioTapInstalled');
+    expect(source).toContain('consecutiveErrorCount');
   });
 
   it('sends local speech segments to installed-sign matching without cloud transcription', () => {

@@ -1,0 +1,24 @@
+{
+  "gloss": "AGUA",
+  "status": "draft",
+  "language": "lsc-CO",
+  "reference": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf#page=110",
+  "referencePage": 58,
+  "description": "Con la mano derecha en configuración A y la palma hacia dentro, la punta del pulgar toca dos veces el mentón. Entre toques, el pulgar se separa brevemente del mentón.",
+  "fps": 30,
+  "durationMs": 2000,
+  "contactWindows": [{"startFrame": 21, "endFrame": 23}, {"startFrame": 33, "endFrame": 35}],
+  "keyframes": [
+    {"ms": 0, "wrist": [0.32, 1.14, -0.28], "elbow": [0.25, 1.02, -0.13], "direction": [0.65, 0.55, -0.1], "across": [0.5, -0.65, 0.35]},
+    {"ms": 167, "wrist": [0.32, 1.14, -0.28], "elbow": [0.25, 1.02, -0.13], "direction": [0.65, 0.55, -0.1], "across": [0.5, -0.65, 0.35]},
+    {"ms": 533, "wrist": [0.405, 0.65, -0.44], "elbow": [0.23, 0.96, -0.21], "direction": [0.24, -1, 0.05], "across": [-0.48, 0, 0.88]},
+    {"ms": 700, "wrist": [0.445, 0.62, -0.31], "elbow": [0.24, 0.95, -0.19]},
+    {"ms": 767, "wrist": [0.445, 0.62, -0.31], "elbow": [0.24, 0.95, -0.19]},
+    {"ms": 933, "wrist": [0.415, 0.655, -0.45], "elbow": [0.23, 0.96, -0.22]},
+    {"ms": 1100, "wrist": [0.445, 0.62, -0.31], "elbow": [0.24, 0.95, -0.19]},
+    {"ms": 1167, "wrist": [0.445, 0.62, -0.31], "elbow": [0.24, 0.95, -0.19]},
+    {"ms": 1333, "wrist": [0.405, 0.66, -0.44], "elbow": [0.23, 0.96, -0.21]},
+    {"ms": 1833, "wrist": [0.32, 1.14, -0.28], "elbow": [0.25, 1.02, -0.13], "direction": [0.65, 0.55, -0.1], "across": [0.5, -0.65, 0.35]},
+    {"ms": 2000, "wrist": [0.32, 1.14, -0.28], "elbow": [0.25, 1.02, -0.13], "direction": [0.65, 0.55, -0.1], "across": [0.5, -0.65, 0.35]}
+  ]
+}

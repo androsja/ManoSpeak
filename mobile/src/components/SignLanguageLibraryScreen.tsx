@@ -1,8 +1,10 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   BackHandler,
+  Easing,
   FlatList,
   Platform,
   Pressable,
@@ -22,10 +24,11 @@ import {
   selectSignLanguage,
   type PublishedSign,
   type SignLanguageStatus,
+  type SignLibraryInstallProgress,
 } from '../services/SignLanguageService';
 import {playableLscPhraseSuggestions} from '../services/LscPhraseAssetCatalogService';
 import {ensureAndroidSpeechModel} from '../services/AndroidSpeechModelService';
-import {useI18n} from '../i18n/I18n';
+import {type TranslationKey, type TranslationValues, useI18n} from '../i18n/I18n';
 
 type Props = {
   initialSetup: boolean;
@@ -53,6 +56,20 @@ export function recommendedPhrasesForInstalledLibrary(
     .map(phrase => phrase.spanish);
 }
 
+/** Suggests playable phrases for the currently selected language library. */
+export function possibleLibraryPhrases(
+  language?: Pick<SignLanguageStatus, 'installedSigns' | 'installedPhrases' | 'phrases'>,
+): string[] {
+  const installedSigns = language?.installedSigns ?? [];
+  const remotePhrases = language?.installedPhrases.length
+    ? language.installedPhrases
+    : (language?.phrases ?? []);
+  return Array.from(new Set([
+    ...recommendedPhrasesForInstalledLibrary(remotePhrases, installedSigns),
+    ...playableLscPhraseSuggestions(installedSigns),
+  ]));
+}
+
 export function handleLibraryBack(
   catalogLanguageId: string,
   closeCatalog: () => void,
@@ -70,6 +87,298 @@ function megabytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 }
 
+/** Formats the active download stage label and step completion indices. */
+export function describeInstallProgress(
+  detail: SignLibraryInstallProgress | undefined,
+  t: (key: TranslationKey, params?: TranslationValues) => string,
+): {
+  stageLabel: string;
+  counterLabel: string;
+  activeGloss: string;
+  activeStepIndex: number;
+} {
+  const stage = detail?.stage ?? 'preparing';
+  const gloss = detail?.currentGloss?.trim() ?? '';
+  const completed = detail?.completedSigns ?? 0;
+  const total = detail?.totalSigns ?? 0;
+  const counterLabel = total > 0
+    ? t('library.install.counter', {completed: Math.min(completed, total), total})
+    : '';
+  let stageLabel = t('library.install.stage.preparing');
+  let activeStepIndex = 0;
+
+  if (stage === 'downloading') {
+    stageLabel = gloss
+      ? t('library.install.stage.downloading', {gloss})
+      : t('library.install.stage.preparing');
+    activeStepIndex = 0;
+  } else if (stage === 'verifying') {
+    stageLabel = gloss
+      ? t('library.install.stage.verifying', {gloss})
+      : t('library.install.stage.preparing');
+    activeStepIndex = 1;
+  } else if (stage === 'phrases') {
+    stageLabel = t('library.install.stage.phrases');
+    activeStepIndex = 2;
+  } else if (stage === 'saving') {
+    stageLabel = t('library.install.stage.saving');
+    activeStepIndex = 3;
+  }
+
+  return {
+    stageLabel,
+    counterLabel,
+    activeGloss: gloss,
+    activeStepIndex,
+  };
+}
+
+/** Computes unified initial-setup percentage and stage label across signs, voice, and activation. */
+export function resolveInitialSetupProgress({
+  signsProgress,
+  signsDone,
+  voiceProgress,
+  voiceDone,
+  finalizing,
+  isAndroid,
+  detail,
+  t,
+}: {
+  signsProgress: number;
+  signsDone: boolean;
+  voiceProgress: number;
+  voiceDone: boolean;
+  finalizing: boolean;
+  isAndroid: boolean;
+  detail?: SignLibraryInstallProgress;
+  t: (key: TranslationKey, params?: TranslationValues) => string;
+}): {
+  fraction: number;
+  percent: number;
+  stageLabel: string;
+  counterLabel: string;
+  activeGloss: string;
+  activeStepIndex: number;
+} {
+  const base = describeInstallProgress(detail, t);
+  const clampedSigns = Math.max(0, Math.min(1, signsProgress));
+  const clampedVoice = Math.max(0, Math.min(100, voiceProgress));
+
+  if (finalizing) {
+    return {
+      fraction: 0.99,
+      percent: 99,
+      stageLabel: t('library.install.stage.finalizing'),
+      counterLabel: base.counterLabel,
+      activeGloss: '',
+      activeStepIndex: 3,
+    };
+  }
+
+  if (isAndroid) {
+    const voiceFraction = voiceDone ? 1 : clampedVoice / 100;
+    const weighted = (signsDone ? 1 : clampedSigns) * 0.25 + voiceFraction * 0.75;
+    const fraction = Math.min(0.98, weighted * 0.98);
+    if (signsDone && !voiceDone) {
+      return {
+        fraction,
+        percent: Math.round(fraction * 100),
+        stageLabel: clampedVoice >= 99
+          ? t('library.install.stage.voiceVerifying')
+          : t('library.install.stage.voiceDownloading', {progress: clampedVoice}),
+        counterLabel: base.counterLabel,
+        activeGloss: '',
+        activeStepIndex: 3,
+      };
+    }
+    return {
+      fraction,
+      percent: Math.round(fraction * 100),
+      ...base,
+    };
+  }
+
+  const fraction = Math.min(0.97, clampedSigns * 0.97);
+  return {
+    fraction,
+    percent: Math.round(fraction * 100),
+    ...base,
+  };
+}
+
+function AnimatedShimmerBar({progress}: {progress: number}) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+  const clamped = Math.max(0.03, Math.min(1, progress));
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(shimmer, {
+        toValue: 1,
+        duration: 1400,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
+
+  const sweepTranslate = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-120, 280],
+  });
+
+  return (
+    <View style={styles.progressTrack}>
+      <View style={[styles.progressFill, {width: `${Math.round(clamped * 100)}%`}]}>
+        <Animated.View
+          style={[
+            styles.progressShimmer,
+            {transform: [{translateX: sweepTranslate}]},
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
+function ModernDownloadShowcase({
+  signsProgress,
+  signsDone,
+  voiceProgress,
+  voiceDone,
+  finalizing,
+  detail,
+  recentGlosses,
+  t,
+}: {
+  signsProgress: number;
+  signsDone: boolean;
+  voiceProgress: number;
+  voiceDone: boolean;
+  finalizing: boolean;
+  detail?: SignLibraryInstallProgress;
+  recentGlosses: readonly string[];
+  t: (key: TranslationKey, params?: TranslationValues) => string;
+}) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1100,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1100,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, [pulse]);
+
+  const dotOpacity = pulse.interpolate({inputRange: [0, 1], outputRange: [0.4, 1]});
+  const isAndroid = Platform.OS === 'android';
+  const info = resolveInitialSetupProgress({
+    signsProgress,
+    signsDone,
+    voiceProgress,
+    voiceDone,
+    finalizing,
+    isAndroid,
+    detail,
+    t,
+  });
+  const steps = [
+    t('library.install.step.signs'),
+    t('library.install.step.integrity'),
+    t('library.install.step.phrases'),
+    isAndroid
+      ? t('library.install.androidVoice', {progress: voiceDone ? 100 : voiceProgress})
+      : t('library.install.step.offline'),
+  ];
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.brand}>VOZUAL</Text>
+      <Text style={styles.title}>{t('library.install.title')}</Text>
+      <Text style={styles.description}>{t('library.install.subtitle')}</Text>
+
+      <View style={styles.downloadCard}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.heroMeta}>
+            <View style={styles.stageRow}>
+              <Animated.View style={[styles.liveDot, {opacity: dotOpacity}]} />
+              <Text style={styles.stageText} numberOfLines={2}>{info.stageLabel}</Text>
+            </View>
+            {info.counterLabel ? (
+              <Text style={styles.counterText}>{info.counterLabel}</Text>
+            ) : null}
+          </View>
+          <Text style={styles.percentHeadline}>{info.percent}%</Text>
+        </View>
+
+        <AnimatedShimmerBar progress={info.fraction} />
+
+        <View style={styles.stepList}>
+          {steps.map((stepLabel, index) => {
+            const done = index < info.activeStepIndex || (index === 3 && finalizing && info.percent >= 100);
+            const active = index === info.activeStepIndex && !done;
+            return (
+              <View key={stepLabel} style={styles.stepRow}>
+                <View style={[
+                  styles.stepBadge,
+                  done && styles.stepBadgeDone,
+                  active && styles.stepBadgeActive,
+                ]}>
+                  <Text style={[
+                    styles.stepBadgeText,
+                    (done || active) && styles.stepBadgeTextActive,
+                  ]}>
+                    {done ? '✓' : active ? '•' : `${index + 1}`}
+                  </Text>
+                </View>
+                <Text style={[
+                  styles.stepText,
+                  done && styles.stepTextDone,
+                  active && styles.stepTextActive,
+                ]}>
+                  {stepLabel}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {recentGlosses.length > 0 ? (
+          <View style={styles.glossTrail}>
+            {recentGlosses.map((gloss, index) => {
+              const isCurrent = index === recentGlosses.length - 1 && info.activeGloss === gloss;
+              return (
+                <View
+                  key={gloss}
+                  style={[styles.glossPill, isCurrent && styles.glossPillActive]}
+                >
+                  <Text style={[styles.glossPillText, isCurrent && styles.glossPillTextActive]}>
+                    {isCurrent ? `⟳ ${gloss}` : `✓ ${gloss}`}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedLanguageChange}: Props) {
   const {t} = useI18n();
   const [languages, setLanguages] = useState<SignLanguageStatus[]>([]);
@@ -78,7 +387,12 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
   const [activeLanguageId, setActiveLanguageId] = useState('');
   const [activeSignId, setActiveSignId] = useState('');
   const [progress, setProgress] = useState(0);
+  const [signsDone, setSignsDone] = useState(false);
+  const [installDetail, setInstallDetail] = useState<SignLibraryInstallProgress | undefined>(undefined);
+  const [recentInstallGlosses, setRecentInstallGlosses] = useState<string[]>([]);
   const [voiceProgress, setVoiceProgress] = useState(0);
+  const [voiceDone, setVoiceDone] = useState(false);
+  const [finalizingInstall, setFinalizingInstall] = useState(false);
   const [catalogLanguageId, setCatalogLanguageId] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState(ALL_CATEGORIES);
@@ -118,7 +432,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
   );
   const possiblePhrases = useMemo(() => {
     const language = languages.find(candidate => candidate.selected) ?? languages[0];
-    return playableLscPhraseSuggestions(language?.installedSigns ?? []);
+    return possibleLibraryPhrases(language);
   }, [languages]);
   const possiblePhrase = possiblePhrases.length > 0
     ? possiblePhrases[suggestionIndex % possiblePhrases.length]
@@ -152,19 +466,43 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
     return () => subscription.remove();
   }, [catalogLanguageId, languages, onContinue]);
 
+  const handleInstallProgress = useCallback((fraction: number, detail?: SignLibraryInstallProgress) => {
+    setProgress(fraction);
+    if (!detail) return;
+    setInstallDetail(detail);
+    const gloss = detail.currentGloss?.trim();
+    if (gloss) {
+      setRecentInstallGlosses(previous => {
+        if (previous[previous.length - 1] === gloss) return previous;
+        return [...previous.filter(item => item !== gloss), gloss].slice(-4);
+      });
+    }
+  }, []);
+
   const install = async (language: SignLanguageStatus) => {
     setActiveLanguageId(language.id);
     setActiveSignId('');
     setProgress(0);
+    setSignsDone(false);
+    setInstallDetail(undefined);
+    setRecentInstallGlosses([]);
     setVoiceProgress(0);
+    setVoiceDone(Platform.OS !== 'android');
+    setFinalizingInstall(false);
     try {
       const voiceInstallation = initialSetup && Platform.OS === 'android'
-        ? ensureAndroidSpeechModel(setVoiceProgress)
+        ? ensureAndroidSpeechModel(setVoiceProgress).then(() => { setVoiceDone(true); })
         : Promise.resolve();
+      const signsInstallation = installSignLanguageChanges(language, handleInstallProgress)
+        .then(count => {
+          setSignsDone(true);
+          return count;
+        });
       const [changed] = await Promise.all([
-        installSignLanguageChanges(language, setProgress),
+        signsInstallation,
         voiceInstallation,
       ]);
+      setFinalizingInstall(true);
       try {
         await onSelectedLanguageChange?.(language.id);
       } catch {
@@ -184,7 +522,12 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
     } finally {
       setActiveLanguageId('');
       setProgress(0);
+      setSignsDone(false);
+      setInstallDetail(undefined);
+      setRecentInstallGlosses([]);
       setVoiceProgress(0);
+      setVoiceDone(false);
+      setFinalizingInstall(false);
     }
   };
 
@@ -193,6 +536,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
     setActiveLanguageId(language.id);
     setActiveSignId(sign.id);
     setProgress(0);
+    setInstallDetail(undefined);
     try {
       const selectedSignStatus: SignLanguageStatus = {
         ...language,
@@ -202,7 +546,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
         removedPhrases: [],
         pendingSizeBytes: sign.compressedSizeBytes ?? sign.sizeBytes,
       };
-      await installSignLanguageChanges(selectedSignStatus, setProgress);
+      await installSignLanguageChanges(selectedSignStatus, handleInstallProgress);
       try {
         await onSelectedLanguageChange?.(language.id);
       } catch {
@@ -224,6 +568,7 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
       setActiveLanguageId('');
       setActiveSignId('');
       setProgress(0);
+      setInstallDetail(undefined);
     }
   };
 
@@ -304,18 +649,16 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
 
   if (initialSetup && activeLanguageId && !activeSignId) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.brand}>VOZUAL</Text>
-        <Text style={styles.title}>Preparando la app</Text>
-        <Text style={styles.description}>
-          Descargando señas y voz para usarlas sin conexión. Mantén la app abierta hasta que termine.
-        </Text>
-        <ActivityIndicator color="#38BDF8" size="large" />
-        <Text style={styles.progress}>Señas: {Math.round(progress * 100)}%</Text>
-        {Platform.OS === 'android' && (
-          <Text style={styles.progress}>Voz: {voiceProgress}% · paquete de 126 MB</Text>
-        )}
-      </View>
+      <ModernDownloadShowcase
+        signsProgress={progress}
+        signsDone={signsDone}
+        voiceProgress={voiceProgress}
+        voiceDone={voiceDone}
+        finalizing={finalizingInstall}
+        detail={installDetail}
+        recentGlosses={recentInstallGlosses}
+        t={t}
+      />
     );
   }
 
@@ -482,7 +825,14 @@ export function SignLanguageLibraryScreen({initialSetup, onContinue, onSelectedL
                   </>
                 ) : null}
                 {downloading ? (
-                  <Text style={styles.progress}>{t('library.downloading', {progress: Math.round(progress * 100)})}</Text>
+                  <View style={styles.cardProgressWrap}>
+                    <Text style={styles.progress}>
+                      {installDetail
+                        ? `${describeInstallProgress(installDetail, t).stageLabel} · ${Math.round(progress * 100)}%`
+                        : t('library.downloading', {progress: Math.round(progress * 100)})}
+                    </Text>
+                    <AnimatedShimmerBar progress={progress} />
+                  </View>
                 ) : null}
               </View>
               <TouchableOpacity
@@ -550,6 +900,33 @@ const styles = StyleSheet.create({
   update: {color: '#FBBF24', fontSize: 13, fontWeight: '700', marginTop: 7},
   pendingSigns: {color: '#FDE68A', fontSize: 12, marginTop: 4},
   progress: {color: '#38BDF8', fontSize: 13, marginTop: 7},
+  cardProgressWrap: {marginTop: 4, gap: 6},
+  cardHeaderRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12},
+  percentHeadline: {color: '#F8FAFC', fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums']},
+  heroMeta: {flex: 1},
+  stageRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  liveDot: {width: 8, height: 8, borderRadius: 4, backgroundColor: '#16D9D1'},
+  stageText: {flex: 1, color: '#F8FAFC', fontSize: 15, fontWeight: '800', lineHeight: 20},
+  counterText: {color: '#7DD3FC', fontSize: 12, fontWeight: '700', marginTop: 5},
+  downloadCard: {backgroundColor: '#1E293B', borderColor: '#29394F', borderWidth: 1, borderRadius: 16, padding: 18, gap: 16},
+  progressTrack: {height: 8, borderRadius: 4, backgroundColor: '#0B1424', overflow: 'hidden'},
+  progressFill: {height: '100%', borderRadius: 4, backgroundColor: '#16D9D1', overflow: 'hidden'},
+  progressShimmer: {position: 'absolute', top: 0, bottom: 0, width: 80, backgroundColor: '#FFFFFF4D', borderRadius: 4},
+  stepList: {gap: 10},
+  stepRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  stepBadge: {width: 22, height: 22, borderRadius: 11, backgroundColor: '#0F172A', borderWidth: 1, borderColor: '#334155', alignItems: 'center', justifyContent: 'center'},
+  stepBadgeActive: {backgroundColor: '#155E75', borderColor: '#38BDF8'},
+  stepBadgeDone: {backgroundColor: '#16D9D1', borderColor: '#16D9D1'},
+  stepBadgeText: {color: '#64748B', fontSize: 11, fontWeight: '800'},
+  stepBadgeTextActive: {color: '#07111F'},
+  stepText: {flex: 1, color: '#64748B', fontSize: 13, fontWeight: '700'},
+  stepTextActive: {color: '#F8FAFC', fontWeight: '800'},
+  stepTextDone: {color: '#94A3B8'},
+  glossTrail: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 2},
+  glossPill: {backgroundColor: '#0F172A', borderColor: '#29394F', borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5},
+  glossPillActive: {backgroundColor: '#12364A', borderColor: '#16D9D1'},
+  glossPillText: {color: '#94A3B8', fontSize: 11, fontWeight: '700'},
+  glossPillTextActive: {color: '#E0F2FE', fontWeight: '800'},
   action: {backgroundColor: '#0284C7', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11},
   disabled: {backgroundColor: '#475569'},
   actionText: {color: '#FFFFFF', fontSize: 12, fontWeight: '900'},

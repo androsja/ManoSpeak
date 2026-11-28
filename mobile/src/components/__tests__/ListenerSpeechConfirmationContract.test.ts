@@ -52,4 +52,10 @@ describe('Listener speech confirmation contract', () => {
     expect(listenerScreenSource).toMatch(/liveListeningIndicatorActive/);
     expect(listenerScreenSource).toMatch(/detectedWordsText: \{[^}]*fontSize: 12/);
   });
+
+  it('keeps the speak button disabled on iOS until permissions are granted, then auto-starts', () => {
+    expect(listenerScreenSource).toMatch(/iosPermissionsReady = Platform\.OS !== 'ios' \|\| iosPermissionsStatus === 'granted'/);
+    expect(listenerScreenSource).toMatch(/speechButtonDisabled[\s\S]*?!iosPermissionsReady/);
+    expect(listenerScreenSource).toMatch(/canAutoStart[\s\S]*?iosPermissionsStatus === 'granted'/);
+  });
 });

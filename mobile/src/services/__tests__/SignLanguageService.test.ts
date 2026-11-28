@@ -530,6 +530,90 @@ describe('SignLanguageService', () => {
     ]);
   });
 
+  it('parses and installs phrases embedded in a versioned JSON release manifest', async () => {
+    const jsonSign = parsePublishedSign('lsc-co-agua', {
+      languageId: 'lsc-co',
+      gloss: 'AGUA',
+      version: 1,
+      assetName: 'agua.motion.json',
+      sizeBytes: 1024,
+      sha256: 'a'.repeat(64),
+      profileSha256: 'b'.repeat(64),
+      releaseSha256: 'c'.repeat(64),
+      speechAliases: ['agua'],
+      categories: ['necesidades_basicas'],
+      lexicalClass: 'noun',
+      verbType: 'none',
+      requiresSubjectMarker: false,
+      motionFormat: 'legacy-json-v2',
+      jsonReleaseId: 'lsc-co-json-v2',
+      jsonChunkCount: 1,
+      approved: true,
+      compiled: true,
+      published: true,
+    });
+    const installedAgua: InstalledSign = {
+      id: jsonSign.id,
+      languageId: jsonSign.languageId,
+      gloss: jsonSign.gloss,
+      version: jsonSign.version,
+      assetName: jsonSign.assetName,
+      sizeBytes: jsonSign.sizeBytes,
+      sha256: jsonSign.sha256,
+      profileSha256: jsonSign.profileSha256,
+      releaseSha256: jsonSign.releaseSha256,
+      speechAliases: jsonSign.speechAliases,
+      categories: jsonSign.categories,
+      lexicalClass: jsonSign.lexicalClass,
+      verbType: jsonSign.verbType,
+      requiresSubjectMarker: jsonSign.requiresSubjectMarker,
+      motionFormat: 'legacy-json-v2',
+      installedAt: '2026-09-01T00:00:00.000Z',
+      localPath: '/documents/agua.motion.json',
+    };
+    mockFiles.set(
+      '/documents/vozual-sign-languages/library.json',
+      JSON.stringify(state({[jsonSign.id]: installedAgua})),
+    );
+    (getDoc as jest.Mock)
+      .mockResolvedValueOnce({exists: () => true, data: () => ({
+        schema: 'vozual.sign-json-release-pointer',
+        languageId: 'lsc-co',
+        releaseId: 'lsc-co-json-v2',
+        version: 2,
+        published: true,
+      })})
+      .mockResolvedValueOnce({exists: () => true, data: () => ({
+        schema: 'vozual.sign-json-release',
+        releaseId: 'lsc-co-json-v2',
+        languageId: 'lsc-co',
+        version: 2,
+        published: true,
+        signs: [jsonSign],
+        phrases: [phrase],
+      })});
+
+    const [status] = await listVersionedJsonReleaseLanguages();
+    expect(status.phrases).toEqual([
+      expect.objectContaining({
+        id: phrase.id,
+        spanish: 'Necesito agua.',
+        glossSequence: ['AGUA'],
+        jsonReleaseId: 'lsc-co-json-v2',
+      }),
+    ]);
+
+    await expect(installSignLanguageChanges(status)).resolves.toBe(1);
+    expect(getDoc).toHaveBeenCalledTimes(2);
+    await expect(installedPhrasesForSelectedLanguage()).resolves.toEqual([
+      expect.objectContaining({
+        id: phrase.id,
+        spanish: 'Necesito agua.',
+        glossSequence: ['AGUA'],
+      }),
+    ]);
+  });
+
   it('does not install a phrase that references a missing sign', () => {
     const invalidPhrase = {...phrase, glossSequence: ['AGUA', 'INEXISTENTE']};
     const [status] = mergeSignLanguageStatuses([language], [sign], state(), [invalidPhrase]);

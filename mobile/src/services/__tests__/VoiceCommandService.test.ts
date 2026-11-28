@@ -2,6 +2,7 @@ import {
   advanceIncrementalSpeechMatches,
   advanceRevisableSpeechMatches,
   androidDirectSignVocabulary,
+  classifyIosSpeechError,
   extractKnownSpeechWords,
   mergeSpeechSegments,
   normalizeSpeech,
@@ -325,5 +326,40 @@ describe('VoiceCommandService', () => {
   it('detects only real Android picture-in-picture transitions', () => {
     expect(resolvePictureInPictureTransition(false, true)).toBe('entered');
     expect(resolvePictureInPictureTransition(true, false)).toBe('left');
+  });
+
+  it('classifies iOS permission, offline dictation, and fatal loop errors clearly', () => {
+    expect(classifyIosSpeechError({
+      code: 'SPEECH_PERMISSION',
+      message: 'El reconocimiento de voz no está autorizado.',
+    })).toEqual({
+      action: 'permission',
+      message: 'Debes permitir el micrófono y el reconocimiento de voz en los ajustes del iPhone.',
+    });
+
+    expect(classifyIosSpeechError({
+      code: 412,
+      message: 'El reconocimiento local de español (Colombia) no está disponible.',
+    }).action).toBe('offline_unavailable');
+
+    expect(classifyIosSpeechError({
+      code: 1101,
+      message: 'Siri dictation asset unavailable',
+    }).action).toBe('offline_unavailable');
+
+    expect(classifyIosSpeechError({
+      code: 1107,
+      message: 'Local task failed',
+      fatal: true,
+    }).action).toBe('fatal');
+
+    expect(classifyIosSpeechError({
+      code: 1110,
+      message: 'No speech detected',
+      fatal: false,
+    })).toEqual({
+      action: 'ignore',
+      message: '',
+    });
   });
 });

@@ -8,12 +8,15 @@ const {buildRelease} = require('../publish-json-motion-release.cjs') as {
     version: number,
     glosses: string[],
     inputs: {motionDirectory: string; catalogPath: string},
-  ) => {signs: Array<{metadata: {
-    speechAliases: string[];
-    jsonCompression: string;
-    compressedSizeBytes: number;
-    sizeBytes: number;
-  }; compressedChunks: string[]}>};
+  ) => {
+    manifest: {phrases: Array<{id: string; spanish: string; glossSequence: string[]}>};
+    signs: Array<{metadata: {
+      speechAliases: string[];
+      jsonCompression: string;
+      compressedSizeBytes: number;
+      sizeBytes: number;
+    }; compressedChunks: string[]}>;
+  };
 };
 
 function sha256(value: string): string {
@@ -55,6 +58,30 @@ describe('JSON motion release speech metadata', () => {
           compiled: true,
         },
       })),
+      phrases: [
+        {
+          id: 'lsc-co-uno-comer',
+          data: {
+            languageId: 'lsc-co',
+            version: 1,
+            spanish: 'Uno, comer.',
+            glossSequence: ['UNO', 'COMER'],
+            releaseSha256: sha256('lsc-co-uno-comer'),
+            approved: true,
+          },
+        },
+        {
+          id: 'lsc-co-falta-sena',
+          data: {
+            languageId: 'lsc-co',
+            version: 1,
+            spanish: 'Falta otra seña.',
+            glossSequence: ['UNO', 'FALTA'],
+            releaseSha256: sha256('lsc-co-falta-sena'),
+            approved: true,
+          },
+        },
+      ],
     }));
 
     try {
@@ -66,6 +93,13 @@ describe('JSON motion release speech metadata', () => {
       expect(release.signs[0].compressedChunks).toHaveLength(1);
       expect(release.signs[0].metadata.compressedSizeBytes)
         .toBeLessThan(release.signs[0].metadata.sizeBytes);
+      expect(release.manifest.phrases).toEqual([
+        expect.objectContaining({
+          id: 'lsc-co-uno-comer',
+          spanish: 'Uno, comer.',
+          glossSequence: ['UNO', 'COMER'],
+        }),
+      ]);
     } finally {
       fs.rmSync(root, {recursive: true, force: true});
     }

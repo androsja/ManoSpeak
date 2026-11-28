@@ -23,6 +23,7 @@ import {
   advanceIncrementalSpeechMatches,
   advanceRevisableSpeechMatches,
   androidDirectSignVocabulary,
+  classifyIosSpeechError,
   extractKnownSpeechWords,
   mergeSpeechSegments,
   resolvePictureInPictureTransition,
@@ -126,7 +127,10 @@ type SpeechAudioModule = {
   silenceRecognitionPrompts: () => Promise<void>;
   restoreAudioAfter: (delayMillis: number) => void;
 };
+type IosPermissionsStatus = 'checking' | 'undetermined' | 'denied' | 'granted';
 type IosSpeechRecognizerModule = {
+  getPermissionsStatus?: () => Promise<'granted' | 'denied' | 'undetermined'>;
+  requestPermissions?: () => Promise<'granted' | 'denied' | 'undetermined'>;
   start: (locale: string, mode: ListeningMode, contextualStrings?: string[]) => Promise<boolean>;
   stop: () => Promise<boolean>;
   finishPhrase: () => Promise<boolean>;
@@ -186,6 +190,8 @@ export function ListenerScreen({
   const iosPartialSignTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const iosPendingSignMatches = useRef<KnownWord[] | undefined>(undefined);
   const iosRecognitionRestartTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const iosStartRetryCount = useRef(0);
+  const iosPermissionRequestInFlight = useRef(false);
   const startActivityRecognitionRef = useRef<() => Promise<void>>(async () => undefined);
   const iosLastSpeechEvent = useRef<SpeechEvent | undefined>(undefined);
   const iosFinalResultHandled = useRef(false);
@@ -242,6 +248,15 @@ export function ListenerScreen({
   const [tutorialVisible, setTutorialVisible] = useState(false);
   const [pictureInPictureMode, setPictureInPictureMode] = useState(false);
   const [avatarReady, setAvatarReady] = useState(false);
+  const [iosPermissionsStatus, setIosPermissionsStatus] = useState<IosPermissionsStatus>(() => (
+    Platform.OS !== 'ios'
+      ? 'granted'
+      : iosSpeechRecognizer
+        ? 'checking'
+        : 'denied'
+  ));
+  const iosPermissionsStatusRef = useRef<IosPermissionsStatus>(iosPermissionsStatus);
+  iosPermissionsStatusRef.current = iosPermissionsStatus;
   // Remount the full WebView after leaving PiP. Android can keep the compact
   // surface dimensions during the first layout pass when returning from PiP.
   const [avatarLayoutEpoch, setAvatarLayoutEpoch] = useState(0);
@@ -257,8 +272,11 @@ export function ListenerScreen({
   // start request is still unwinding. A terminal session must never leave the
   // primary action visually busy: only render its spinner while a session is
   // still active.
+  const iosPermissionsReady = Platform.OS !== 'ios' || iosPermissionsStatus === 'granted';
   const speechActionBusy = starting || (listening && phraseFinalizing);
-  const speechButtonDisabled = speechActionBusy || (!listening && (!avatarReady || playingSign));
+  const speechButtonDisabled = speechActionBusy
+    || !iosPermissionsReady
+    || (!listening && (!avatarReady || playingSign));
   const listenerFlowState = useMemo(() => deriveListenerFlowState({
     listening,
     starting,
@@ -928,6 +946,7 @@ export function ListenerScreen({
           iosDirectSignsAvailable ? iosSpeechContextualStrings : undefined,
         );
         nativeStartInFlight.current = false;
+        iosStartRetryCount.current = 0;
         if (
           listeningRef.current &&
           generation === recognitionGeneration.current &&
@@ -942,17 +961,27 @@ export function ListenerScreen({
       } catch (error) {
         nativeStartInFlight.current = false;
         markRecognitionUnavailable();
-        if (isOfflineSpeechUnavailable(error)) {
+        const classified = classifyIosSpeechError(error);
+        if (isOfflineSpeechUnavailable(error) || classified.action === 'offline_unavailable') {
           listeningRef.current = false;
           setListening(false);
           setErrorMessage(OFFLINE_SPEECH_MESSAGE);
           return;
         }
+        if (classified.action === 'permission') {
+          listeningRef.current = false;
+          setListening(false);
+          setMicrophonePermissionBlocked(true);
+          setErrorMessage(classified.message);
+          return;
+        }
         if (
           listeningRef.current &&
           generation === recognitionGeneration.current &&
-          listeningModeRef.current === 'continuous'
+          listeningModeRef.current === 'continuous' &&
+          iosStartRetryCount.current < 4
         ) {
+          iosStartRetryCount.current += 1;
           if (iosRecognitionRestartTimer.current) clearTimeout(iosRecognitionRestartTimer.current);
           iosRecognitionRestartTimer.current = setTimeout(() => {
             iosRecognitionRestartTimer.current = undefined;
@@ -963,7 +992,7 @@ export function ListenerScreen({
         } else if (listeningRef.current && generation === recognitionGeneration.current) {
           listeningRef.current = false;
           setListening(false);
-          setErrorMessage(speechErrorMessage(error) || 'No se pudo iniciar el reconocimiento de voz en este iPhone.');
+          setErrorMessage(classified.message || speechErrorMessage(error) || 'No se pudo iniciar el reconocimiento de voz en este iPhone.');
         }
       }
       return;
@@ -1117,6 +1146,7 @@ export function ListenerScreen({
     if (iosPartialSignTimer.current) clearTimeout(iosPartialSignTimer.current);
     iosPartialSignTimer.current = undefined;
     iosPendingSignMatches.current = undefined;
+    iosStartRetryCount.current = 0;
     if (phraseFinalizeTimer.current) clearTimeout(phraseFinalizeTimer.current);
     phraseFinalizeTimer.current = undefined;
     phrasePartialTextRef.current = '';
@@ -1131,16 +1161,68 @@ export function ListenerScreen({
   }, [startListening]);
 
   useEffect(() => {
+    if (Platform.OS !== 'ios' || !avatarReady || !iosSpeechRecognizer?.getPermissionsStatus) {
+      return undefined;
+    }
+    let mounted = true;
+    const ensureIosPermissions = async () => {
+      if (iosPermissionRequestInFlight.current) return;
+      const status = await iosSpeechRecognizer.getPermissionsStatus?.().catch(() => 'denied' as const);
+      if (!mounted) return;
+      if (status === 'granted') {
+        setIosPermissionsStatus('granted');
+        setMicrophonePermissionBlocked(false);
+        return;
+      }
+      if (status === 'denied') {
+        setIosPermissionsStatus('denied');
+        setMicrophonePermissionBlocked(true);
+        setErrorMessage('Debes permitir el micrófono y el reconocimiento de voz en los ajustes del iPhone.');
+        return;
+      }
+      // First-time install: keep HABLAR disabled while prompting permissions,
+      // then warm up the audio session and auto-start once both are granted.
+      setIosPermissionsStatus('undetermined');
+      iosPermissionRequestInFlight.current = true;
+      try {
+        const requested = await iosSpeechRecognizer.requestPermissions?.().catch(() => 'denied' as const);
+        if (!mounted) return;
+        if (requested === 'granted') {
+          setIosPermissionsStatus('granted');
+          setMicrophonePermissionBlocked(false);
+          setErrorMessage('');
+        } else if (requested === 'denied') {
+          setIosPermissionsStatus('denied');
+          setMicrophonePermissionBlocked(true);
+          setErrorMessage('Debes permitir el micrófono y el reconocimiento de voz en los ajustes del iPhone.');
+        }
+      } finally {
+        iosPermissionRequestInFlight.current = false;
+      }
+    };
+    void ensureIosPermissions();
+    const appStateSubscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active' && iosPermissionsStatusRef.current === 'denied') {
+        void ensureIosPermissions();
+      }
+    });
+    return () => {
+      mounted = false;
+      appStateSubscription.remove();
+    };
+  }, [avatarReady]);
+
+  useEffect(() => {
     const canAutoStart = Platform.OS === 'android'
       ? androidAutoSignsAvailable
-      : true;
+      : iosPermissionsStatus === 'granted';
     if (!canAutoStart || !avatarReady || autoListeningAttempted.current) return;
     autoListeningAttempted.current = true;
     speechDebug('listener-auto-start', {platform: Platform.OS, state: 'listener-ready'});
     startPhraseListening().catch(error => {
       speechDebug('listener-auto-start-failed', {platform: Platform.OS, error});
     });
-  }, [androidAutoSignsAvailable, avatarReady, startPhraseListening]);
+  }, [androidAutoSignsAvailable, avatarReady, iosPermissionsStatus, startPhraseListening]);
 
   const finishPhraseListening = useCallback(async () => {
     if (!listeningRef.current || listeningModeRef.current !== 'phrase' || phraseFinalizing) return;
@@ -1305,7 +1387,9 @@ export function ListenerScreen({
       Platform.OS !== 'ios' ||
       !listeningRef.current ||
       listeningModeRef.current !== 'continuous' ||
-      nativeStartInFlight.current
+      listeningStartInFlight.current ||
+      nativeStartInFlight.current ||
+      iosRecognitionRestartTimer.current !== undefined
     ) return;
     const isRecognizing = await iosSpeechRecognizer?.isListening().catch(() => false) ?? false;
     if (!listeningRef.current || listeningModeRef.current !== 'continuous') return;
@@ -1468,7 +1552,8 @@ export function ListenerScreen({
           if (listeningModeRef.current === 'phrase') {
             finalizeIosSpeechResult();
           }
-          if (isOfflineSpeechUnavailable(event.error)) {
+          const classified = classifyIosSpeechError(event.error);
+          if (isOfflineSpeechUnavailable(event.error) || classified.action === 'offline_unavailable') {
             listeningRef.current = false;
             markRecognitionUnavailable();
             setListening(false);
@@ -1477,8 +1562,17 @@ export function ListenerScreen({
             void iosSpeechRecognizer.stop();
             return;
           }
-          // Continuous recognition is restarted by the native module. Do not
-          // stop the user's listening session because one Apple task ended.
+          if (classified.action === 'permission' || classified.action === 'fatal') {
+            listeningRef.current = false;
+            markRecognitionUnavailable();
+            setListening(false);
+            setPhraseFinalizing(false);
+            if (classified.action === 'permission') setMicrophonePermissionBlocked(true);
+            setErrorMessage(classified.message);
+            void iosSpeechRecognizer.stop();
+            return;
+          }
+          // Benign single-task errors in continuous mode are restarted natively.
         });
         const endSubscription = emitter.addListener(
           'onVozualIosSpeechEnd',
@@ -1889,21 +1983,26 @@ export function ListenerScreen({
         {accessPolicy.canUsePictureInPicture && <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('listener.openFloating')}
-          disabled={!avatarReady || starting || phraseFinalizing}
+          disabled={!avatarReady || !iosPermissionsReady || starting || phraseFinalizing}
           onPress={() => { enterFloatingMode().catch(() => undefined); }}
           style={[
             styles.floatingButton,
-            (!avatarReady || starting || phraseFinalizing) && styles.floatingButtonDisabled,
+            (!avatarReady || !iosPermissionsReady || starting || phraseFinalizing) && styles.floatingButtonDisabled,
           ]}
         >
           <Text style={[
             styles.floatingButtonText,
-            (!avatarReady || starting || phraseFinalizing) && styles.floatingButtonTextDisabled,
+            (!avatarReady || !iosPermissionsReady || starting || phraseFinalizing) && styles.floatingButtonTextDisabled,
           ]}>
             {t('listener.openFloatingAction')}
           </Text>
         </Pressable>}
-        {phraseFinalizing ? (
+        {Platform.OS === 'ios' && (iosPermissionsStatus === 'checking' || iosPermissionsStatus === 'undetermined') ? (
+          <View style={styles.microphoneProgress} accessibilityLabel="Autorizando micrófono y voz">
+            <ActivityIndicator size="small" color="#16D9D1" />
+            <Text style={styles.microphoneProgressText}>Autorizando micrófono y reconocimiento de voz…</Text>
+          </View>
+        ) : phraseFinalizing ? (
           <View style={styles.microphoneProgress} accessibilityLabel={t('listener.preparingTranslation')}>
             <ActivityIndicator size="small" color="#16D9D1" />
             <Text style={styles.microphoneProgressText}>{t('listener.preparingSign')}</Text>
@@ -1984,7 +2083,9 @@ export function ListenerScreen({
               style={styles.permissionSettingsButton}
               onPress={() => {
                 Linking.openSettings().catch(() => {
-                  setErrorMessage('No fue posible abrir los ajustes. Ábrelos desde la configuración de Android.');
+                  setErrorMessage(Platform.OS === 'ios'
+                    ? 'No fue posible abrir los ajustes. Ábrelos desde Configuración del iPhone.'
+                    : 'No fue posible abrir los ajustes. Ábrelos desde la configuración de Android.');
                 });
               }}
             >

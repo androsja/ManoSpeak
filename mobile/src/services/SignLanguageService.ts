@@ -78,6 +78,7 @@ export type PublishedPhrase = {
   spanish: string;
   glossSequence: string[];
   releaseSha256: string;
+  jsonReleaseId?: string;
   approved: boolean;
   published: boolean;
   updatedAt?: unknown;
@@ -714,6 +715,19 @@ export async function listVersionedJsonReleaseLanguages(): Promise<SignLanguageS
     }
     return parseVersionedJsonReleaseSign(entry.id, pointer.releaseId, entry);
   });
+  const phrases: PublishedPhrase[] = Array.isArray(release.phrases)
+    ? release.phrases.flatMap((entry: unknown) => {
+      if (!isRecord(entry) || typeof entry.id !== 'string') return [];
+      try {
+        return [{
+          ...parsePublishedPhrase(entry.id, entry),
+          jsonReleaseId: pointer.releaseId as string,
+        }];
+      } catch {
+        return [];
+      }
+    })
+    : [];
   const language: SignLanguage = {
     id: languageId,
     code: typeof release.code === 'string' ? release.code : languageId,
@@ -721,7 +735,7 @@ export async function listVersionedJsonReleaseLanguages(): Promise<SignLanguageS
     region: typeof release.region === 'string' ? release.region : 'Colombia',
     published: true,
   };
-  return mergeSignLanguageStatuses([language], signs, state, []);
+  return mergeSignLanguageStatuses([language], signs, state, phrases);
 }
 
 export function hasUnpromptedSignChanges(statuses: readonly SignLanguageStatus[]): boolean {
@@ -898,9 +912,24 @@ export async function dismissSignLanguageChanges(
   await writeLibraryState(state);
 }
 
+export type SignLibraryInstallStage =
+  | 'preparing'
+  | 'downloading'
+  | 'verifying'
+  | 'phrases'
+  | 'saving';
+
+export type SignLibraryInstallProgress = {
+  fraction: number;
+  stage: SignLibraryInstallStage;
+  currentGloss?: string;
+  completedSigns: number;
+  totalSigns: number;
+};
+
 export async function installSignLanguageChanges(
   status: SignLanguageStatus,
-  onProgress?: (fraction: number) => void,
+  onProgress?: (fraction: number, detail?: SignLibraryInstallProgress) => void,
   storageAdapter?: FirebaseStorageAdapter,
 ): Promise<number> {
   if (
@@ -921,6 +950,23 @@ export async function installSignLanguageChanges(
   };
   let completedBytes = 0;
   const totalBytes = Math.max(1, status.pendingSizeBytes);
+  const totalSigns = status.pendingSigns.length;
+  const emitProgress = (
+    fraction: number,
+    stage: SignLibraryInstallStage,
+    completedSigns: number,
+    currentGloss?: string,
+  ) => {
+    const clamped = Math.max(0, Math.min(1, fraction));
+    onProgress?.(clamped, {
+      fraction: clamped,
+      stage,
+      currentGloss,
+      completedSigns,
+      totalSigns,
+    });
+  };
+  emitProgress(0, 'preparing', 0);
   const staged: Array<{
     sign: PublishedSign;
     avatarProfile: Record<string, unknown>;
@@ -931,7 +977,9 @@ export async function installSignLanguageChanges(
   const stagedPhrases: PublishedPhrase[] = [];
 
   try {
-    for (const sign of status.pendingSigns) {
+    for (let signIndex = 0; signIndex < status.pendingSigns.length; signIndex += 1) {
+      const sign = status.pendingSigns[signIndex];
+      emitProgress(completedBytes / totalBytes, 'downloading', signIndex, sign.gloss);
       const finalPath = immutableAssetPath(languageDirectory, sign);
       const temporaryPath = `${finalPath}.download`;
       if (await RNFS.exists(temporaryPath)) await RNFS.unlink(temporaryPath);
@@ -1005,7 +1053,8 @@ export async function installSignLanguageChanges(
       } else {
         throw new Error(`Sign ${sign.gloss} has storagePath metadata but no Firebase Storage adapter or legacy content.`);
       }
-      onProgress?.(Math.min(1, (completedBytes + transferSizeBytes(sign)) / totalBytes));
+      const downloadedFraction = Math.min(1, (completedBytes + transferSizeBytes(sign)) / totalBytes);
+      emitProgress(downloadedFraction, 'verifying', signIndex, sign.gloss);
       const fileStat = await RNFS.stat(temporaryPath);
       if (fileStat.size !== sign.sizeBytes) {
         throw new Error(`Sign ${sign.gloss} has an invalid downloaded size.`);
@@ -1034,7 +1083,11 @@ export async function installSignLanguageChanges(
         finalPath,
       });
       completedBytes += transferSizeBytes(sign);
-      onProgress?.(Math.min(1, completedBytes / totalBytes));
+      emitProgress(completedBytes / totalBytes, 'verifying', staged.length, sign.gloss);
+    }
+
+    if (status.pendingPhrases.length > 0) {
+      emitProgress(Math.max(0.95, completedBytes / totalBytes), 'phrases', totalSigns);
     }
 
     // Validate against the resulting local library, rather than merely the
@@ -1046,9 +1099,14 @@ export async function installSignLanguageChanges(
     for (const item of staged) downloadableGlosses.add(item.sign.gloss);
     for (const sign of status.removedSigns) downloadableGlosses.delete(sign.gloss);
     for (const phrase of status.pendingPhrases) {
-      const phraseSnapshot = await getDoc(doc(getFirestore(), `phrases/${phrase.id}`));
-      if (!phraseSnapshot.exists()) throw new Error(`Phrase ${phrase.spanish} is no longer published.`);
-      const publishedPhrase = parsePublishedPhrase(phrase.id, phraseSnapshot.data());
+      let publishedPhrase: PublishedPhrase;
+      if (phrase.jsonReleaseId) {
+        publishedPhrase = phrase;
+      } else {
+        const phraseSnapshot = await getDoc(doc(getFirestore(), `phrases/${phrase.id}`));
+        if (!phraseSnapshot.exists()) throw new Error(`Phrase ${phrase.spanish} is no longer published.`);
+        publishedPhrase = parsePublishedPhrase(phrase.id, phraseSnapshot.data());
+      }
       if (
         publishedPhrase.languageId !== status.id
         || publishedPhrase.version !== phrase.version
@@ -1111,7 +1169,9 @@ export async function installSignLanguageChanges(
     if (appliedChangeCount >= status.changeCount) {
       nextState.dismissedRevisions[status.id] = status.revision;
     }
+    emitProgress(0.99, 'saving', totalSigns);
     await writeLibraryState(nextState);
+    emitProgress(1, 'saving', totalSigns);
   } catch (error) {
     for (const temporaryPath of temporaryPaths) await bestEffortDelete(temporaryPath);
     for (const item of staged) {

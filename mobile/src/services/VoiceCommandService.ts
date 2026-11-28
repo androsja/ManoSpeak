@@ -278,3 +278,66 @@ export function androidDirectSignVocabulary(
     .filter(sign => sign.gloss.trim().length > 0)
     .map(sign => ({gloss: sign.gloss, aliases: sign.speechAliases ?? []}));
 }
+
+export type IosSpeechErrorAction = 'ignore' | 'permission' | 'offline_unavailable' | 'fatal';
+
+export type IosSpeechErrorClassification = {
+  action: IosSpeechErrorAction;
+  message: string;
+};
+
+/** Classifies native iOS speech errors so permission and local-model failures surface clearly. */
+export function classifyIosSpeechError(error: unknown): IosSpeechErrorClassification {
+  const record = typeof error === 'object' && error !== null
+    ? (error as {code?: unknown; message?: unknown; fatal?: unknown})
+    : undefined;
+  const rawCode = record?.code;
+  const code = typeof rawCode === 'string' || typeof rawCode === 'number' ? String(rawCode) : '';
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : typeof record?.message === 'string'
+        ? record.message
+        : '';
+  const normalized = message.toLocaleLowerCase('es-CO');
+  const fatal = record?.fatal === true;
+
+  if (
+    code === 'SPEECH_PERMISSION'
+    || code === '401'
+    || normalized.includes('no está autorizado')
+    || normalized.includes('not authorized')
+    || normalized.includes('permiso')
+  ) {
+    return {
+      action: 'permission',
+      message: 'Debes permitir el micrófono y el reconocimiento de voz en los ajustes del iPhone.',
+    };
+  }
+
+  if (
+    normalized.includes('reconocimiento local')
+    || normalized.includes('no admite reconocimiento de voz local')
+    || normalized.includes('dictation')
+    || normalized.includes('dictado')
+    || normalized.includes('siri')
+    || normalized.includes('asset')
+    || normalized.includes('on-device')
+    || normalized.includes('offline')
+  ) {
+    return {
+      action: 'offline_unavailable',
+      message: 'El reconocimiento local de español (Colombia) no está disponible todavía. Verifica que Dictado esté activo en Ajustes de iOS o conéctate brevemente para descargarlo.',
+    };
+  }
+
+  if (fatal) {
+    return {
+      action: 'fatal',
+      message: 'iOS no pudo iniciar la escucha local. Verifica que Dictado en español esté activo en Ajustes o toca HABLAR para reintentar.',
+    };
+  }
+
+  return {action: 'ignore', message: ''};
+}

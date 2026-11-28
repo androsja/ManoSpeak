@@ -113,6 +113,31 @@ function releaseInputs(gloss, options = {}) {
   };
 }
 
+function releasePhrases(glosses, options = {}) {
+  const catalogPath = options.catalogPath ?? CATALOG_PATH;
+  const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+  const glossSet = new Set(glosses);
+  return (Array.isArray(catalog.phrases) ? catalog.phrases : [])
+    .filter(entry => (
+      entry?.id
+      && entry?.data?.approved === true
+      && entry?.data?.languageId === LANGUAGE_ID
+      && Array.isArray(entry?.data?.glossSequence)
+      && entry.data.glossSequence.length > 0
+      && entry.data.glossSequence.every(gloss => glossSet.has(String(gloss).trim().toLocaleUpperCase('es-CO')))
+    ))
+    .map(entry => ({
+      id: entry.id,
+      languageId: entry.data.languageId,
+      version: entry.data.version,
+      spanish: entry.data.spanish,
+      glossSequence: entry.data.glossSequence.map(gloss => String(gloss).trim().toLocaleUpperCase('es-CO')),
+      releaseSha256: entry.data.releaseSha256,
+      approved: true,
+      published: true,
+    }));
+}
+
 function buildRelease(releaseId, version, glosses, inputs = {}) {
   const signs = glosses.map(gloss => {
     const input = releaseInputs(gloss, inputs);
@@ -160,6 +185,7 @@ function buildRelease(releaseId, version, glosses, inputs = {}) {
       compressedChunks,
     };
   });
+  const phrases = releasePhrases(glosses, inputs);
   return {
     manifest: {
       schema: 'vozual.sign-json-release',
@@ -173,8 +199,10 @@ function buildRelease(releaseId, version, glosses, inputs = {}) {
       published: true,
       createdAt: new Date().toISOString(),
       signs: signs.map(sign => sign.metadata),
+      phrases,
     },
     signs,
+    phrases,
   };
 }
 
@@ -202,7 +230,7 @@ async function documentExists(token, documentPath) {
 }
 
 async function publish(releaseId, version, glosses, dryRun, inputs = {}) {
-  const {manifest, signs} = buildRelease(releaseId, version, glosses, inputs);
+  const {manifest, signs, phrases} = buildRelease(releaseId, version, glosses, inputs);
   const pointerPath = `signJsonReleasePointers/${LANGUAGE_ID}`;
   const releasePath = `signJsonReleases/${releaseId}`;
   const summary = {
@@ -210,6 +238,7 @@ async function publish(releaseId, version, glosses, dryRun, inputs = {}) {
     pointerPath,
     releasePath,
     version,
+    phraseCount: phrases.length,
     signs: signs.map(({metadata, chunks, compressedChunks}) => ({
       id: metadata.id,
       gloss: metadata.gloss,

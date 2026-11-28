@@ -571,10 +571,15 @@
         "lemmas": [
           "buenas noches"
         ],
-        "synonyms": [],
+        "synonyms": [
+          "buena noche"
+        ],
         "forms": [
           {
             "text": "buenas noches"
+          },
+          {
+            "text": "buena noche"
           }
         ]
       },
@@ -587,13 +592,16 @@
         "published": true
       },
       "review": {
-        "status": "legacy_approved",
+        "status": "approved",
         "regionalVariants": [],
         "ownerApproval": {
           "status": "approved",
           "approvedBy": "project_owner",
-          "approvedAt": "2026-08-28T16:32:15+00:00"
-        }
+          "approvedAt": "2026-11-27T15:06:31.578Z",
+          "reviewedAt": "2026-11-27T15:06:31.578Z",
+          "reviewFingerprint": "dce3d550ad6fedd27f7c3da73f026447522f6350dfcb5f52c4dd7bf410fba1b5"
+        },
+        "reviewScope": "Owner visual approval of the authored JSON preview based on INSOR page 486."
       }
     },
     {
@@ -607,10 +615,15 @@
         "lemmas": [
           "buenas tardes"
         ],
-        "synonyms": [],
+        "synonyms": [
+          "buena tarde"
+        ],
         "forms": [
           {
             "text": "buenas tardes"
+          },
+          {
+            "text": "buena tarde"
           }
         ]
       },
@@ -623,13 +636,16 @@
         "published": true
       },
       "review": {
-        "status": "legacy_approved",
+        "status": "approved",
         "regionalVariants": [],
         "ownerApproval": {
           "status": "approved",
           "approvedBy": "project_owner",
-          "approvedAt": "2026-08-28T15:55:30+00:00"
-        }
+          "approvedAt": "2026-11-27T05:21:18.752Z",
+          "reviewedAt": "2026-11-27T05:21:18.752Z",
+          "reviewFingerprint": "8853fb5e86868cf55e49c20e9b0230697426145172941b9ba67868f2cb178c03"
+        },
+        "reviewScope": "Owner visual approval of the authored JSON preview based on INSOR page 487."
       }
     },
     {
@@ -643,13 +659,22 @@
         "lemmas": [
           "buenos días"
         ],
-        "synonyms": [],
+        "synonyms": [
+          "buen día",
+          "buen dia"
+        ],
         "forms": [
           {
             "text": "buenos días"
           },
           {
             "text": "buenos dias"
+          },
+          {
+            "text": "buen día"
+          },
+          {
+            "text": "buen dia"
           }
         ]
       },
@@ -662,13 +687,16 @@
         "published": true
       },
       "review": {
-        "status": "legacy_approved",
+        "status": "approved",
         "regionalVariants": [],
         "ownerApproval": {
           "status": "approved",
           "approvedBy": "project_owner",
-          "approvedAt": "2026-08-28T15:57:10+00:00"
-        }
+          "approvedAt": "2026-11-27T04:58:57.846Z",
+          "reviewedAt": "2026-11-27T04:58:57.846Z",
+          "reviewFingerprint": "da060c01779923b76cc25973f79d4aac4c2c899eda55ee26d13eba88ba2100b0"
+        },
+        "reviewScope": "Owner visual approval of the authored JSON preview based on INSOR page 487."
       }
     },
     {
@@ -843,6 +871,21 @@
             "text": "comer"
           },
           {
+            "text": "comiendo"
+          },
+          {
+            "text": "comido"
+          },
+          {
+            "text": "comida"
+          },
+          {
+            "text": "comidos"
+          },
+          {
+            "text": "comidas"
+          },
+          {
             "text": "como"
           },
           {
@@ -927,91 +970,70 @@
             "text": "comerían"
           },
           {
-            "text": "comida"
+            "text": "coma"
           },
           {
-            "text": "alimento"
+            "text": "comas"
           },
           {
-            "text": "alimentar"
+            "text": "comamos"
           },
           {
-            "text": "alimentas"
+            "text": "comáis"
           },
           {
-            "text": "alimenta"
+            "text": "coman"
           },
           {
-            "text": "alimentamos"
+            "text": "comiera"
           },
           {
-            "text": "alimentáis"
+            "text": "comieras"
           },
           {
-            "text": "alimentan"
+            "text": "comiéramos"
           },
           {
-            "text": "alimenté"
+            "text": "comierais"
           },
           {
-            "text": "alimentaste"
+            "text": "comieran"
           },
           {
-            "text": "alimentó"
+            "text": "comiese"
           },
           {
-            "text": "alimentasteis"
+            "text": "comieses"
           },
           {
-            "text": "alimentaron"
+            "text": "comiésemos"
           },
           {
-            "text": "alimentaba"
+            "text": "comieseis"
           },
           {
-            "text": "alimentabas"
+            "text": "comiesen"
           },
           {
-            "text": "alimentábamos"
+            "text": "comed"
           },
           {
-            "text": "alimentabais"
+            "text": "cómete"
           },
           {
-            "text": "alimentaban"
+            "text": "cómase"
           },
           {
-            "text": "alimentaré"
+            "text": "cómanse"
           },
           {
-            "text": "alimentarás"
+            "text": "comete"
           },
           {
-            "text": "alimentará"
+            "text": "comase"
           },
           {
-            "text": "alimentaremos"
-          },
-          {
-            "text": "alimentaréis"
-          },
-          {
-            "text": "alimentarán"
-          },
-          {
-            "text": "alimentaría"
-          },
-          {
-            "text": "alimentarías"
-          },
-          {
-            "text": "alimentaríamos"
-          },
-          {
-            "text": "alimentaríais"
-          },
-          {
-            "text": "alimentarían"
+            "text": "comanse"
           }
         ]
       },
@@ -1029,8 +1051,11 @@
         "ownerApproval": {
           "status": "approved",
           "approvedBy": "project_owner",
-          "approvedAt": "2026-08-28T19:32:42+00:00"
-        }
+          "approvedAt": "2026-11-27T15:52:24.041408+00:00",
+          "reviewedAt": "2026-11-27T15:52:24.041408+00:00",
+          "reviewFingerprint": "6cf62a6c8314a333458f86e7d612736fea725aa3d82d2538f6d6c7aaa9dac46c"
+        },
+        "reviewScope": "Owner approved open-hand COMER with four finger flaps, wider mouth animation and corrected wrist alignment."
       }
     },
     {
@@ -1388,10 +1413,10 @@
       },
       "motion": {
         "clip": "EL",
-        "published": true
+        "published": false
       },
       "review": {
-        "status": "approved",
+        "status": "pending",
         "regionalVariants": []
       }
     },
@@ -1417,10 +1442,10 @@
       },
       "motion": {
         "clip": "ELLA",
-        "published": true
+        "published": false
       },
       "review": {
-        "status": "approved",
+        "status": "pending",
         "regionalVariants": []
       }
     },
@@ -3565,18 +3590,25 @@
           "perdón"
         ],
         "synonyms": [
-          "disculpa",
-          "disculpe",
+          "perdona",
+          "perdone",
           "perdóname",
           "perdóneme",
-          "discúlpame",
-          "discúlpeme",
+          "perdónenme",
           "pido perdón",
           "te pido perdón",
           "le pido perdón",
+          "perdonar",
+          "disculpa",
+          "disculpe",
+          "discúlpame",
+          "discúlpeme",
+          "discúlpenme",
           "disculpas",
           "pido disculpas",
-          "te pido disculpas"
+          "te pido disculpas",
+          "le pido disculpas",
+          "disculpar"
         ],
         "forms": [
           {
@@ -3586,10 +3618,10 @@
             "text": "perdon"
           },
           {
-            "text": "disculpa"
+            "text": "perdona"
           },
           {
-            "text": "disculpe"
+            "text": "perdone"
           },
           {
             "text": "perdóname"
@@ -3598,10 +3630,7 @@
             "text": "perdóneme"
           },
           {
-            "text": "discúlpame"
-          },
-          {
-            "text": "discúlpeme"
+            "text": "perdónenme"
           },
           {
             "text": "pido perdón"
@@ -3613,6 +3642,24 @@
             "text": "le pido perdón"
           },
           {
+            "text": "perdonar"
+          },
+          {
+            "text": "disculpa"
+          },
+          {
+            "text": "disculpe"
+          },
+          {
+            "text": "discúlpame"
+          },
+          {
+            "text": "discúlpeme"
+          },
+          {
+            "text": "discúlpenme"
+          },
+          {
             "text": "disculpas"
           },
           {
@@ -3620,6 +3667,12 @@
           },
           {
             "text": "te pido disculpas"
+          },
+          {
+            "text": "le pido disculpas"
+          },
+          {
+            "text": "disculpar"
           }
         ]
       },
@@ -4096,6 +4149,15 @@
         ],
         "forms": [
           {
+            "text": "querer"
+          },
+          {
+            "text": "queriendo"
+          },
+          {
+            "text": "querido"
+          },
+          {
             "text": "desear"
           },
           {
@@ -4200,15 +4262,16 @@
         "published": true
       },
       "review": {
-        "status": "legacy_approved",
+        "status": "approved",
         "regionalVariants": [],
         "ownerApproval": {
           "status": "approved",
           "approvedBy": "project_owner",
-          "approvedAt": "2026-09-14T04:53:46+00:00",
-          "reviewFingerprint": "9d049f415e8f77040436c6a348a532fa2e62a0888e6a211456439b41594198f2",
-          "reviewedAt": "2026-09-14T04:53:46+00:00"
-        }
+          "approvedAt": "2026-11-28T03:30:13.040Z",
+          "reviewFingerprint": "b54726d692460057bedce96fa2da688b07cd76c5a32f2e5f78224f25dbbe17df",
+          "reviewedAt": "2026-11-28T03:30:13.040Z"
+        },
+        "reviewScope": "Owner visual approval of the authored JSON preview based on INSOR page 266 (open-spider-to-downward-close QUERER)."
       }
     },
     {
@@ -5318,10 +5381,10 @@
       },
       "motion": {
         "clip": "TÚ",
-        "published": true
+        "published": false
       },
       "review": {
-        "status": "legacy_approved",
+        "status": "pending",
         "regionalVariants": []
       }
     },
@@ -5654,18 +5717,11 @@
       },
       "motion": {
         "clip": "YO",
-        "published": true
+        "published": false
       },
       "review": {
-        "status": "legacy_approved",
-        "regionalVariants": [],
-        "ownerApproval": {
-          "status": "approved",
-          "approvedBy": "project_owner",
-          "approvedAt": "2026-09-14T00:09:54+00:00",
-          "reviewFingerprint": "e7f4d81a690d8d09d640a0821efd18fd4359e24c0027dba53079ad7abb582552",
-          "reviewedAt": "2026-09-14T04:59:06+00:00"
-        }
+        "status": "pending",
+        "regionalVariants": []
       }
     },
     {

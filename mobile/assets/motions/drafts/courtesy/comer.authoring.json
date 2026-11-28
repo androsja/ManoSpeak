@@ -1,0 +1,510 @@
+{
+  "gloss": "COMER",
+  "status": "draft",
+  "language": "lsc-CO",
+  "reference": "https://www.colombiaaprende.edu.co/sites/default/files/files_public/2022-04/Diccionario-lengua-de-senas.pdf#page=84",
+  "referencePage": 32,
+  "description": "La mano derecha abierta, con los dedos juntos y la palma hacia el cuerpo, se coloca frente a la boca. Los cuatro dedos se flexionan juntos hacia la boca y vuelven a extenderse cuatro veces, como un pequeño aleteo. El pulgar permanece separado. La boca se abre más ampliamente y se cierra al ritmo de los cuatro movimientos. La muñeca sigue la dirección del antebrazo. Al terminar, la mano baja suavemente al reposo.",
+  "fps": 30,
+  "durationMs": 2800,
+  "keyframes": [
+    {
+      "ms": 0,
+      "wrist": [
+        0.32,
+        1.14,
+        -0.28
+      ],
+      "elbow": [
+        0.25,
+        1.02,
+        -0.13
+      ],
+      "direction": [
+        0.65,
+        0.55,
+        -0.1
+      ],
+      "across": [
+        0.5,
+        -0.65,
+        0.35
+      ]
+    },
+    {
+      "ms": 167,
+      "wrist": [
+        0.32,
+        1.14,
+        -0.28
+      ],
+      "elbow": [
+        0.25,
+        1.02,
+        -0.13
+      ],
+      "direction": [
+        0.65,
+        0.55,
+        -0.1
+      ],
+      "across": [
+        0.5,
+        -0.65,
+        0.35
+      ]
+    },
+    {
+      "ms": 533,
+      "wrist": [
+        0.46,
+        0.67,
+        -0.4
+      ],
+      "elbow": [
+        0.34,
+        0.96,
+        -0.27
+      ],
+      "direction": [
+        0.35,
+        -1,
+        -0.15
+      ],
+      "across": [
+        -1,
+        -0.35,
+        0
+      ]
+    },
+    {
+      "ms": 700,
+      "wrist": [
+        0.46,
+        0.67,
+        -0.4
+      ],
+      "elbow": [
+        0.34,
+        0.96,
+        -0.27
+      ],
+      "direction": [
+        0.35,
+        -1,
+        -0.15
+      ],
+      "across": [
+        -1,
+        -0.35,
+        0
+      ]
+    },
+    {
+      "ms": 767,
+      "wrist": [
+        0.46,
+        0.67,
+        -0.4
+      ],
+      "elbow": [
+        0.34,
+        0.96,
+        -0.27
+      ],
+      "direction": [
+        0.35,
+        -1,
+        -0.15
+      ],
+      "across": [
+        -1,
+        -0.35,
+        0
+      ]
+    },
+    {
+      "ms": 933,
+      "wrist": [
+        0.46,
+        0.67,
+        -0.4
+      ],
+      "elbow": [
+        0.34,
+        0.96,
+        -0.27
+      ],
+      "direction": [
+        0.35,
+        -1,
+        -0.15
+      ],
+      "across": [
+        -1,
+        -0.35,
+        0
+      ]
+    },
+    {
+      "ms": 1100,
+      "wrist": [
+        0.46,
+        0.67,
+        -0.4
+      ],
+      "elbow": [
+        0.34,
+        0.96,
+        -0.27
+      ],
+      "direction": [
+        0.35,
+        -1,
+        -0.15
+      ],
+      "across": [
+        -1,
+        -0.35,
+        0
+      ]
+    },
+    {
+      "ms": 1167,
+      "wrist": [
+        0.46,
+        0.67,
+        -0.4
+      ],
+      "elbow": [
+        0.34,
+        0.96,
+        -0.27
+      ],
+      "direction": [
+        0.35,
+        -1,
+        -0.15
+      ],
+      "across": [
+        -1,
+        -0.35,
+        0
+      ]
+    },
+    {
+      "ms": 2133,
+      "wrist": [
+        0.46,
+        0.67,
+        -0.4
+      ],
+      "elbow": [
+        0.34,
+        0.96,
+        -0.27
+      ],
+      "direction": [
+        0.35,
+        -1,
+        -0.15
+      ],
+      "across": [
+        -1,
+        -0.35,
+        0
+      ]
+    },
+    {
+      "ms": 2633,
+      "wrist": [
+        0.32,
+        1.14,
+        -0.28
+      ],
+      "elbow": [
+        0.25,
+        1.02,
+        -0.13
+      ],
+      "direction": [
+        0.65,
+        0.55,
+        -0.1
+      ],
+      "across": [
+        0.5,
+        -0.65,
+        0.35
+      ]
+    },
+    {
+      "ms": 2800,
+      "wrist": [
+        0.32,
+        1.14,
+        -0.28
+      ],
+      "elbow": [
+        0.25,
+        1.02,
+        -0.13
+      ],
+      "direction": [
+        0.65,
+        0.55,
+        -0.1
+      ],
+      "across": [
+        0.5,
+        -0.65,
+        0.35
+      ]
+    }
+  ],
+  "speechFormGroups": {
+    "infinitive": [
+      "comer"
+    ],
+    "nonPersonal": [
+      "comiendo",
+      "comido",
+      "comida",
+      "comidos",
+      "comidas"
+    ],
+    "present": [
+      "como",
+      "comes",
+      "come",
+      "comemos",
+      "coméis",
+      "comen"
+    ],
+    "preterite": [
+      "comí",
+      "comiste",
+      "comió",
+      "comimos",
+      "comisteis",
+      "comieron"
+    ],
+    "imperfect": [
+      "comía",
+      "comías",
+      "comíamos",
+      "comíais",
+      "comían"
+    ],
+    "future": [
+      "comeré",
+      "comerás",
+      "comerá",
+      "comeremos",
+      "comeréis",
+      "comerán"
+    ],
+    "conditional": [
+      "comería",
+      "comerías",
+      "comeríamos",
+      "comeríais",
+      "comerían"
+    ],
+    "subjunctive": [
+      "coma",
+      "comas",
+      "comamos",
+      "comáis",
+      "coman",
+      "comiera",
+      "comieras",
+      "comiéramos",
+      "comierais",
+      "comieran",
+      "comiese",
+      "comieses",
+      "comiésemos",
+      "comieseis",
+      "comiesen"
+    ],
+    "imperative": [
+      "comed",
+      "cómete",
+      "cómase",
+      "cómanse",
+      "comete",
+      "comase",
+      "comanse"
+    ]
+  },
+  "releaseMetadata": {
+    "languageId": "lsc-co",
+    "gloss": "COMER",
+    "speechAliases": [
+      "COMER",
+      "comer",
+      "comiendo",
+      "comido",
+      "comida",
+      "comidos",
+      "comidas",
+      "como",
+      "comes",
+      "come",
+      "comemos",
+      "coméis",
+      "comen",
+      "comí",
+      "comiste",
+      "comió",
+      "comimos",
+      "comisteis",
+      "comieron",
+      "comía",
+      "comías",
+      "comíamos",
+      "comíais",
+      "comían",
+      "comeré",
+      "comerás",
+      "comerá",
+      "comeremos",
+      "comeréis",
+      "comerán",
+      "comería",
+      "comerías",
+      "comeríamos",
+      "comeríais",
+      "comerían",
+      "coma",
+      "comas",
+      "comamos",
+      "comáis",
+      "coman",
+      "comiera",
+      "comieras",
+      "comiéramos",
+      "comierais",
+      "comieran",
+      "comiese",
+      "comieses",
+      "comiésemos",
+      "comieseis",
+      "comiesen",
+      "comed",
+      "cómete",
+      "cómase",
+      "cómanse",
+      "comete",
+      "comase",
+      "comanse"
+    ],
+    "categories": [
+      "necesidades"
+    ],
+    "lexicalClass": "verb",
+    "verbType": "plain",
+    "requiresSubjectMarker": true,
+    "motionFormat": "legacy-json-v2",
+    "jsonCompression": "gzip",
+    "reviewStatus": "draft",
+    "sizeBytes": 450409,
+    "sha256": "54479e59c81c165c160a7d8be9642f9a0cf53905511471bfb2ece9035ada819b",
+    "compressedSizeBytes": 10084,
+    "profileSha256": "d49574cf9d01bb85dfc511065e9a3d9fddfd61ae4a8490d717b9da71f3328950"
+  },
+  "variant": "INSOR page 32, variant 2; owner supplied three visual references of the open-hand flexion.",
+  "handKeyframes": [
+    {
+      "frame": 0,
+      "transitionFrames": 1,
+      "bend": 0,
+      "mouthOpening": 0
+    },
+    {
+      "frame": 16,
+      "transitionFrames": 8,
+      "bend": 0,
+      "mouthOpening": 0.85
+    },
+    {
+      "frame": 21,
+      "transitionFrames": 5,
+      "bend": 1,
+      "mouthOpening": 0.35
+    },
+    {
+      "frame": 23,
+      "transitionFrames": 2,
+      "bend": 1,
+      "mouthOpening": 0.03
+    },
+    {
+      "frame": 28,
+      "transitionFrames": 5,
+      "bend": 0,
+      "mouthOpening": 0.85
+    },
+    {
+      "frame": 33,
+      "transitionFrames": 5,
+      "bend": 1,
+      "mouthOpening": 0.35
+    },
+    {
+      "frame": 35,
+      "transitionFrames": 2,
+      "bend": 1,
+      "mouthOpening": 0.03
+    },
+    {
+      "frame": 40,
+      "transitionFrames": 5,
+      "bend": 0,
+      "mouthOpening": 0.85
+    },
+    {
+      "frame": 45,
+      "transitionFrames": 5,
+      "bend": 1,
+      "mouthOpening": 0.35
+    },
+    {
+      "frame": 47,
+      "transitionFrames": 2,
+      "bend": 1,
+      "mouthOpening": 0.03
+    },
+    {
+      "frame": 52,
+      "transitionFrames": 5,
+      "bend": 0,
+      "mouthOpening": 0.85
+    },
+    {
+      "frame": 57,
+      "transitionFrames": 5,
+      "bend": 1,
+      "mouthOpening": 0.35
+    },
+    {
+      "frame": 59,
+      "transitionFrames": 2,
+      "bend": 1,
+      "mouthOpening": 0.03
+    },
+    {
+      "frame": 64,
+      "transitionFrames": 5,
+      "bend": 0,
+      "mouthOpening": 0
+    },
+    {
+      "frame": 84,
+      "transitionFrames": 1,
+      "bend": 0,
+      "mouthOpening": 0
+    }
+  ]
+}

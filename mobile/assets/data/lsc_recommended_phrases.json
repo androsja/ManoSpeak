@@ -3,6 +3,95 @@
   "language": "lsc-CO",
   "entries": [
     {
+      "id": "hola-buenos-dias",
+      "spanish": "Hola, buenos días.",
+      "glossSequence": [
+        "HOLA",
+        "BUENOS DÍAS"
+      ]
+    },
+    {
+      "id": "hola-buenas-tardes",
+      "spanish": "Hola, buenas tardes.",
+      "glossSequence": [
+        "HOLA",
+        "BUENAS TARDES"
+      ]
+    },
+    {
+      "id": "hola-buenas-noches",
+      "spanish": "Hola, buenas noches.",
+      "glossSequence": [
+        "HOLA",
+        "BUENAS NOCHES"
+      ]
+    },
+    {
+      "id": "hola-gracias",
+      "spanish": "Hola, gracias.",
+      "glossSequence": [
+        "HOLA",
+        "GRACIAS"
+      ]
+    },
+    {
+      "id": "hola-perdon",
+      "spanish": "Hola, perdón.",
+      "glossSequence": [
+        "HOLA",
+        "PERDÓN"
+      ]
+    },
+    {
+      "id": "buenos-dias-gracias",
+      "spanish": "Buenos días, gracias.",
+      "glossSequence": [
+        "BUENOS DÍAS",
+        "GRACIAS"
+      ]
+    },
+    {
+      "id": "buenas-tardes-gracias",
+      "spanish": "Buenas tardes, gracias.",
+      "glossSequence": [
+        "BUENAS TARDES",
+        "GRACIAS"
+      ]
+    },
+    {
+      "id": "buenas-noches-gracias",
+      "spanish": "Buenas noches, gracias.",
+      "glossSequence": [
+        "BUENAS NOCHES",
+        "GRACIAS"
+      ]
+    },
+    {
+      "id": "perdon-gracias",
+      "spanish": "Perdón, gracias.",
+      "glossSequence": [
+        "PERDÓN",
+        "GRACIAS"
+      ]
+    },
+    {
+      "id": "gracias-buenos-dias",
+      "spanish": "Gracias, buenos días.",
+      "glossSequence": [
+        "GRACIAS",
+        "BUENOS DÍAS"
+      ]
+    },
+    {
+      "id": "uno-dos-tres",
+      "spanish": "Uno, dos, tres.",
+      "glossSequence": [
+        "UNO",
+        "DOS",
+        "TRES"
+      ]
+    },
+    {
       "id": "hola-como-estas",
       "spanish": "Hola, ¿cómo estás?",
       "glossSequence": [
